@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,20 +7,20 @@ import { Copy, Check, FileCode, Download } from "lucide-react";
 const openApiSpec = `
 openapi: 3.0.0
 info:
-  title: "AutoTrader AI - Broker Integration API"
+  title: "QuantumLeap Trading - Backend API"
   version: "1.0.0"
-  description: "API specification for connecting the AutoTrader AI frontend to a backend service that interacts with the Kite Connect API."
+  description: "API specification for the backend service that connects to a broker (e.g., Kite Connect) and powers the QuantumLeap Trading frontend."
 servers:
-  - url: "/api/broker"
-    description: "Backend broker API endpoint"
+  - url: "https://your-backend-url.com"
+    description: "Replace with your actual backend server URL"
 
 paths:
-  /generate-session:
+  /api/broker/generate-session:
     post:
-      summary: "Generate Session Token"
-      description: "Exchanges a request_token obtained from the Kite Connect OAuth flow for a valid access_token."
+      summary: "Generate Broker Session"
+      description: "Exchanges a request_token from the broker's OAuth flow for a valid access_token and stores it securely for the user."
       tags:
-        - "Authentication"
+        - "Broker Authentication"
       requestBody:
         required: true
         content:
@@ -29,19 +28,23 @@ paths:
             schema:
               type: object
               properties:
-                api_key:
-                  type: string
-                  description: "User's Kite Connect API key."
-                api_secret:
-                  type: string
-                  description: "User's Kite Connect API secret."
                 request_token:
                   type: string
-                  description: "Request token received from the successful OAuth callback."
+                  description: "The one-time request token from the broker's successful login redirect."
+                user_id:
+                  type: string
+                  description: "The unique ID of the user from the frontend."
+                api_key:
+                  type: string
+                  description: "The user's broker API key."
+                api_secret:
+                  type: string
+                  description: "The user's broker API secret."
               required:
+                - request_token
+                - user_id
                 - api_key
                 - api_secret
-                - request_token
       responses:
         '200':
           description: "Session generated successfully."
@@ -53,49 +56,9 @@ paths:
                   status:
                     type: string
                     example: "success"
-                  data:
-                    type: object
-                    properties:
-                      access_token:
-                        type: string
-                      public_token:
-                        type: string
-                      user_id:
-                        type: string
-        '400':
-          description: "Invalid request or token exchange failed."
-
-  /profile:
-    post:
-      summary: "Get User Profile & Margins"
-      description: "Verifies a connection by fetching the user's profile and margin information."
-      tags:
-        - "User Data"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                api_key:
-                  type: string
-                access_token:
-                  type: string
-              required:
-                - api_key
-                - access_token
-      responses:
-        '200':
-          description: "Profile fetched successfully."
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
+                  message:
                     type: string
-                    example: "success"
+                    example: "Broker connected successfully."
                   data:
                     type: object
                     properties:
@@ -105,37 +68,58 @@ paths:
                         type: string
                       email:
                         type: string
-                      equity:
-                        type: object
-                        properties:
-                          available:
-                            type: object
-                            properties:
-                              cash:
-                                type: number
-        '401':
-          description: "Unauthorized. Invalid access token."
+        '400':
+          description: "Invalid request or token exchange failed."
+        '500':
+          description: "Internal server error."
 
-  /holdings:
-    post:
-      summary: "Get Holdings"
-      description: "Fetches the user's long-term equity holdings."
+  /api/portfolio/summary:
+    get:
+      summary: "Get Portfolio Summary"
+      description: "Fetches a high-level summary of the user's portfolio, including P&L."
       tags:
         - "Portfolio Data"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                api_key:
-                  type: string
-                access_token:
-                  type: string
-              required:
-                - api_key
-                - access_token
+      parameters:
+        - in: query
+          name: user_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "Summary fetched successfully."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: 
+                    type: string
+                    example: "success"
+                  data:
+                    type: object
+                    properties:
+                      total_value:
+                        type: number
+                      total_pnl:
+                        type: number
+                      todays_pnl:
+                        type: number
+        '401':
+          description: "Unauthorized or broker not connected."
+
+  /api/portfolio/holdings:
+    get:
+      summary: "Get Holdings"
+      description: "Fetches the user's long-term equity holdings from the broker."
+      tags:
+        - "Portfolio Data"
+      parameters:
+        - in: query
+          name: user_id
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: "Holdings fetched successfully."
@@ -146,49 +130,36 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: "success"
                   data:
                     type: array
                     items:
                       type: object
                       properties:
-                        tradingsymbol:
-                          type: string
-                        exchange:
+                        symbol:
                           type: string
                         quantity:
                           type: number
-                        average_price:
+                        avg_price:
                           type: number
-                        last_price:
+                        current_price:
                           type: number
                         pnl:
                           type: number
-                        instrument_token:
-                          type: string
         '401':
           description: "Unauthorized."
 
-  /positions:
-    post:
+  /api/portfolio/positions:
+    get:
       summary: "Get Positions"
-      description: "Fetches the user's current day (intraday and F&O) positions."
+      description: "Fetches the user's current day (intraday and F&O) positions from the broker."
       tags:
         - "Portfolio Data"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                api_key:
-                  type: string
-                access_token:
-                  type: string
-              required:
-                - api_key
-                - access_token
+      parameters:
+        - in: query
+          name: user_id
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: "Positions fetched successfully."
@@ -199,54 +170,8 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: "success"
                   data:
-                    type: object
-                    properties:
-                      net:
-                        type: array
-                        items:
-                          type: object
-                      day:
-                        type: array
-                        items:
-                          type: object
-        '401':
-          description: "Unauthorized."
-
-  /margins:
-    post:
-      summary: "Get Margins"
-      description: "Fetches the user's current margin details."
-      tags:
-        - "User Data"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                api_key:
-                  type: string
-                access_token:
-                  type: string
-              required:
-                - api_key
-                - access_token
-      responses:
-        '200':
-          description: "Margins fetched successfully."
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "success"
-                  data:
-                    type: object
+                    type: object # The structure can be complex (net/day), so keeping it flexible
         '401':
           description: "Unauthorized."
 `;
@@ -265,7 +190,7 @@ export default function OpenAPISpec() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'autotrader-api-spec.yml';
+    a.download = 'quantumleap-api-spec.yml';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -274,26 +199,26 @@ export default function OpenAPISpec() {
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <Card className="trading-card">
+      <Card className="bg-slate-800/50 border-white/10 text-white">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
-              <FileCode className="w-6 h-6" />
-              OpenAPI 3.0 Specification
+              <FileCode className="w-6 h-6 text-amber-400" />
+              Backend API Specification
             </span>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleCopy}>
-                {copied ? <Check className="w-4 h-4 mr-2 text-green-600" /> : <Copy className="w-4 h-4 mr-2" />}
-                {copied ? 'Copied!' : 'Copy YAML'}
+              <Button variant="outline" size="sm" onClick={handleCopy} className="text-slate-300 border-slate-600 hover:bg-slate-700 hover:text-white">
+                {copied ? <Check className="w-4 h-4 mr-2 text-green-400" /> : <Copy className="w-4 h-4 mr-2" />}
+                {copied ? 'Copied!' : 'Copy Spec'}
               </Button>
-              <Button variant="outline" size="sm" onClick={handleDownload}>
+              <Button variant="outline" size="sm" onClick={handleDownload} className="text-slate-300 border-slate-600 hover:bg-slate-700 hover:text-white">
                 <Download className="w-4 h-4 mr-2" />
-                Download YAML
+                Download Spec
               </Button>
             </div>
           </CardTitle>
-          <p className="text-slate-600 pt-2">
-            Use this specification to implement the backend services. This YAML can be imported into tools like Postman, Insomnia, or Cursor for code generation and testing.
+          <p className="text-slate-400 pt-2">
+            Provide this specification to your backend developer or AI (like Cursor) to build the required API endpoints.
           </p>
         </CardHeader>
         <CardContent>

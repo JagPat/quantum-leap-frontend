@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { BrokerConfig, ImportedPosition, User } from "@/api/entities";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,9 +35,12 @@ export default function BrokerIntegration() {
     try {
       const configs = await BrokerConfig.list();
       if (configs.length > 0) {
-        setBrokerConfig(configs[0]);
-        if (configs[0].is_connected) {
+        const currentConfig = configs[0];
+        setBrokerConfig(currentConfig);
+        if (currentConfig.is_connected) {
           setActiveTab('import');
+        } else {
+          setActiveTab('setup');
         }
       }
       
@@ -70,12 +74,18 @@ export default function BrokerIntegration() {
       }
     } catch (error) {
       console.error("Error saving broker config:", error);
+      // Re-throw the error to ensure the calling component can handle it
+      // and update the UI state (e.g., stop the loading spinner).
+      throw error;
     }
+  };
+
+  const onConnectionComplete = () => {
+    loadBrokerConfig();
   };
 
   const handleImportComplete = async (selectedPositions) => {
     try {
-      // Convert imported data to Position entities
       const positionPromises = selectedPositions.map(position => 
         ImportedPosition.create({
           ...position,
@@ -88,7 +98,6 @@ export default function BrokerIntegration() {
       const importedData = await Promise.all(positionPromises);
       setImportedPositions(prev => [...prev, ...importedData]);
       
-      // Navigate to portfolio page
       navigate(createPageUrl("Portfolio"));
     } catch (error) {
       console.error("Error importing positions:", error);
@@ -207,6 +216,7 @@ export default function BrokerIntegration() {
               onConfigSaved={handleConfigSaved}
               existingConfig={brokerConfig}
               isLoading={isLoading}
+              onConnectionComplete={onConnectionComplete}
             />
           </TabsContent>
 

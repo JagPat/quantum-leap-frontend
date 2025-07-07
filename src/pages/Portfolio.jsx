@@ -1,135 +1,125 @@
+import React, { useState, useEffect, Suspense } from 'react';
+import { User } from '@/api/entities';
+import { portfolioAPI } from '@/api/functions';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Terminal } from "lucide-react";
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+const PortfolioSummaryCards = React.lazy(() => import('../components/portfolio/PortfolioSummaryCards'));
+const PortfolioTable = React.lazy(() => import('../components/portfolio/PortfolioTable'));
+const PortfolioAnalytics = React.lazy(() => import('../components/portfolio/PortfolioAnalytics'));
+const AISummaryPanel = React.lazy(() => import('../components/portfolio/AISummaryPanel'));
 
-// Import all required components for both levels
-import PortfolioTable from '../components/portfolio/PortfolioTable';
-import AIRecommendationsPanel from '../components/portfolio/AIRecommendationsPanel';
-import PortfolioAnalytics from '../components/portfolio/PortfolioAnalytics';
-import PerformanceComparisonTool from '../components/portfolio/PerformanceComparisonTool';
-import StrategyAttributionView from '../components/portfolio/StrategyAttributionView';
-import AISummaryPanel from '../components/portfolio/AISummaryPanel'; // Import the new component
-import { Brain, LineChart, GanttChartSquare } from 'lucide-react';
-import PinnableWidget from '../components/dashboard/PinnableWidget';
-import PortfolioSummaryCards from '../components/portfolio/PortfolioSummaryCards';
+export default function Portfolio() {
+    const [portfolioData, setPortfolioData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
+    useEffect(() => {
+        const fetchPortfolioData = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const user = await User.me();
+                if (!user || !user.email) {
+                    throw new Error("Could not identify the current user. Please log in again.");
+                }
 
-export default function PortfolioPage() {
-  const [activeView, setActiveView] = useState('overview'); // 'overview' or 'analysis'
+                const { data, error: apiError } = await portfolioAPI({ user_id: user.email });
 
-  const portfolioSummary = {
-    total_value: 346255,
-    total_pnl: 21250,
-    total_pnl_percent: 6.5,
-    todays_pnl: 1211,
-    todays_pnl_percent: 0.35,
-  };
+                if (apiError || (data && data.status === 'error')) {
+                    console.error("API Error Response:", data);
+                    throw new Error(apiError?.message || data.detail || 'Failed to fetch portfolio data from the backend.');
+                }
+                
+                // Assuming the backend returns the portfolio data directly
+                if(data && data.positions) {
+                    setPortfolioData(data);
+                } else {
+                     // Handle cases where backend might wrap data, e.g. { data: { positions: [] } }
+                     if(data && data.data && data.data.positions) {
+                         setPortfolioData(data.data);
+                     } else {
+                        throw new Error("Portfolio data received from backend is not in the expected format.");
+                     }
+                }
 
-  // Dummy Data for the new AI-centric holdings table
-  const holdingsData = [
-    { id: 1, symbol: 'RELIANCE', quantity: 50, avg_price: 2450.75, current_price: 2855.50, unrealized_pnl: 20237.5, pnl_percent: 16.5, entry_date: '2023-05-10', ai_target_price: 3000, ai_action: 'HOLD', confidence_score: 88, strategy: 'MomentumBoost' },
-    { id: 2, symbol: 'INFY', quantity: 75, avg_price: 1750.00, current_price: 1550.25, unrealized_pnl: -14981.25, pnl_percent: -11.41, entry_date: '2023-02-15', ai_target_price: 1500, ai_action: 'SELL', confidence_score: 92, strategy: 'MeanReversion' },
-    { id: 3, symbol: 'TCS', quantity: 25, avg_price: 3650.25, current_price: 3825.00, unrealized_pnl: 4368.75, pnl_percent: 4.79, entry_date: '2023-08-01', ai_target_price: 4000, ai_action: 'BUY', confidence_score: 75, strategy: 'MomentumBoost' },
-    { id: 4, symbol: 'HDFCBANK', quantity: 30, avg_price: 1580.50, current_price: 1610.00, unrealized_pnl: 885, pnl_percent: 1.86, entry_date: '2023-09-20', ai_target_price: 1750, ai_action: 'HOLD', confidence_score: 65, strategy: 'ValueInvest' },
-  ];
-  
-  const renderOverview = () => (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-white">Portfolio Overview</h1>
-        <Button onClick={() => setActiveView('analysis')} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold">
-          View Detailed Analysis
-        </Button>
-      </div>
-      
-      <PinnableWidget widgetType="PortfolioSummaryCards" defaultLayout={{ w: 12, h: 2 }}>
-        <PortfolioSummaryCards summary={portfolioSummary} />
-      </PinnableWidget>
+            } catch (err) {
+                setError(err.message);
+                console.error("Error fetching portfolio:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3">
-          {/* PortfolioTable is not a standalone widget in this design */}
-          <PortfolioTable holdings={holdingsData} />
+        fetchPortfolioData();
+    }, []);
+
+    if (loading) {
+        return <PortfolioSkeleton />;
+    }
+
+    if (error) {
+        return (
+            <div className="flex items-center justify-center h-full p-4">
+                <Alert variant="destructive" className="max-w-lg">
+                    <Terminal className="h-4 w-4" />
+                    <AlertTitle>Error Fetching Portfolio</AlertTitle>
+                    <AlertDescription>
+                        {error}
+                        <p className="text-xs text-muted-foreground mt-2">
+                            Please ensure your trading backend is running and accessible. If the issue persists, check the function logs.
+                        </p>
+                    </AlertDescription>
+                </Alert>
+            </div>
+        );
+    }
+    
+    if (!portfolioData) {
+        return <div>No portfolio data available.</div>;
+    }
+
+    return (
+        <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+            <div className="flex items-center justify-between space-y-2">
+                <h2 className="text-3xl font-bold tracking-tight">Portfolio Overview</h2>
+            </div>
+            <Suspense fallback={<PortfolioSkeleton />}>
+                <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-7">
+                     <div className="col-span-1 lg:col-span-5 space-y-4">
+                        <PortfolioSummaryCards summary={portfolioData.summary} />
+                        <Card className="w-full">
+                            <CardHeader>
+                                <CardTitle>Current Holdings</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <PortfolioTable positions={portfolioData.positions} />
+                            </CardContent>
+                        </Card>
+                        <PortfolioAnalytics positions={portfolioData.positions}/>
+                    </div>
+                     <div className="col-span-1 lg:col-span-2">
+                        <AISummaryPanel positions={portfolioData.positions}/>
+                    </div>
+                </div>
+            </Suspense>
         </div>
-        <div className="lg:col-span-1">
-          <PinnableWidget widgetType="AIRecommendationsPanel" defaultLayout={{ w: 4, h: 5 }}>
-            <AIRecommendationsPanel />
-          </PinnableWidget>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderAnalysis = () => (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-white">Portfolio Analysis</h1>
-        <Button onClick={() => setActiveView('overview')} variant="outline" className="text-slate-300 border-slate-600 hover:bg-slate-700 hover:text-white">
-          Back to Overview
-        </Button>
-      </div>
-      <Tabs defaultValue="performance" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-slate-800/80">
-          <TabsTrigger value="performance"><LineChart className="w-4 h-4 mr-2"/> Performance</TabsTrigger>
-          <TabsTrigger value="attribution"><GanttChartSquare className="w-4 h-4 mr-2"/> Strategy Attribution</TabsTrigger>
-          <TabsTrigger value="comparison"><Brain className="w-4 h-4 mr-2"/> AI Comparison Tool</TabsTrigger>
-        </TabsList>
-        <TabsContent value="performance" className="mt-4">
-          <AISummaryPanel title="AI Performance Summary">
-            <p>
-              Over the last 6 months, your portfolio has underperformed the NIFTY 50 benchmark by <strong className="text-red-400">-3.2%</strong>.
-            </p>
-            <p>
-              The primary contributor to this lag is your significant exposure to the IT sector, which has seen a downturn. Your holdings in <strong className="text-green-400">RELIANCE</strong> have partially offset these losses.
-            </p>
-            <p className="font-semibold text-amber-300">
-              Recommendation: Consider rebalancing to increase exposure to the FMCG and Auto sectors to improve diversification.
-            </p>
-          </AISummaryPanel>
-          <PinnableWidget widgetType="PortfolioAnalytics" defaultLayout={{ w: 6, h: 4 }}>
-            <PortfolioAnalytics />
-          </PinnableWidget>
-        </TabsContent>
-        <TabsContent value="attribution" className="mt-4">
-          <AISummaryPanel title="AI Strategy Attribution Summary">
-            <p>
-              The <strong className="text-green-400">MomentumBoost</strong> strategy is the primary driver of gains, contributing over <strong className="text-green-400">₹2,200</strong> in P&L across 15 trades.
-            </p>
-            <p>
-              Conversely, the <strong className="text-red-400">MeanReversion</strong> strategy has shown mixed results, with a lower win rate of 55%.
-            </p>
-            <p className="font-semibold text-amber-300">
-              Recommendation: Allocate more capital to MomentumBoost and review the parameters for MeanReversion to improve its performance.
-            </p>
-          </AISummaryPanel>
-          <PinnableWidget widgetType="StrategyAttributionView" defaultLayout={{ w: 8, h: 6 }}>
-             <StrategyAttributionView />
-          </PinnableWidget>
-        </TabsContent>
-        <TabsContent value="comparison" className="mt-4">
-          <AISummaryPanel title="AI Comparison Summary">
-            <p>
-              Your portfolio shows higher volatility compared to the NIFTY 50 index. While it captured more upside in early 2024, it also experienced a deeper drawdown in March.
-            </p>
-            <p>
-              The AI-suggested asset <strong className="text-green-400">TCS</strong> has consistently outperformed both your portfolio and the index, indicating strong momentum in large-cap IT.
-            </p>
-             <p className="font-semibold text-amber-300">
-              Recommendation: Explore adding high-momentum stocks like TCS to potentially enhance returns while monitoring overall portfolio volatility.
-            </p>
-          </AISummaryPanel>
-          <PinnableWidget widgetType="PerformanceComparisonTool" defaultLayout={{ w: 8, h: 5 }}>
-            <PerformanceComparisonTool />
-          </PinnableWidget>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-
-  return (
-    <div className="p-4 md:p-6 space-y-6">
-      {activeView === 'overview' ? renderOverview() : renderAnalysis()}
-    </div>
-  );
+    );
 }
+
+const PortfolioSkeleton = () => (
+    <div className="p-8 pt-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-1">
+            <Skeleton className="h-96" />
+        </div>
+    </div>
+);

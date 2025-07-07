@@ -7,6 +7,17 @@ import { Check, ArrowRight, TrendingUp, TrendingDown, Settings } from 'lucide-re
 export default function StrategyPreview({ strategy, onSave }) {
   if (!strategy) return null;
 
+  // Destructure with default values to prevent runtime errors if parts of the strategy are missing.
+  const {
+    description = "AI is generating the description...",
+    parameters = {}, // Default to an empty object
+    conditions = { buy: [], sell: [] } // Default to an object with empty arrays
+  } = strategy;
+
+  // Ensure buy/sell conditions are always arrays
+  const buyConditions = conditions.buy || [];
+  const sellConditions = conditions.sell || [];
+
   return (
     <Card className="bg-slate-800 border-slate-700 text-white animate-in fade-in-50">
       <CardHeader>
@@ -14,7 +25,7 @@ export default function StrategyPreview({ strategy, onSave }) {
           <Check className="w-6 h-6 text-green-500" />
           AI Generated Strategy Preview
         </CardTitle>
-        <CardDescription>{strategy.description}</CardDescription>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
@@ -22,11 +33,14 @@ export default function StrategyPreview({ strategy, onSave }) {
             <Settings className="w-4 h-4" /> Parameters
           </h4>
           <div className="flex flex-wrap gap-2">
-            {Object.entries(strategy.parameters).map(([key, value]) => (
+            {Object.entries(parameters).map(([key, value]) => (
               <Badge key={key} variant="secondary" className="bg-slate-700 text-slate-300">
                 {key.replace(/_/g, ' ')}: <span className="font-bold ml-1">{String(value)}</span>
               </Badge>
             ))}
+            {Object.keys(parameters).length === 0 && (
+              <p className="text-sm text-slate-400">No specific parameters defined.</p>
+            )}
           </div>
         </div>
         
@@ -35,11 +49,14 @@ export default function StrategyPreview({ strategy, onSave }) {
             <TrendingUp className="w-4 h-4 text-green-400" /> Buy Conditions
           </h4>
           <div className="space-y-1">
-            {strategy.conditions.buy.map((cond, i) => (
+            {buyConditions.map((cond, i) => (
               <p key={i} className="text-sm font-mono p-2 bg-slate-700 rounded flex items-center gap-2">
                 <ArrowRight className="w-4 h-4 text-green-400" /> {cond}
               </p>
             ))}
+            {buyConditions.length === 0 && (
+              <p className="text-sm text-slate-400">No specific buy conditions defined.</p>
+            )}
           </div>
         </div>
 
@@ -48,11 +65,14 @@ export default function StrategyPreview({ strategy, onSave }) {
             <TrendingDown className="w-4 h-4 text-red-400" /> Sell Conditions
           </h4>
           <div className="space-y-1">
-            {strategy.conditions.sell.map((cond, i) => (
+            {sellConditions.map((cond, i) => (
               <p key={i} className="text-sm font-mono p-2 bg-slate-700 rounded flex items-center gap-2">
                 <ArrowRight className="w-4 h-4 text-red-400" /> {cond}
               </p>
             ))}
+            {sellConditions.length === 0 && (
+              <p className="text-sm text-slate-400">No specific sell conditions defined.</p>
+            )}
           </div>
         </div>
 

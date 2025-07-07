@@ -4,8 +4,6 @@ import Trading from "./Trading";
 
 import BrokerIntegration from "./BrokerIntegration";
 
-import BrokerCallback from "./BrokerCallback";
-
 import ApiSpec from "./ApiSpec";
 
 import StrategyDetail from "./StrategyDetail";
@@ -20,6 +18,8 @@ import MyDashboard from "./MyDashboard";
 
 import Widgets from "./Widgets";
 
+import BrokerCallback from "./BrokerCallback";
+
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
@@ -27,8 +27,6 @@ const PAGES = {
     Trading: Trading,
     
     BrokerIntegration: BrokerIntegration,
-    
-    BrokerCallback: BrokerCallback,
     
     ApiSpec: ApiSpec,
     
@@ -43,6 +41,8 @@ const PAGES = {
     MyDashboard: MyDashboard,
     
     Widgets: Widgets,
+    
+    BrokerCallback: BrokerCallback,
     
 }
 
@@ -75,8 +75,6 @@ function PagesContent() {
                 
                 <Route path="/BrokerIntegration" element={<BrokerIntegration />} />
                 
-                <Route path="/BrokerCallback" element={<BrokerCallback />} />
-                
                 <Route path="/ApiSpec" element={<ApiSpec />} />
                 
                 <Route path="/StrategyDetail" element={<StrategyDetail />} />
@@ -90,6 +88,8 @@ function PagesContent() {
                 <Route path="/MyDashboard" element={<MyDashboard />} />
                 
                 <Route path="/Widgets" element={<Widgets />} />
+                
+                <Route path="/BrokerCallback" element={<BrokerCallback />} />
                 
             </Routes>
         </Layout>

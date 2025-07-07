@@ -1,13 +1,15 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { DashboardWidget } from '@/api/entities';
+import { User } from '@/api/entities'; // Added User import
 import WidgetWrapper from '../components/dashboard/WidgetWrapper';
-import { toast } from "sonner";
-import { PlusCircle, Settings, LayoutGrid, Grid3X3, Save, Info, Package } from 'lucide-react';
+import { PlusCircle, Settings, LayoutGrid, Grid3X3, Save, Info, Package, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { portfolioAPI } from '@/api/functions';
 
 // Import all possible widgets
 import PortfolioAnalytics from '../components/portfolio/PortfolioAnalytics';
@@ -31,50 +33,9 @@ const widgetMap = {
   RecentTrades
 };
 
-// Fixed widgets that are always shown (non-removable)
-const FIXED_WIDGETS = [
-  {
-    id: 'fixed-portfolio-summary',
-    widget_type: 'PortfolioSummaryCards',
-    title: 'Portfolio Summary',
-    props_config: {
-      summary: {
-        total_value: 346255,
-        total_pnl: 21250,
-        total_pnl_percent: 6.5,
-        todays_pnl: 1211,
-        todays_pnl_percent: 0.35,
-      }
-    }
-  },
-  {
-    id: 'fixed-trading-status',
-    widget_type: 'TradingStatus',
-    title: 'Trading Engine Status',
-    props_config: {
-      isEngineRunning: true,
-      activeStrategies: ['RSI Momentum', 'MACD Crossover', 'AI Strategy 4'],
-      lastSignal: { type: 'BUY', symbol: 'RELIANCE', confidence: 85, time: '2m ago' },
-      tradingMode: 'sandbox'
-    }
-  },
-  {
-    id: 'fixed-recent-trades',
-    widget_type: 'RecentTrades',
-    title: 'Recent Activity',
-    props_config: {
-      trades: [
-        { id: 1, created_date: new Date().toISOString(), symbol: 'RELIANCE', side: 'BUY', quantity: 10, price: 2850, pnl: 1500 },
-        { id: 2, created_date: new Date().toISOString(), symbol: 'TCS', side: 'SELL', quantity: 20, price: 3800, pnl: -800 },
-        { id: 3, created_date: new Date().toISOString(), symbol: 'INFY', side: 'BUY', quantity: 15, price: 1550, pnl: 2250 },
-      ]
-    }
-  }
-];
-
-// Available widget types for customizable section (excludes fixed widgets)
+// Available widget types for customizable section
 const CUSTOMIZABLE_WIDGET_TYPES = Object.keys(widgetMap).filter(type => 
-  !FIXED_WIDGETS.some(fixed => fixed.widget_type === type)
+  !['PortfolioSummaryCards', 'TradingStatus', 'RecentTrades'].includes(type)
 );
 
 const MAX_CUSTOMIZABLE_WIDGETS = 8;
@@ -85,29 +46,80 @@ export default function MyDashboardPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+  const [portfolioSummary, setPortfolioSummary] = useState(null);
+  const [fixedWidgetsProps, setFixedWidgetsProps] = useState({
+      tradingStatus: { isEngineRunning: true, activeStrategies: ['RSI Momentum', 'AI Strategy 4'], lastSignal: null, tradingMode: 'sandbox' },
+      recentTrades: { trades: [] }
+  });
 
-  useEffect(() => {
-    loadCustomizableWidgets();
-  }, []);
-
-  const loadCustomizableWidgets = async () => {
+  const loadData = async () => {
     setIsLoading(true);
     try {
-      const userWidgets = await DashboardWidget.list('-created_date');
+      // Get current user first
+      const user = await User.me();
+      if (!user || !user.email) {
+        console.error("Could not get current user");
+        setIsLoading(false);
+        return;
+      }
+
+      const [userWidgets, summaryRes] = await Promise.all([
+        DashboardWidget.list('-created_date'),
+        portfolioAPI({ user_id: user.email }),
+      ]);
+      
       setCustomizableWidgets(userWidgets);
+
+      if (summaryRes?.data) {
+        if (summaryRes.data.status === 'success') {
+          setPortfolioSummary(summaryRes.data.data);
+        } else {
+          console.error("Portfolio API returned error:", summaryRes.data);
+          // Set some default values to prevent UI from breaking
+          setPortfolioSummary({
+            current_value: 0,
+            total_investment: 0,
+            total_pnl: 0,
+            day_pnl: 0
+          });
+        }
+      } else {
+        console.error("No data received from portfolio API");
+        setPortfolioSummary({
+          current_value: 0,
+          total_investment: 0,
+          total_pnl: 0,
+          day_pnl: 0
+        });
+      }
+      
+      // Here you would also fetch data for other fixed widgets like recent trades and engine status
+      // For now, using static data for them
+      
     } catch (error) {
-      toast.error("Failed to load your dashboard layout.");
+      console.error("Failed to load dashboard data:", error);
+      // Set fallback data to prevent UI from breaking
+      setPortfolioSummary({
+        current_value: 0,
+        total_investment: 0,
+        total_pnl: 0,
+        day_pnl: 0
+      });
     }
     setIsLoading(false);
   };
+  
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const onRemoveWidget = async (widgetId) => {
     try {
       await DashboardWidget.delete(widgetId);
       setCustomizableWidgets(prev => prev.filter(w => w.id !== widgetId));
-      toast.success("Widget removed from dashboard.");
+      alert("Widget removed from dashboard.");
     } catch (error) {
-      toast.error("Failed to remove widget.");
+      alert("Failed to remove widget.");
     }
   };
 
@@ -119,22 +131,11 @@ export default function MyDashboardPage() {
     items.splice(result.destination.index, 0, reorderedItem);
 
     setCustomizableWidgets(items);
-    toast.success("Widget moved!");
+    console.log("Widget moved!");
   };
 
-  const calculateGridStyle = (widget) => {
-    const { x, y, w, h } = widget.layout_config || { x: 0, y: 0, w: 6, h: 4 };
-    return {
-      gridColumn: `${x + 1} / ${x + w + 1}`,
-      gridRow: `${y + 1} / ${y + h + 1}`,
-    };
-  };
-
-  // Calculate widget statistics
   const currentCustomWidgetCount = customizableWidgets.length;
   const remainingSlots = MAX_CUSTOMIZABLE_WIDGETS - currentCustomWidgetCount;
-  const totalAvailableTypes = CUSTOMIZABLE_WIDGET_TYPES.length;
-  const usedWidgetTypes = new Set(customizableWidgets.map(w => w.widget_type)).size;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 lg:p-6">
@@ -143,7 +144,7 @@ export default function MyDashboardPage() {
           <div>
             <h1 className="text-3xl lg:text-4xl font-bold text-white flex items-center gap-3">
               <LayoutGrid className="text-amber-400" />
-              📊 My Dashboard
+              My Dashboard
             </h1>
             <p className="text-slate-400 mt-2">Essential insights above, customize below</p>
             
@@ -158,27 +159,6 @@ export default function MyDashboardPage() {
             </div>
           </div>
           <div className="flex gap-3 flex-wrap">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="grid-helper"
-                checked={showGrid}
-                onCheckedChange={setShowGrid}
-                className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-red-500"
-              />
-              <Label htmlFor="grid-helper" className="text-slate-300 text-sm">
-                <Grid3X3 className="w-4 h-4 inline mr-1" />
-                Grid
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="auto-save"
-                checked={autoSaveEnabled}
-                onCheckedChange={setAutoSaveEnabled}
-                className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-red-500"
-              />
-              <Label htmlFor="auto-save" className="text-slate-300 text-sm">Auto-save</Label>
-            </div>
             <Button 
               variant={isEditMode ? "default" : "outline"}
               onClick={() => setIsEditMode(!isEditMode)}
@@ -198,36 +178,21 @@ export default function MyDashboardPage() {
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
-            {/* Portfolio Summary - Full Width */}
             <div className="lg:col-span-12">
-              <WidgetWrapper 
-                title="Portfolio Summary" 
-                isFixed={true}
-                isEditMode={false}
-              >
-                <PortfolioSummaryCards {...FIXED_WIDGETS[0].props_config} />
+              <WidgetWrapper title="Portfolio Summary" isFixed={true} isEditMode={false}>
+                <PortfolioSummaryCards summary={portfolioSummary} isLoading={isLoading} />
               </WidgetWrapper>
             </div>
             
-            {/* Trading Status */}
             <div className="lg:col-span-4">
-              <WidgetWrapper 
-                title="Trading Engine Status" 
-                isFixed={true}
-                isEditMode={false}
-              >
-                <TradingStatus {...FIXED_WIDGETS[1].props_config} />
+              <WidgetWrapper title="Trading Engine Status" isFixed={true} isEditMode={false}>
+                <TradingStatus {...fixedWidgetsProps.tradingStatus} />
               </WidgetWrapper>
             </div>
             
-            {/* Recent Activity */}
             <div className="lg:col-span-8">
-              <WidgetWrapper 
-                title="Recent Activity" 
-                isFixed={true}
-                isEditMode={false}
-              >
-                <RecentTrades {...FIXED_WIDGETS[2].props_config} />
+              <WidgetWrapper title="Recent Activity" isFixed={true} isEditMode={false}>
+                <RecentTrades {...fixedWidgetsProps.recentTrades} />
               </WidgetWrapper>
             </div>
           </div>
@@ -256,10 +221,7 @@ export default function MyDashboardPage() {
         
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-400 mx-auto mb-4"></div>
-              <p className="text-slate-300">Loading your custom widgets...</p>
-            </div>
+            <Loader2 className="animate-spin h-12 w-12 text-amber-400" />
           </div>
         ) : customizableWidgets.length === 0 ? (
           <div className="text-center py-20 bg-slate-800/30 rounded-xl border-2 border-dashed border-slate-700">
@@ -283,11 +245,7 @@ export default function MyDashboardPage() {
                   className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 lg:gap-6"
                 >
                   {customizableWidgets.map((widget, index) => {
-                    const widgetKeys = Object.keys(widgetMap);
-                    const matchingKey = widgetKeys.find(key => 
-                      key.toLowerCase() === (widget.widget_type || '').toLowerCase()
-                    );
-                    const WidgetComponent = widgetMap[matchingKey];
+                    const WidgetComponent = widgetMap[widget.widget_type];
                     
                     return (
                       <Draggable key={widget.id.toString()} draggableId={widget.id.toString()} index={index}>
@@ -298,7 +256,7 @@ export default function MyDashboardPage() {
                             className={`lg:col-span-6 transition-all duration-200 ${snapshot.isDragging ? 'z-50 scale-105 shadow-2xl' : ''}`}
                           >
                             <WidgetWrapper 
-                              title={matchingKey ? matchingKey.replace(/([A-Z])/g, ' $1').trim() : "Unknown Widget"} 
+                              title={widget.widget_type.replace(/([A-Z])/g, ' $1').trim()} 
                               onRemove={() => onRemoveWidget(widget.id)}
                               isEditMode={isEditMode}
                               dragHandleProps={provided.dragHandleProps}
@@ -308,12 +266,7 @@ export default function MyDashboardPage() {
                               {WidgetComponent ? (
                                 <WidgetComponent {...widget.props_config} isDashboardWidget={true} />
                               ) : (
-                                <div className="flex items-center justify-center h-full text-slate-400">
-                                  <div className="text-center">
-                                    <p>Unknown Widget Type</p>
-                                    <p className="text-xs mt-1">{widget.widget_type}</p>
-                                  </div>
-                                </div>
+                                <div className="text-slate-400">Unknown Widget Type</div>
                               )}
                             </WidgetWrapper>
                           </div>

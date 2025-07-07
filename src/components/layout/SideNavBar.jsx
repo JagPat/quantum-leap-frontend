@@ -1,53 +1,97 @@
+
 import React from 'react';
-import { NavLink, Link } from 'react-router-dom';
-import { Bot, LayoutDashboard, GanttChartSquare, PieChart, History, Settings, FileJson, Circle, View, Package } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import {
+  LayoutDashboard,
+  CandlestickChart,
+  Wallet,
+  History,
+  Settings,
+  Bot,
+  FileCode,
+  Power
+} from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const navItems = [
-  { href: createPageUrl('MyDashboard'), label: 'My Dashboard', icon: View },
-  { href: createPageUrl('Trading'), label: 'Trading Engine', icon: GanttChartSquare },
-  { href: createPageUrl('Portfolio'), label: 'Portfolio', icon: PieChart },
-  { href: createPageUrl('TradeHistory'), label: 'Trade History', icon: History },
-  { href: createPageUrl('Widgets'), label: 'Widgets', icon: Package },
-  { href: createPageUrl('Settings'), label: 'Settings', icon: Settings },
-  { href: createPageUrl('ApiSpec'), label: 'API Spec', icon: FileJson },
+  { href: 'MyDashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: 'Portfolio', icon: Wallet, label: 'Portfolio' },
+  { href: 'Trading', icon: CandlestickChart, label: 'Trading Engine' },
+  { href: 'TradeHistory', icon: History, label: 'Trade History' },
+  { href: 'ApiSpec', icon: FileCode, label: 'API Spec' },
 ];
 
-export default function SideNavBar() {
-  const activeLinkClass = "bg-slate-700 text-white";
-  const inactiveLinkClass = "text-slate-400 hover:bg-slate-700/50 hover:text-white";
+const bottomNavItems = [
+  { href: 'Settings', icon: Settings, label: 'Settings' },
+];
 
+const NavItem = ({ href, icon: Icon, label }) => {
+  const location = useLocation();
+  const isActive = location.pathname.split('?')[0] === createPageUrl(href);
+  
   return (
-    <aside className="w-60 flex-shrink-0 bg-slate-800 p-4 flex flex-col">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="w-10 h-10 bg-gradient-to-r from-amber-400 to-orange-500 rounded-lg flex items-center justify-center">
-          <Bot className="w-6 h-6 text-white" />
-        </div>
-        <h1 className="text-xl font-bold text-white">QuantumLeap</h1>
-      </div>
-      <nav className="flex-1 space-y-2">
-        {navItems.map(({ href, label, icon: Icon }) => (
-          <NavLink
-            key={label}
-            to={href}
-            end={href === createPageUrl('MyDashboard')}
-            className={({ isActive }) => 
-              `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${isActive ? activeLinkClass : inactiveLinkClass}`
-            }
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Link
+            to={createPageUrl(href)}
+            className={`flex items-center justify-center lg:justify-start gap-4 p-3 rounded-lg transition-colors duration-200 ${
+              isActive
+                ? 'bg-amber-500 text-slate-900 shadow-md'
+                : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+            }`}
           >
-            <Icon className="w-5 h-5" />
-            <span>{label}</span>
-          </NavLink>
+            <Icon className="w-6 h-6 flex-shrink-0" />
+            <span className="hidden lg:inline font-semibold">{label}</span>
+          </Link>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="lg:hidden bg-slate-800 text-white border-slate-700">
+          <p>{label}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
+
+export default function SideNavBar() {
+  return (
+    <aside className="w-20 lg:w-64 bg-slate-900/80 backdrop-blur-lg border-r border-white/10 flex flex-col p-4 transition-all duration-300">
+      <div className="flex items-center gap-2 mb-10 p-2">
+        <Bot className="w-8 h-8 text-amber-400" />
+        <h1 className="hidden lg:block text-xl font-bold text-white">QuantumLeap</h1>
+      </div>
+      <nav className="flex-1 flex flex-col gap-3">
+        {navItems.map((item) => (
+          <NavItem key={item.href} {...item} />
         ))}
       </nav>
-      <div className="mt-auto">
-        <div className="flex items-center gap-3 p-3 rounded-md bg-slate-700/50">
-          <div className="relative flex items-center justify-center">
-            <Circle className="w-4 h-4 text-green-400/50" />
-            <Circle className="w-2 h-2 text-green-400 fill-current absolute" />
-          </div>
-          <span className="text-sm font-medium text-white">AI Active</span>
-        </div>
+      <div className="flex flex-col gap-3">
+        {bottomNavItems.map((item) => (
+          <NavItem key={item.href} {...item} />
+        ))}
+        {/* Logout Button */}
+        <TooltipProvider delayDuration={100}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="flex items-center justify-center lg:justify-start gap-4 p-3 rounded-lg transition-colors duration-200 text-slate-400 hover:bg-red-500/20 hover:text-red-300"
+                onClick={() => console.log('Logout clicked')}
+              >
+                <Power className="w-6 h-6 flex-shrink-0" />
+                <span className="hidden lg:inline font-semibold">Logout</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="lg:hidden bg-slate-800 text-white border-slate-700">
+              <p>Logout</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </aside>
   );
