@@ -19,8 +19,8 @@ import {
   Copy,
   Info
 } from "lucide-react";
-import { toast } from "@/components/ui/use-toast"; // Assuming shadcn/ui toast system
-import { createPageUrl } from '@/utils'; // Import createPageUrl
+import { useToast } from "@/components/ui/use-toast";
+import { createPageUrl } from '@/utils';
 
 export default function BrokerSetup({ 
   onConfigSaved, 
@@ -28,6 +28,7 @@ export default function BrokerSetup({
   isLoading = false,
   onConnectionComplete 
 }) {
+  const { toast } = useToast();
   const [config, setConfig] = useState({
     broker_name: 'zerodha',
     api_key: '',
@@ -35,43 +36,43 @@ export default function BrokerSetup({
     ...existingConfig
   });
   const [step, setStep] = useState(existingConfig?.is_connected ? 'connected' : 'credentials');
-  const [isConnecting, setIsConnecting] = useState(false); // Used as 'setSaving' from outline
+  const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState('');
   const [requestToken, setRequestToken] = useState('');
-  // verificationData is now expected to come from existingConfig after a successful connection and parent re-fetch
 
   // Listen for message from popup window
   useEffect(() => {
     const handleAuthMessage = (event) => {
-        // Only process messages that are specifically broker auth messages
+        console.log('🔍 [Parent] Received message:', event.data, 'from origin:', event.origin);
+
         if (!event.data || !event.data.type || 
             !['BROKER_AUTH_SUCCESS', 'BROKER_AUTH_ERROR'].includes(event.data.type)) {
-            // Ignore non-broker messages (like Stripe, analytics, etc.)
+            console.log("🔍 [Parent] Ignoring irrelevant message.");
             return;
         }
 
-        const allowedOrigins = [
-            'https://preview--quantum-leap-trading-15b08bd5.base44.app',
-            'https://app.base44.com'
-        ];
-
-        if (!allowedOrigins.includes(event.origin)) {
-            console.warn("Blocked broker auth message from untrusted origin:", event.origin);
+        // 🔥 CRITICAL FIX: The popup (BrokerCallback) will have the same origin as this parent window.
+        // A strict origin check is the most secure and correct way to handle this.
+        if (event.origin !== window.location.origin) {
+            console.warn(`🚨 [Parent] Blocked message. Event origin (${event.origin}) does not match window origin (${window.location.origin}).`);
             return;
         }
+        
+        console.log('✅ [Parent] Origin check passed.');
 
         if (event.data?.type === 'BROKER_AUTH_SUCCESS') {
+            console.log('✅ [Parent] BROKER_AUTH_SUCCESS received. Token:', event.data.requestToken);
             toast({
                 title: "Authentication Successful",
-                description: "Received token from broker. Please complete the setup.",
+                description: "Token received. Please finalize the connection.",
                 variant: "success",
             });
             setRequestToken(event.data.requestToken);
-            setStep('complete');
-            // Clear temporary credentials from session storage
+            setStep('complete'); // This is the crucial step to show the "Complete Setup" button
             sessionStorage.removeItem('broker_api_key');
             sessionStorage.removeItem('broker_api_secret');
         } else if (event.data?.type === 'BROKER_AUTH_ERROR') {
+            console.error("❌ [Parent] BROKER_AUTH_ERROR received:", event.data.error);
             setError(event.data.error || 'Broker authentication failed.');
             toast({
                 title: "Authentication Error",
@@ -80,7 +81,6 @@ export default function BrokerSetup({
             });
             setStep('credentials');
             setIsConnecting(false);
-            // Clear temporary credentials from session storage
             sessionStorage.removeItem('broker_api_key');
             sessionStorage.removeItem('broker_api_secret');
         }
@@ -93,21 +93,18 @@ export default function BrokerSetup({
     };
   }, []);
 
-  // Generate the correct frontend redirect URL using the platform utility
   const getRedirectUrl = () => {
     return createPageUrl('BrokerCallback');
   };
 
-  // Generate the correct redirect URL for the BACKEND (what Zerodha needs configured)
   const getBackendRedirectUrl = () => {
-    // This is the URL that Zerodha will call on your backend server
     return 'https://web-production-de0bc.up.railway.app/api/broker/callback';
   };
 
   const brokerInfo = {
     zerodha: {
       name: 'Zerodha Kite Connect',
-      loginUrl: 'https://kite.zerodha.com/connect/login', // This URL is now less relevant for client-side direct redirect
+      loginUrl: 'https://kite.zerodha.com/connect/login',
       docsUrl: 'https://kite.trade/docs/connect/v3/',
       description: 'Connect your Zerodha account to enable automated trading',
       steps: [
@@ -116,30 +113,6 @@ export default function BrokerSetup({
         'Set the redirect URL in your Kite app to the one shown below.',
         '<strong>IMPORTANT:</strong> This must be the <strong>backend</strong> URL, not the frontend one.',
         'Enter your credentials below and complete the OAuth flow in the new window.'
-      ]
-    },
-    upstox: {
-      name: 'Upstox Pro API',
-      loginUrl: 'https://api.upstox.com/v2/login/authorization',
-      docsUrl: 'https://upstox.com/developer/api-docs/',
-      description: 'Connect your Upstox account for trading automation',
-      steps: [
-        'Create an app at Upstox Developer Console',
-        'Get your API Key and Secret',
-        'Configure redirect URL',
-        'Complete OAuth authentication'
-      ]
-    },
-    angel: {
-      name: 'Angel Broking SmartAPI',
-      loginUrl: 'https://smartapi.angelbroking.com',
-      docsUrl: 'https://smartapi.angelbroking.com/docs',
-      description: 'Connect your Angel Broking account',
-      steps: [
-        'Register at Angel SmartAPI portal',
-        'Generate API credentials',
-        'Set up redirect URL',
-        'Authenticate your account'
       ]
     }
   };
@@ -159,8 +132,6 @@ export default function BrokerSetup({
     setError('');
 
     try {
-      // Save credentials first. This is important.
-      // This call to onConfigSaved will persist the API key/secret to the database
       const configData = {
         ...config,
         connection_status: 'connecting',
@@ -169,7 +140,6 @@ export default function BrokerSetup({
 
       await onConfigSaved(configData);
       
-      // Store API credentials temporarily for the callback to use
       sessionStorage.setItem('broker_api_key', config.api_key);
       sessionStorage.setItem('broker_api_secret', config.api_secret);
       
@@ -178,17 +148,15 @@ export default function BrokerSetup({
         description: "Opening Zerodha login in a new window...",
       });
 
-      // Open Zerodha login in a popup window
       const kiteConnectURL = `https://kite.trade/connect/login?api_key=${config.api_key}&v=3`;
+      
       const popup = window.open(kiteConnectURL, 'ZerodhaAuth', 'width=800,height=700,resizable=yes,scrollbars=yes');
       
-      // Check if popup was blocked
       if (!popup || popup.closed || typeof popup.closed == 'undefined') {
-        // Popup was blocked, use direct redirect
         setError('Popup was blocked. Redirecting directly to Zerodha...');
         toast({
             title: "Popup Blocked",
-            description: "Your browser blocked the popup. Redirecting you directly to the broker's login page. Please authorize and you will be redirected back.",
+            description: "Your browser blocked the popup. Redirecting you directly to the broker's login page.",
             variant: "destructive",
         });
         setTimeout(() => {
@@ -206,12 +174,13 @@ export default function BrokerSetup({
         description: `Failed to save configuration. Please try again.`,
         variant: "destructive",
       });
-      console.error('Broker connection error:', error);
       setIsConnecting(false);
     }
   };
 
   const handleCompleteSetup = async () => {
+    // Step 1: Initial validation
+    console.log('🔍 STEP 1: Starting setup completion...');
     if (!requestToken) {
       setError('No request token received. Please try the authentication again.');
       toast({
@@ -224,89 +193,123 @@ export default function BrokerSetup({
 
     setIsConnecting(true);
     setError('');
-    console.log('Starting setup completion with request token:', requestToken);
+
+    // Step 2: Setup timeout protection
+    console.log('🔍 STEP 2: Setting up timeout protection...');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+        console.log('⏰ TIMEOUT: Operation timed out after 30 seconds');
+        controller.abort();
+        setError("The connection to the backend timed out. It might be starting up. Please try again in a minute.");
+        toast({
+            title: "Connection Timeout",
+            description: "The server took too long to respond. This can happen if the service is waking up from sleep.",
+            variant: "destructive",
+        });
+        setIsConnecting(false);
+    }, 30000);
 
     try {
-      // Step 1: Clean the request token if it contains a URL
+      // Step 3: Token cleaning
+      console.log('🔍 STEP 3: Cleaning request token...');
+      console.log('🔍 Raw token received:', requestToken);
+      
       let cleanRequestToken = requestToken.trim();
       
-      // Check if the request token is actually a URL (common issue)
       if (cleanRequestToken.startsWith('http') || cleanRequestToken.includes('://')) {
-        console.log('Request token appears to be a URL, extracting clean token...');
+        console.log('🔍 STEP 3a: Token appears to be URL, extracting...');
         try {
           const url = new URL(cleanRequestToken);
           const params = new URLSearchParams(url.search);
           
-          // Check for request_token parameter first
           if (params.has('request_token')) {
             cleanRequestToken = params.get('request_token');
-            console.log('✅ Extracted clean token from request_token parameter:', cleanRequestToken);
-          }
-          // Check for sess_id parameter (Zerodha's format)
-          else if (params.has('sess_id')) {
+          } else if (params.has('sess_id')) {
             cleanRequestToken = params.get('sess_id');
-            console.log('✅ Extracted clean token from sess_id parameter:', cleanRequestToken);
-          }
-          else {
-            console.error('❌ No valid token parameter found in URL');
-            throw new Error('No valid token found in URL parameters');
+          } else {
+            throw new Error('No valid token parameter found in URL');
           }
         } catch (urlError) {
-          console.error('❌ Error parsing request token URL:', urlError);
+          console.error('🔍 STEP 3a ERROR:', urlError);
           throw new Error('Invalid request token format received');
         }
       }
       
-      // Validate the cleaned token
+      console.log('🔍 STEP 3b: Clean token extracted:', cleanRequestToken);
+      
       if (!cleanRequestToken || cleanRequestToken.length < 10) {
         throw new Error('Invalid request token - token appears to be too short or empty');
       }
-      
-      console.log('✅ Using clean request token:', cleanRequestToken);
 
-      // Step 2: Call the backend to exchange the request token for an access token
+      // Step 4: Backend preparation
+      console.log('🔍 STEP 4: Preparing backend request...');
       const BACKEND_URL = 'https://web-production-de0bc.up.railway.app';
       const payload = {
-          request_token: cleanRequestToken, // Use the cleaned token
+          request_token: cleanRequestToken,
           api_key: config.api_key || sessionStorage.getItem('broker_api_key'),
           api_secret: config.api_secret || sessionStorage.getItem('broker_api_secret')
       };
       
-      console.log('Calling backend generate-session endpoint with payload:', {
-        ...payload,
-        api_secret: '[HIDDEN]' // Don't log the secret
+      console.log('🔍 Backend URL:', BACKEND_URL);
+      console.log('🔍 Payload prepared (token/secrets hidden)');
+
+      // Step 5: Wake up backend
+      console.log('🔍 STEP 5: Waking up backend (if sleeping)...');
+      toast({
+        title: "Connecting to Backend",
+        description: "Waking up the trading server...",
       });
 
+      // Step 6: Make backend call
+      console.log('🔍 STEP 6: Making backend API call...');
+      const backendStartTime = Date.now();
+      
       const response = await fetch(`${BACKEND_URL}/api/broker/generate-session`, {
           method: 'POST',
           headers: {
               'Content-Type': 'application/json',
           },
           body: JSON.stringify(payload),
+          signal: controller.signal
       });
-      
-      console.log('Backend response status:', response.status);
+
+      const backendEndTime = Date.now();
+      const backendResponseTime = backendEndTime - backendStartTime;
+      console.log(`🔍 STEP 6 COMPLETE: Backend responded in ${backendResponseTime}ms`);
+
+      clearTimeout(timeoutId);
+
+      // Step 7: Process backend response
+      console.log('🔍 STEP 7: Processing backend response...');
+      console.log('🔍 Response status:', response.status);
 
       if (!response.ok) {
+          console.log('🔍 STEP 7 ERROR: Backend returned non-OK status');
           let errorMessage = `Backend error: ${response.status}`;
           try {
               const errorData = await response.json();
+              console.log('🔍 Backend error data:', errorData);
               errorMessage = errorData.message || errorData.error || errorMessage;
           } catch(e) {
               const textError = await response.text();
+              console.log('🔍 Backend error text:', textError);
               errorMessage = textError || errorMessage;
           }
           throw new Error(errorMessage);
       }
 
+      // Step 8: Parse successful response
+      console.log('🔍 STEP 8: Parsing successful backend response...');
       const result = await response.json();
-      console.log('Backend response:', result);
+      console.log('🔍 Backend result received:', {
+        status: result.status,
+        has_access_token: !!result.access_token,
+        has_user_data: !!result.user_data
+      });
       
-      // Step 3: Handle the response and save the CORRECT data to BrokerConfig
       if (result.status === 'success' && result.access_token) {
-        console.log('✅ Access token received successfully:', result.access_token);
+        console.log('🔍 STEP 8a: Backend success confirmed, preparing user verification...');
         
-        // Prepare user verification data from the new format
         const userVerification = result.user_data ? {
           user_id: result.user_data.user_id,
           user_name: result.user_data.user_name,
@@ -316,359 +319,290 @@ export default function BrokerSetup({
           ...result.user_data.profile
         } : null;
 
-        // 🔥 CRITICAL FIX: Save the CORRECT data to BrokerConfig
+        console.log('🔍 STEP 8b: User verification prepared');
+
+        // Step 9: Prepare Base44 save data
+        console.log('🔍 STEP 9: Preparing data for Base44 save...');
         const configDataToSave = {
           ...config,
-          is_connected: true,                    // ✅ Set to true
+          is_connected: true,
           connection_status: 'connected',
-          access_token: result.access_token,     // ✅ Save the actual access token from backend
-          request_token: cleanRequestToken,      // ✅ Save the CLEAN request token, not the URL
+          access_token: result.access_token,
+          request_token: cleanRequestToken,
           user_verification: userVerification,
-          error_message: null // Clear any previous errors
+          error_message: null
         };
 
-        console.log('💾 Saving config data to BrokerConfig:', {
+        console.log('🔍 Config data prepared for save:', {
           ...configDataToSave,
           access_token: configDataToSave.access_token ? '[PRESENT]' : '[MISSING]',
           api_secret: '[HIDDEN]'
         });
 
-        // Save to BrokerConfig entity
-        await onConfigSaved(configDataToSave);
+        // Step 10: Critical Base44 save operation
+        console.log('🔍 STEP 10: Starting Base44 save operation...');
+        toast({
+          title: "Saving Configuration",
+          description: "Saving your broker connection to Base44...",
+        });
 
+        try {
+          console.log('💾 Attempting Base44 save...');
+          const base44SaveStartTime = Date.now();
+          
+          const savePromise = onConfigSaved(configDataToSave);
+          const saveTimeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => {
+              console.log('⏰ BASE44 SAVE TIMEOUT: Save operation timed out after 60 seconds');
+              reject(new Error('Base44 save operation timed out after 60 seconds'));
+            }, 60000) // 60 second timeout for Base44 save
+          );
+          
+          await Promise.race([savePromise, saveTimeoutPromise]);
+          
+          const base44SaveEndTime = Date.now();
+          const base44SaveTime = base44SaveEndTime - base44SaveStartTime;
+          console.log(`✅ STEP 10 COMPLETE: Base44 save completed in ${base44SaveTime}ms`);
+          
+        } catch (saveError) {
+          console.error('❌ STEP 10 FAILED: Base44 save operation failed:', saveError);
+          console.error('❌ Save error details:', saveError.message);
+          
+          toast({
+            title: "Save Failed", 
+            description: `Configuration couldn't be saved: ${saveError.message}`,
+            variant: "destructive",
+          });
+          throw new Error(`Base44 configuration save failed: ${saveError.message}`);
+        }
+
+        // Step 11: Finalization
+        console.log('🔍 STEP 11: Finalizing setup...');
+        
         if (onConnectionComplete) {
-          console.log('Calling onConnectionComplete...');
+          console.log('🔍 STEP 11a: Calling onConnectionComplete...');
           onConnectionComplete();
         }
         
+        console.log('🔍 STEP 11b: Setting final UI state...');
         setStep('connected');
+        
+        console.log('🔍 STEP 11c: Showing success message...');
         toast({
           title: "Setup Complete",
           description: "Broker connected successfully! Portfolio access is now available.",
-          variant: "success",
         });
-        console.log('✅ Setup completed successfully');
+        
+        console.log('✅ AUTHENTICATION FLOW COMPLETE: All steps successful!');
         
       } else {
+        console.error('❌ STEP 8 FAILED: Backend success but missing access token');
         throw new Error(result.message || 'Authentication failed - no access token received from backend.');
       }
       
     } catch (error) {
-      const errorMessage = `Setup failed: ${error.message}`;
-      setError(errorMessage);
-      toast({
-        title: "Setup Failed",
-        description: "Please check your API credentials and try again.",
-        variant: "destructive",
-      });
-      console.error('❌ Setup completion error:', errorMessage);
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        console.log('🔍 OPERATION ABORTED: User or timeout cancelled the operation');
+      } else {
+        console.error('❌ AUTHENTICATION FAILED at some step:', error.message);
+        const errorMessage = `Setup failed: ${error.message}`;
+        setError(errorMessage);
+        toast({
+          title: "Setup Failed",
+          description: "Please check your API credentials and try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
+      console.log('🔍 CLEANUP: Resetting connection state...');
       setIsConnecting(false);
-      // Clear temporary credentials
       sessionStorage.removeItem('broker_api_key');
       sessionStorage.removeItem('broker_api_secret');
     }
   };
 
-  const copyRedirectUrl = () => {
-    navigator.clipboard.writeText(getRedirectUrl());
-    toast({
-      title: "URL Copied",
-      description: "Redirect URL copied to clipboard.",
-    });
-  };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-32 bg-slate-200 rounded"></div>
-          <div className="h-64 bg-slate-200 rounded"></div>
-        </div>
-      </div>
-    );
-  }
+  const currentBroker = brokerInfo[config.broker_name] || brokerInfo.zerodha;
 
   return (
-    <div className="space-y-6">
-      {/* Broker Selection */}
-      <Card className="trading-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            Broker Configuration
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Select Your Broker</Label>
-            <Select 
-              value={config.broker_name} 
-              onValueChange={(value) => setConfig(prev => ({ ...prev, broker_name: value }))}
-              disabled={step === 'connected'}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(brokerInfo).map(([key, info]) => (
-                  <SelectItem key={key} value={key}>
-                    {info.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-slate-500">
-              {brokerInfo[config.broker_name].description}
-            </p>
-          </div>
-
-          {step === 'connected' && (
-            <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              <span className="text-green-800 font-medium">
-                Connected to {brokerInfo[config.broker_name].name}
-              </span>
-              <Badge variant="outline" className="ml-auto bg-green-100 text-green-800">
-                Active
-              </Badge>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Setup Instructions */}
-      {step !== 'connected' && (
-        <Card className="trading-card border-blue-200 bg-blue-50">
+    <div>
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Left Column: Instructions */}
+        <Card className="trading-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-blue-800">
-              <Info className="w-5 h-5" />
-              Setup Instructions
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5"/>
+              {currentBroker.name} Setup
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3 text-sm text-blue-800">
-              {brokerInfo[config.broker_name].steps.map((step, index) => (
-                <div key={index} className="flex gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 bg-blue-200 text-blue-800 rounded-full flex items-center justify-center text-xs font-medium">
-                    {index + 1}
-                  </span>
-                  <span dangerouslySetInnerHTML={{ __html: step }}></span>
-                </div>
-              ))}
+          <CardContent className="space-y-4">
+            <p className="text-sm text-slate-600">
+              {currentBroker.description}
+            </p>
+            <div className="space-y-2 text-sm">
+              <h4 className="font-semibold text-slate-800">Setup Instructions</h4>
+              <ul className="list-disc pl-5 space-y-1 text-slate-600">
+                {currentBroker.steps.map((step, i) => (
+                  <li key={i} dangerouslySetInnerHTML={{ __html: step }} />
+                ))}
+              </ul>
             </div>
             
-            <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
-              <Label className="text-sm font-medium text-blue-800">Required Redirect URL (for your {brokerInfo[config.broker_name].name} App):</Label>
+            <div className="bg-blue-50 border border-blue-200 rounded p-3">
+              <Label className="font-semibold text-blue-800">Backend Redirect URL</Label>
               <div className="flex items-center gap-2 mt-1">
-                <code className="flex-1 px-2 py-1 bg-slate-100 rounded text-sm font-mono">
-                  {getBackendRedirectUrl()}
-                </code>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(getBackendRedirectUrl());
-                    toast({
-                      title: "URL Copied",
-                      description: "Backend redirect URL copied to clipboard.",
-                    });
-                  }}
-                  className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                <Input
+                  readOnly
+                  value={getBackendRedirectUrl()}
+                  className="bg-white"
+                />
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => navigator.clipboard.writeText(getBackendRedirectUrl())}
                 >
                   <Copy className="w-4 h-4" />
                 </Button>
               </div>
-              <p className="text-xs text-blue-600 mt-1">
-                Copy this URL and paste it into your {brokerInfo[config.broker_name].name} app's redirect URL field.
-              </p>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* API Credentials */}
-      {(step === 'credentials' || step === 'oauth' || step === 'complete') && (
-        <Card className="trading-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Key className="w-5 h-5" />
-              API Credentials
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert>
-              <Shield className="h-4 w-4" />
-              <AlertDescription>
-                Your API credentials are encrypted and stored securely. We never store your trading password.
-                <a 
-                  href={brokerInfo[config.broker_name].docsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-1 text-blue-600 hover:underline inline-flex items-center"
-                >
-                  Get API credentials
-                  <ExternalLink className="w-3 h-3 ml-1" />
-                </a>
-              </AlertDescription>
-            </Alert>
-
-            <div className="grid gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="api_key">API Key</Label>
-                <Input
-                  id="api_key"
-                  type="text"
-                  placeholder="Enter your API key"
-                  value={config.api_key}
-                  onChange={(e) => setConfig(prev => ({ ...prev, api_key: e.target.value }))}
-                  disabled={isConnecting || step === 'connected'}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="api_secret">API Secret</Label>
-                <Input
-                  id="api_secret"
-                  type="password"
-                  placeholder="Enter your API secret"
-                  value={config.api_secret}
-                  onChange={(e) => setConfig(prev => ({ ...prev, api_secret: e.target.value }))}
-                  disabled={isConnecting || step === 'connected'}
-                />
-              </div>
-            </div>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <div className="flex gap-3">
-              {step !== 'complete' && step !== 'connected' && (
-                <Button 
-                  onClick={handleCredentialsSubmit}
-                  disabled={isConnecting || !config.api_key || !config.api_secret}
-                  className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-                >
-                  {isConnecting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Redirecting...
-                    </>
-                  ) : (
-                    <>
-                      <LinkIcon className="w-4 h-4 mr-2" />
-                      Connect to {brokerInfo[config.broker_name].name}
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* OAuth Flow Instructions */}
-      {step === 'oauth' && (
-        <Card className="trading-card border-amber-200 bg-amber-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-amber-800">
-              <ExternalLink className="w-5 h-5" />
-              Complete Authentication
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 text-sm text-amber-800">
-              <p>
-                <strong>Step 1:</strong> A new window has opened for {brokerInfo[config.broker_name].name} login.
-              </p>
-              <p>
-                <strong>Step 2:</strong> Log in with your broker credentials and authorize the application.
-              </p>
-              <p>
-                <strong>Step 3:</strong> After successful authorization, the popup window will close automatically, and this page will update.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Token Completion Step */}
-      {step === 'complete' && (
-        <Card className="trading-card">
-          <CardHeader>
-            <CardTitle>Finalize Connection</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <p className="font-medium text-green-800">✓ Request token received successfully!</p>
-            </div>
-            <p className="text-sm text-slate-600">
-                Click 'Complete Setup' to securely exchange the token and finalize the connection.
-            </p>
-            <Button 
-              onClick={handleCompleteSetup}
-              disabled={!requestToken || isConnecting}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {isConnecting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Completing Setup...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Complete Setup
-                </>
-              )}
+            
+            <Button asChild variant="outline">
+              <a href={currentBroker.docsUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="w-4 h-4 mr-2" />
+                View Zerodha Docs
+              </a>
             </Button>
           </CardContent>
         </Card>
-      )}
+        
+        {/* Right Column: Setup Steps */}
+        <div className="space-y-6">
+          {/* Step 1: Credentials */}
+          {step === 'credentials' && (
+            <Card className="trading-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Key className="w-5 h-5 text-slate-600"/>
+                  Step 1: Enter Credentials
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-1">
+                  <Label>API Key</Label>
+                  <Input 
+                    placeholder="Enter your API Key" 
+                    value={config.api_key}
+                    onChange={(e) => setConfig({...config, api_key: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>API Secret</Label>
+                  <Input 
+                    type="password"
+                    placeholder="Enter your API Secret"
+                    value={config.api_secret}
+                    onChange={(e) => setConfig({...config, api_secret: e.target.value})}
+                  />
+                </div>
+                <Button 
+                  onClick={handleCredentialsSubmit}
+                  disabled={isConnecting}
+                >
+                  {isConnecting ? 'Saving...' : 'Save & Authenticate'}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Connection Verification Results */}
-      {step === 'connected' && existingConfig?.user_verification && (
-        <Card className="trading-card border-green-200 bg-green-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-green-800">
-              <CheckCircle className="w-5 h-5" />
-              Live Connection Verified
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="font-medium text-green-800">User ID</p>
-                  <p className="text-green-700">{existingConfig.user_verification.user_id}</p>
+          {/* Step 2: OAuth */}
+          {step === 'oauth' && (
+            <Card className="trading-card">
+              <CardHeader>
+                <CardTitle>Step 2: Authenticate</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="animate-spin text-slate-600">
+                    <RefreshCw className="w-12 h-12 mx-auto"/>
                 </div>
-                <div>
-                  <p className="font-medium text-green-800">Name</p>
-                  <p className="text-green-700">{existingConfig.user_verification.user_name}</p>
-                </div>
-                <div>
-                  <p className="font-medium text-green-800">Email</p>
-                  <p className="text-green-700">{existingConfig.user_verification.email}</p>
-                </div>
-                <div>
-                  <p className="font-medium text-green-800">Available Cash</p>
-                  <p className="text-green-700">₹{typeof existingConfig.user_verification.available_cash === 'number' ? existingConfig.user_verification.available_cash.toLocaleString('en-IN') : 'N/A'}</p>
-                </div>
-              </div>
-              <div className="mt-4 p-3 bg-white rounded border border-green-200">
-                <p className="text-xs text-green-600">
-                  ✓ Live API connection established and verified with your {brokerInfo[config.broker_name].name} account
+                <p className="font-medium text-slate-800 text-center">Waiting for Authentication</p>
+                <p className="text-sm text-slate-600 text-center">
+                    Please complete the login process in the popup window.
                 </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Token Completion Step */}
+          {step === 'complete' && (
+            <Card className="trading-card">
+              <CardHeader>
+                <CardTitle>Finalize Connection</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <p className="font-medium text-green-800">✓ Authentication successful!</p>
+                </div>
+                <p className="text-sm text-slate-600">
+                    Click 'Complete Setup' to securely exchange the token and finalize the connection.
+                </p>
+                <Button 
+                  onClick={handleCompleteSetup}
+                  disabled={!requestToken || isConnecting}
+                  className="bg-green-600 hover:bg-green-700 w-full"
+                >
+                  {isConnecting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Completing Setup...
+                      </>
+                    ) : (
+                      'Complete Setup'
+                    )}
+                </Button>
+                 {isConnecting && (
+                    <p className="text-xs text-slate-500 mt-2 text-center">
+                        This may take a moment, especially if the server is waking up.
+                    </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Connected State */}
+          {step === 'connected' && (
+             <Card className="trading-card border-green-300 bg-green-50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-green-800">
+                    <CheckCircle className="w-5 h-5" />
+                    Broker Connected
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-green-700">
+                    Your {currentBroker.name} account is successfully connected and synchronized.
+                  </p>
+                  <Button 
+                    variant="destructive"
+                    onClick={() => {
+                        // Here you'd implement a disconnect logic
+                        console.log("Disconnecting...");
+                    }}
+                  >
+                    Disconnect
+                  </Button>
+                </CardContent>
+              </Card>
+          )}
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

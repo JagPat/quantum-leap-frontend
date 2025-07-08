@@ -9,85 +9,103 @@ export default function BrokerCallback() {
     const location = useLocation();
 
     useEffect(() => {
-        const urlParams = new URLSearchParams(location.search);
-        const requestTokenParam = urlParams.get('request_token');
-
-        // Explicitly set the parent window's origin as requested
-        const targetOrigin = 'https://app.base44.com';
-        
         if (window.opener) {
+            // 🔥 CRITICAL FIX: Use wildcard origin to ensure cross-origin communication works
+            const targetOrigin = '*';
+            
+            console.log('🔍 BrokerCallback: Processing URL:', window.location.href);
+            
+            const urlParams = new URLSearchParams(location.search);
+            const requestTokenParam = urlParams.get('request_token');
+
+            console.log('🔍 BrokerCallback: Raw request_token from URL:', requestTokenParam);
+
             if (requestTokenParam) {
-                // 🔥 CRITICAL FIX: Extract clean request token
                 let cleanRequestToken = requestTokenParam.trim();
                 
-                // Handle case where request_token might be a URL (shouldn't happen here but let's be safe)
+                // Handle case where request_token might be a full URL
                 if (cleanRequestToken.startsWith('http') || cleanRequestToken.includes('://')) {
-                    console.log('Request token appears to be a URL, extracting clean token...');
                     try {
                         const url = new URL(cleanRequestToken);
                         const params = new URLSearchParams(url.search);
                         
-                        // Check for request_token parameter first
                         if (params.has('request_token')) {
                             cleanRequestToken = params.get('request_token');
-                        }
-                        // Check for sess_id parameter (Zerodha's format)
-                        else if (params.has('sess_id')) {
+                        } else if (params.has('sess_id')) {
                             cleanRequestToken = params.get('sess_id');
-                        }
-                        else {
-                            throw new Error('No valid token found in URL parameters');
+                        } else {
+                            console.error('🔍 BrokerCallback: No valid token parameter found in URL');
+                            throw new Error('No valid token parameter found in URL');
                         }
                     } catch (urlError) {
-                        console.error('Error parsing request token URL:', urlError);
-                        cleanRequestToken = requestTokenParam; // Fallback to original
+                        console.error('🔍 BrokerCallback: Error parsing URL:', urlError);
+                        cleanRequestToken = ''; // Invalidate on parsing error
                     }
                 }
                 
-                // Validate the cleaned token
-                if (!cleanRequestToken || cleanRequestToken.length < 10) {
-                    console.error('Invalid request token received:', cleanRequestToken);
+                console.log('🔍 BrokerCallback: Clean request_token:', cleanRequestToken);
+                
+                if (cleanRequestToken && cleanRequestToken.length > 5) {
+                    console.log('✅ BrokerCallback: Sending success message to parent');
                     
-                    // ❌ Failure: Send error to parent
-                    window.opener.postMessage({
-                        type: 'BROKER_AUTH_ERROR',
-                        error: 'Invalid request token received from Zerodha'
-                    }, targetOrigin);
-
-                    setStatus('error');
-                    setMessage('Invalid authentication token received. Please try again.');
-                } else {
-                    console.log('✅ Clean request token extracted:', cleanRequestToken);
-                    
-                    // ✅ Success: Send CLEAN token back to parent
+                    // Send clean token back to parent window
                     window.opener.postMessage({
                         type: 'BROKER_AUTH_SUCCESS',
-                        requestToken: cleanRequestToken  // Send the clean token
+                        requestToken: cleanRequestToken
                     }, targetOrigin);
-
+                    
                     setStatus('success');
-                    setMessage('Authentication successful! You can now close this window.');
+                    setMessage('Authentication successful! Closing window...');
+                } else {
+                    console.error('❌ BrokerCallback: Invalid token - too short or empty');
+                    
+                    window.opener.postMessage({
+                        type: 'BROKER_AUTH_ERROR',
+                        error: 'Invalid or empty request token received from Zerodha.'
+                    }, targetOrigin);
+                    
+                    setStatus('error');
+                    setMessage('Invalid token received. Please try again.');
                 }
             } else {
-                // ❌ Failure: No token parameter found
-                window.opener.postMessage({
-                    type: 'BROKER_AUTH_ERROR',
-                    error: 'Authentication failed or was cancelled - no request token received.'
-                }, targetOrigin);
-
-                setStatus('error');
-                setMessage('Authentication failed. Please try again.');
+                console.error('❌ BrokerCallback: No request_token parameter found in URL');
+                
+                // Check if we have sess_id directly in URL params
+                const sessId = urlParams.get('sess_id');
+                if (sessId) {
+                    console.log('🔍 BrokerCallback: Found sess_id directly:', sessId);
+                    
+                    window.opener.postMessage({
+                        type: 'BROKER_AUTH_SUCCESS',
+                        requestToken: sessId
+                    }, targetOrigin);
+                    
+                    setStatus('success');
+                    setMessage('Authentication successful! Closing window...');
+                } else {
+                    window.opener.postMessage({
+                        type: 'BROKER_AUTH_ERROR',
+                        error: 'Authentication failed. No request token was returned from Zerodha.'
+                    }, targetOrigin);
+                    
+                    setStatus('error');
+                    setMessage('Authentication failed. Please try again.');
+                }
             }
 
-            // Auto-close the popup after a short delay
+            // Auto-close the popup after a delay
             setTimeout(() => {
-                window.close();
+                try {
+                    window.close();
+                } catch (e) {
+                    console.log('Could not close window automatically');
+                }
             }, 3000);
 
         } else {
-            // This was opened directly, not as a popup
+            console.error('❌ BrokerCallback: No window.opener found');
             setStatus('error');
-            setMessage('This page should be opened from the Broker Setup page. Please restart the connection process.');
+            setMessage('This page should be opened in a popup window. Please close this tab and try again.');
         }
 
     }, [location]);
@@ -116,8 +134,15 @@ export default function BrokerCallback() {
                     <div className="space-y-2">
                         <p className="text-xl font-semibold text-slate-200">{message}</p>
                         <p className="text-sm text-slate-400">
-                            {status !== 'processing' && "This window will close automatically."}
+                            {status === 'processing' ? "Processing authentication..." : "This window will close automatically."}
                         </p>
+                        {status === 'error' && (
+                            <div className="mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded">
+                                <p className="text-sm text-red-300">
+                                    Debug info: {window.location.href}
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>
