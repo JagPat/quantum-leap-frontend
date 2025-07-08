@@ -227,15 +227,55 @@ export default function BrokerSetup({
     console.log('Starting setup completion with request token:', requestToken);
 
     try {
-      // Step 1: Call the updated backend to exchange the request token for an access token
+      // Step 1: Clean the request token if it contains a URL
+      let cleanRequestToken = requestToken.trim();
+      
+      // Check if the request token is actually a URL (common issue)
+      if (cleanRequestToken.startsWith('http') || cleanRequestToken.includes('://')) {
+        console.log('Request token appears to be a URL, extracting clean token...');
+        try {
+          const url = new URL(cleanRequestToken);
+          const params = new URLSearchParams(url.search);
+          
+          // Check for request_token parameter first
+          if (params.has('request_token')) {
+            cleanRequestToken = params.get('request_token');
+            console.log('✅ Extracted clean token from request_token parameter:', cleanRequestToken);
+          }
+          // Check for sess_id parameter (Zerodha's format)
+          else if (params.has('sess_id')) {
+            cleanRequestToken = params.get('sess_id');
+            console.log('✅ Extracted clean token from sess_id parameter:', cleanRequestToken);
+          }
+          else {
+            console.error('❌ No valid token parameter found in URL');
+            throw new Error('No valid token found in URL parameters');
+          }
+        } catch (urlError) {
+          console.error('❌ Error parsing request token URL:', urlError);
+          throw new Error('Invalid request token format received');
+        }
+      }
+      
+      // Validate the cleaned token
+      if (!cleanRequestToken || cleanRequestToken.length < 10) {
+        throw new Error('Invalid request token - token appears to be too short or empty');
+      }
+      
+      console.log('✅ Using clean request token:', cleanRequestToken);
+
+      // Step 2: Call the backend to exchange the request token for an access token
       const BACKEND_URL = 'https://web-production-de0bc.up.railway.app';
       const payload = {
-          request_token: requestToken,
+          request_token: cleanRequestToken, // Use the cleaned token
           api_key: config.api_key || sessionStorage.getItem('broker_api_key'),
           api_secret: config.api_secret || sessionStorage.getItem('broker_api_secret')
       };
       
-      console.log('Calling updated backend generate-session endpoint...');
+      console.log('Calling backend generate-session endpoint with payload:', {
+        ...payload,
+        api_secret: '[HIDDEN]' // Don't log the secret
+      });
 
       const response = await fetch(`${BACKEND_URL}/api/broker/generate-session`, {
           method: 'POST',
@@ -262,9 +302,9 @@ export default function BrokerSetup({
       const result = await response.json();
       console.log('Backend response:', result);
       
-      // Handle the new response format
+      // Step 3: Handle the response and save the CORRECT data to BrokerConfig
       if (result.status === 'success' && result.access_token) {
-        console.log('✅ Access token received successfully');
+        console.log('✅ Access token received successfully:', result.access_token);
         
         // Prepare user verification data from the new format
         const userVerification = result.user_data ? {
@@ -276,16 +316,25 @@ export default function BrokerSetup({
           ...result.user_data.profile
         } : null;
 
-        // Update the config with connection success AND the access token
-        await onConfigSaved({
+        // 🔥 CRITICAL FIX: Save the CORRECT data to BrokerConfig
+        const configDataToSave = {
           ...config,
-          is_connected: true,
+          is_connected: true,                    // ✅ Set to true
           connection_status: 'connected',
-          access_token: result.access_token,
-          request_token: requestToken,
+          access_token: result.access_token,     // ✅ Save the actual access token from backend
+          request_token: cleanRequestToken,      // ✅ Save the CLEAN request token, not the URL
           user_verification: userVerification,
           error_message: null // Clear any previous errors
+        };
+
+        console.log('💾 Saving config data to BrokerConfig:', {
+          ...configDataToSave,
+          access_token: configDataToSave.access_token ? '[PRESENT]' : '[MISSING]',
+          api_secret: '[HIDDEN]'
         });
+
+        // Save to BrokerConfig entity
+        await onConfigSaved(configDataToSave);
 
         if (onConnectionComplete) {
           console.log('Calling onConnectionComplete...');
