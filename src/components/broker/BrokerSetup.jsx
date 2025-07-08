@@ -224,20 +224,18 @@ export default function BrokerSetup({
 
     setIsConnecting(true);
     setError('');
-    console.log('Starting setup completion...');
+    console.log('Starting setup completion with request token:', requestToken);
 
     try {
-      // Step 1: Call the backend to exchange the request token for an access token.
-      // The backend handles the secure token exchange and saves it to the database.
+      // Step 1: Call the updated backend to exchange the request token for an access token
       const BACKEND_URL = 'https://web-production-de0bc.up.railway.app';
       const payload = {
           request_token: requestToken,
-          // Use API key and secret from config, or from sessionStorage if they were temporarily stored for the callback
           api_key: config.api_key || sessionStorage.getItem('broker_api_key'),
           api_secret: config.api_secret || sessionStorage.getItem('broker_api_secret')
       };
       
-      console.log('Calling backend to generate session with payload:', payload);
+      console.log('Calling updated backend generate-session endpoint...');
 
       const response = await fetch(`${BACKEND_URL}/api/broker/generate-session`, {
           method: 'POST',
@@ -247,33 +245,46 @@ export default function BrokerSetup({
           body: JSON.stringify(payload),
       });
       
-      console.log('Backend response received. Status:', response.status);
+      console.log('Backend response status:', response.status);
 
       if (!response.ok) {
-          let errorDataMessage = `Backend responded with status ${response.status}.`;
+          let errorMessage = `Backend error: ${response.status}`;
           try {
               const errorData = await response.json();
-              errorDataMessage = errorData.message || JSON.stringify(errorData);
+              errorMessage = errorData.message || errorData.error || errorMessage;
           } catch(e) {
-              console.error("Could not parse error JSON:", e);
-              // Try to get text if JSON fails
               const textError = await response.text();
-              errorDataMessage = textError || errorDataMessage;
+              errorMessage = textError || errorMessage;
           }
-          throw new Error(errorDataMessage);
+          throw new Error(errorMessage);
       }
 
       const result = await response.json();
-      console.log('Backend result parsed:', result);
+      console.log('Backend response:', result);
       
-      if (result.status === 'success') {
-        console.log('Setup success. Saving config...');
-        // Update the config with connection success, and potentially store access_token
+      // Handle the new response format
+      if (result.status === 'success' && result.access_token) {
+        console.log('✅ Access token received successfully');
+        
+        // Prepare user verification data from the new format
+        const userVerification = result.user_data ? {
+          user_id: result.user_data.user_id,
+          user_name: result.user_data.user_name,
+          email: result.user_data.email,
+          broker: result.user_data.profile?.broker || 'ZERODHA',
+          available_cash: result.user_data.available_cash || 0,
+          ...result.user_data.profile
+        } : null;
+
+        // Update the config with connection success AND the access token
         await onConfigSaved({
           ...config,
           is_connected: true,
           connection_status: 'connected',
-          access_token: result.access_token || 'connected' // Store if provided by backend
+          access_token: result.access_token,
+          request_token: requestToken,
+          user_verification: userVerification,
+          error_message: null // Clear any previous errors
         });
 
         if (onConnectionComplete) {
@@ -284,12 +295,13 @@ export default function BrokerSetup({
         setStep('connected');
         toast({
           title: "Setup Complete",
-          description: "Broker connected successfully!",
+          description: "Broker connected successfully! Portfolio access is now available.",
           variant: "success",
         });
-        console.log('UI updated to connected state.');
+        console.log('✅ Setup completed successfully');
+        
       } else {
-        throw new Error(result.message || 'Authentication failed according to backend response.');
+        throw new Error(result.message || 'Authentication failed - no access token received from backend.');
       }
       
     } catch (error) {
@@ -297,14 +309,13 @@ export default function BrokerSetup({
       setError(errorMessage);
       toast({
         title: "Setup Failed",
-        description: "Please check the developer console for more details.",
+        description: "Please check your API credentials and try again.",
         variant: "destructive",
       });
-      console.error('Setup completion error:', errorMessage);
+      console.error('❌ Setup completion error:', errorMessage);
     } finally {
       setIsConnecting(false);
-      console.log('Finished setup completion attempt.');
-      // Ensure temporary credentials are cleared even if setup fails
+      // Clear temporary credentials
       sessionStorage.removeItem('broker_api_key');
       sessionStorage.removeItem('broker_api_secret');
     }

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
@@ -13,25 +12,25 @@ export default function BrokerCallback() {
         const urlParams = new URLSearchParams(location.search);
         const requestToken = urlParams.get('request_token');
 
-        // Dynamically determine the parent's origin from the referrer
-        const parentOrigin = document.referrer ? new URL(document.referrer).origin : null;
+        // Explicitly set the parent window's origin as requested
+        const targetOrigin = 'https://app.base44.com';
         
-        if (window.opener && parentOrigin) {
+        if (window.opener) {
             if (requestToken) {
-                // ✅ Success: Send token back to parent using its dynamically detected origin
+                // ✅ Success: Send token back to parent with the correct target origin
                 window.opener.postMessage({
                     type: 'BROKER_AUTH_SUCCESS',
                     requestToken: requestToken
-                }, parentOrigin);
+                }, targetOrigin);
 
                 setStatus('success');
                 setMessage('Authentication successful! You can now close this window.');
             } else {
-                // ❌ Failure: Notify parent using its dynamically detected origin
+                // ❌ Failure: Notify parent with the correct target origin
                 window.opener.postMessage({
                     type: 'BROKER_AUTH_ERROR',
                     error: 'Authentication failed or was cancelled.'
-                }, parentOrigin);
+                }, targetOrigin);
 
                 setStatus('error');
                 setMessage('Authentication failed. Please try again.');
@@ -43,12 +42,9 @@ export default function BrokerCallback() {
             }, 3000);
 
         } else {
-            // This was opened directly, not as a popup, or referrer was not available
+            // This was opened directly, not as a popup
             setStatus('error');
             setMessage('This page should be opened from the Broker Setup page. Please restart the connection process.');
-            if (!parentOrigin) {
-                console.error("Could not determine parent origin from document.referrer.");
-            }
         }
 
     }, [location]);
