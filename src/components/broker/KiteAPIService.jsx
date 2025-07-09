@@ -1,143 +1,84 @@
-// Production Kite Connect API Service
-// This service handles real API calls through a backend proxy to avoid CORS issues
+
+// This service acts as a wrapper for making API calls to YOUR backend server,
+// not directly to Zerodha. Your backend will handle the direct communication with Kite.
+import { User } from '@/api/entities';
 
 class KiteAPIService {
-  constructor(apiKey, apiSecret, accessToken = null) {
-    this.apiKey = apiKey;
-    this.apiSecret = apiSecret;
-    this.accessToken = accessToken;
-    this.baseURL = '/api/broker'; // Backend API endpoint
-  }
-
-  // Make authenticated requests to our backend
-  async _makeRequest(endpoint, data = {}) {
-    try {
-      const response = await fetch(`${this.baseURL}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          api_key: this.apiKey,
-          api_secret: this.apiSecret,
-          access_token: this.accessToken,
-          ...data
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Network error' }));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('API Request failed:', error);
-      throw error;
+    constructor(apiKey, apiSecret, accessToken) {
+        this.apiKey = apiKey;
+        this.apiSecret = apiSecret;
+        this.accessToken = accessToken;
+        this.backendUrl = 'https://web-production-de0bc.up.railway.app';
     }
-  }
 
-  // Exchange request token for access token (via backend)
-  async generateAccessToken(requestToken, redirectUrl) {
-    try {
-      const response = await this._makeRequest('/generate-session', {
-        request_token: requestToken,
-        redirect_url: redirectUrl
-      });
+    async #getAuthHeaders() {
+        const user = await User.me();
+        if (!user || !user.token) {
+            throw new Error("User not authenticated");
+        }
+        
+        const headers = {
+            'Authorization': `Bearer ${user.token}`,
+            'Content-Type': 'application/json'
+        };
 
-      if (response.status === 'success' && response.data.access_token) {
-        this.accessToken = response.data.access_token;
-        return response.data;
-      } else {
-        throw new Error(response.message || 'Failed to generate access token');
-      }
-    } catch (error) {
-      throw new Error(`Token generation failed: ${error.message}`);
+        // As part of "Fix Broker API Authentication", include the broker-specific credentials
+        // in the headers if they are provided to the service.
+        // Your backend is expected to use these (along with the user's bearer token)
+        // to authenticate and process the broker-related requests.
+        // The header names (e.g., 'X-Kite-ApiKey') are examples and should match
+        // what your backend expects.
+        if (this.apiKey) {
+            headers['X-Kite-ApiKey'] = this.apiKey;
+        }
+        if (this.apiSecret) {
+            headers['X-Kite-ApiSecret'] = this.apiSecret;
+        }
+        if (this.accessToken) {
+            headers['X-Kite-AccessToken'] = this.accessToken;
+        }
+
+        return headers;
     }
-  }
 
-  // Test connection by fetching user profile
-  async testConnection(accessToken = null) {
-    if (accessToken) this.accessToken = accessToken;
+    async #makeRequest(endpoint, method = 'GET', body = null) {
+        const headers = await this.#getAuthHeaders();
+        const config = {
+            method,
+            headers,
+        };
+
+        if (body) {
+            config.body = JSON.stringify(body);
+        }
+
+        const response = await fetch(`${this.backendUrl}${endpoint}`, config);
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response from backend' }));
+            throw new Error(errorData.message || `Backend request failed with status ${response.status}`);
+        }
+
+        return response.json();
+    }
+
+    // Fetches holdings from your backend's /api/broker/holdings endpoint
+    getHoldings() {
+        console.log("🚀 Calling YOUR backend for holdings...");
+        return this.#makeRequest('/api/broker/holdings');
+    }
+
+    // Fetches positions from your backend's /api/broker/positions endpoint
+    getPositions() {
+        console.log("🚀 Calling YOUR backend for positions...");
+        return this.#makeRequest('/api/broker/positions');
+    }
     
-    try {
-      const response = await this._makeRequest('/profile');
-      
-      if (response.status === 'success') {
-        return {
-          status: 'success',
-          user_id: response.data.user_id,
-          user_name: response.data.user_name,
-          email: response.data.email,
-          available_cash: response.data.equity?.available?.cash || 0,
-          broker: 'ZERODHA'
-        };
-      } else {
-        throw new Error(response.message || 'Connection test failed');
-      }
-    } catch (error) {
-      return {
-        status: 'error',
-        error: error.message
-      };
+    // Fetches user profile from your backend's /api/broker/profile endpoint
+    getProfile() {
+        console.log("🚀 Calling YOUR backend for user profile...");
+        return this.#makeRequest('/api/broker/profile');
     }
-  }
-
-  // Fetch real holdings from Kite API
-  async getHoldings() {
-    try {
-      const response = await this._makeRequest('/holdings');
-      
-      if (response.status === 'success') {
-        return {
-          status: 'success',
-          data: response.data
-        };
-      } else {
-        throw new Error(response.message || 'Failed to fetch holdings');
-      }
-    } catch (error) {
-      throw new Error(`Holdings fetch failed: ${error.message}`);
-    }
-  }
-
-  // Fetch real positions from Kite API
-  async getPositions() {
-    try {
-      const response = await this._makeRequest('/positions');
-      
-      if (response.status === 'success') {
-        return {
-          status: 'success',
-          data: response.data
-        };
-      } else {
-        throw new Error(response.message || 'Failed to fetch positions');
-      }
-    } catch (error) {
-      throw new Error(`Positions fetch failed: ${error.message}`);
-    }
-  }
-
-  // Get account margins
-  async getMargins() {
-    try {
-      const response = await this._makeRequest('/margins');
-      return response;
-    } catch (error) {
-      throw new Error(`Margins fetch failed: ${error.message}`);
-    }
-  }
-
-  // Place order (for future use)
-  async placeOrder(orderData) {
-    try {
-      const response = await this._makeRequest('/place-order', orderData);
-      return response;
-    } catch (error) {
-      throw new Error(`Order placement failed: ${error.message}`);
-    }
-  }
 }
 
 export default KiteAPIService;

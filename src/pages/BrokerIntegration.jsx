@@ -11,24 +11,86 @@ import {
   Settings, 
   CheckCircle,
   AlertTriangle,
-  ArrowLeft
+  ArrowLeft,
+  Wifi,
+  WifiOff
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 
 import BrokerSetup from "../components/broker/BrokerSetup";
 import PortfolioImport from "../components/broker/PortfolioImport";
+import { useToast } from "@/components/ui/use-toast";
+import { brokerAPI } from "@/api/functions"; // Import Base44 function for heartbeat
 
 export default function BrokerIntegration() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [brokerConfig, setBrokerConfig] = useState(null);
   const [activeTab, setActiveTab] = useState('setup');
   const [isLoading, setIsLoading] = useState(true);
   const [importedPositions, setImportedPositions] = useState([]);
+  const [liveStatus, setLiveStatus] = useState({ state: 'unknown', message: '' });
 
   useEffect(() => {
     loadBrokerConfig();
   }, []);
+
+  // Re-enabled Heartbeat check with the correct function-based approach
+  useEffect(() => {
+    let intervalId;
+
+    const checkConnection = async () => {
+        if (brokerConfig && brokerConfig.is_connected) {
+            setLiveStatus(prev => ({ ...prev, state: 'checking' }));
+            
+            try {
+                // Call the Base44 function, which handles auth securely.
+                const result = await brokerAPI({ endpoint: 'profile' });
+                const response = result.data;
+
+                if (response && response.status === 'success') {
+                    setLiveStatus({ state: 'connected', message: `Live connection confirmed at ${new Date().toLocaleTimeString()}` });
+                } else {
+                    let errorDetail = response?.detail || 'Connection check failed';
+                    if (errorDetail.includes('No active broker session')) {
+                        errorDetail = 'Broker session not found. Please reconnect.';
+                    } else if (errorDetail.includes('Session expired')) {
+                        errorDetail = 'Broker session expired. Please reconnect.';
+                    } else if (errorDetail.includes('Invalid JWT token')) {
+                        errorDetail = 'Authentication failed. Please log in again.';
+                    }
+                    throw new Error(errorDetail);
+                }
+            } catch (error) {
+                console.error("Heartbeat check failed:", error.message);
+                setLiveStatus({ state: 'disconnected', message: "Connection lost. Please reconnect." });
+                
+                toast({
+                    title: "Broker Connection Lost",
+                    description: error.message,
+                    variant: "destructive",
+                });
+
+                if (intervalId) clearInterval(intervalId); // Stop checking if connection is lost
+            }
+        }
+    };
+
+    // Start heartbeat if broker is connected
+    if (brokerConfig && brokerConfig.is_connected) {
+        checkConnection(); // Check immediately
+        intervalId = setInterval(checkConnection, 60000); // Check every 60 seconds
+    } else if (brokerConfig && !brokerConfig.is_connected) {
+        setLiveStatus({ state: 'disconnected', message: "Not connected to a broker." });
+    } else {
+        setLiveStatus({ state: 'unknown', message: "Loading broker configuration..." });
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [brokerConfig, toast]);
 
   const loadBrokerConfig = async () => {
     setIsLoading(true);
@@ -42,12 +104,19 @@ export default function BrokerIntegration() {
         } else {
           setActiveTab('setup');
         }
+      } else {
+        setBrokerConfig(null); // Explicitly set to null if no config found
       }
       
       const positions = await ImportedPosition.list();
       setImportedPositions(positions);
     } catch (error) {
       console.error("Error loading broker config:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load broker configuration.",
+        variant: "destructive",
+      });
     }
     setIsLoading(false);
   };
@@ -63,7 +132,6 @@ export default function BrokerIntegration() {
       
       setBrokerConfig(savedConfig);
       
-      // Update user's broker connection status
       await User.updateMyUserData({
         broker_connected: configData.is_connected,
         broker_type: configData.broker_name
@@ -74,8 +142,11 @@ export default function BrokerIntegration() {
       }
     } catch (error) {
       console.error("Error saving broker config:", error);
-      // Re-throw the error to ensure the calling component can handle it
-      // and update the UI state (e.g., stop the loading spinner).
+      toast({
+        title: "Error",
+        description: "Failed to save broker configuration.",
+        variant: "destructive",
+      });
       throw error;
     }
   };
@@ -101,15 +172,26 @@ export default function BrokerIntegration() {
       navigate(createPageUrl("Portfolio"));
     } catch (error) {
       console.error("Error importing positions:", error);
+      toast({
+        title: "Error",
+        description: "Failed to import positions.",
+        variant: "destructive",
+      });
     }
   };
 
   const getConnectionStatus = () => {
-    if (!brokerConfig) return { status: 'disconnected', color: 'bg-slate-100 text-slate-600' };
-    if (brokerConfig.is_connected) return { status: 'connected', color: 'bg-green-100 text-green-800' };
-    if (brokerConfig.connection_status === 'connecting') return { status: 'connecting', color: 'bg-yellow-100 text-yellow-800' };
-    if (brokerConfig.connection_status === 'error') return { status: 'error', color: 'bg-red-100 text-red-800' };
-    return { status: 'disconnected', color: 'bg-slate-100 text-slate-600' };
+    // Prioritize explicit liveStatus
+    if (liveStatus.state === 'disconnected') return { status: 'Disconnected', color: 'bg-red-100 text-red-800 animate-pulse', icon: <WifiOff className="w-3 h-3 mr-1" /> };
+    if (liveStatus.state === 'checking') return { status: 'Checking...', color: 'bg-yellow-100 text-yellow-800 animate-pulse', icon: <Wifi className="w-3 h-3 mr-1" /> };
+    if (liveStatus.state === 'connected') return { status: 'Connected', color: 'bg-green-100 text-green-800', icon: <CheckCircle className="w-3 h-3 mr-1" /> };
+    
+    // Fallback based on config if liveStatus is 'unknown' or not yet determined
+    if (brokerConfig?.is_connected) {
+      return { status: 'Connected (Config)', color: 'bg-green-100 text-green-800', icon: <CheckCircle className="w-3 h-3 mr-1" /> };
+    }
+    
+    return { status: 'Not Configured', color: 'bg-slate-100 text-slate-600', icon: null };
   };
 
   const connectionStatus = getConnectionStatus();
@@ -117,7 +199,6 @@ export default function BrokerIntegration() {
   return (
     <div className="p-6 space-y-6 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div className="flex items-center gap-4">
             <Button
@@ -133,10 +214,9 @@ export default function BrokerIntegration() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Badge className={connectionStatus.color}>
-              {connectionStatus.status === 'connected' && <CheckCircle className="w-3 h-3 mr-1" />}
-              {connectionStatus.status === 'error' && <AlertTriangle className="w-3 h-3 mr-1" />}
-              {connectionStatus.status.charAt(0).toUpperCase() + connectionStatus.status.slice(1)}
+            <Badge className={`${connectionStatus.color} transition-all`}>
+              {connectionStatus.icon}
+              {connectionStatus.status}
             </Badge>
             {brokerConfig?.broker_name && (
               <Badge variant="outline">
@@ -146,7 +226,6 @@ export default function BrokerIntegration() {
           </div>
         </div>
 
-        {/* Status Overview */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card className="trading-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -155,7 +234,7 @@ export default function BrokerIntegration() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-slate-800">
-                {brokerConfig?.is_connected ? 'Connected' : 'Not Connected'}
+                {brokerConfig?.is_connected ? 'Configured' : 'Not Configured'}
               </div>
               <p className="text-xs text-slate-500 mt-1">
                 {brokerConfig?.broker_name ? `${brokerConfig.broker_name} integration` : 'No broker configured'}
@@ -180,21 +259,23 @@ export default function BrokerIntegration() {
 
           <Card className="trading-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600">Last Sync</CardTitle>
-              <Settings className="h-4 w-4 text-slate-500" />
+              <CardTitle className="text-sm font-medium text-slate-600">Live Status</CardTitle>
+              {liveStatus.state === 'connected' && <CheckCircle className="h-4 w-4 text-green-500" />}
+              {liveStatus.state === 'disconnected' && <AlertTriangle className="h-4 w-4 text-red-500" />}
+              {liveStatus.state === 'checking' && <Wifi className="h-4 w-4 text-yellow-500 animate-pulse" />}
+              {liveStatus.state === 'unknown' && <Settings className="h-4 w-4 text-slate-500" />}
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-slate-800">
-                {brokerConfig?.last_sync ? 'Today' : 'Never'}
+                {liveStatus.state.charAt(0).toUpperCase() + liveStatus.state.slice(1)}
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Portfolio update
+              <p className="text-xs text-slate-500 mt-1 truncate" title={liveStatus.message}>
+                {liveStatus.message}
               </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="setup" className="flex items-center gap-2">
@@ -228,7 +309,6 @@ export default function BrokerIntegration() {
           </TabsContent>
         </Tabs>
 
-        {/* Help Section */}
         <Card className="trading-card border-blue-200 bg-blue-50 mt-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-blue-800">

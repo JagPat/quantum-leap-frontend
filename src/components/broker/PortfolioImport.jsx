@@ -15,10 +15,11 @@ import {
   Wallet,
   Bot,
   AlertTriangle,
-  Info, // Added Info icon
-  Code // Added Code icon for API docs
+  Info,
+  Code
 } from "lucide-react";
-import BackendConnectionHelper from './BackendConnectionHelper'; // New import
+import BackendConnectionHelper from './BackendConnectionHelper';
+import { brokerAPI } from '@/api/functions'; // Import the Base44 function
 
 export default function PortfolioImport({ onImportComplete, brokerConfig }) {
   const [portfolioData, setPortfolioData] = useState([]);
@@ -26,41 +27,52 @@ export default function PortfolioImport({ onImportComplete, brokerConfig }) {
   const [isLoading, setIsLoading] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [isImporting, setIsImporting] = useState(false);
-  const [apiError, setApiError] = useState(''); // New state for API errors
+  const [apiError, setApiError] = useState('');
 
   useEffect(() => {
-    // This will do nothing on initial load, user must click the button
+    //
   }, [brokerConfig]);
 
   const fetchPortfolioData = async () => {
     setIsLoading(true);
-    setPortfolioData([]); // Clear previous data
-    setSelectedPositions(new Set()); // Clear selections
-    setApiError(''); // Clear previous errors
-    
+    setPortfolioData([]);
+    setSelectedPositions(new Set());
+    setApiError('');
+
     try {
-      if (!brokerConfig?.is_connected || !brokerConfig?.access_token) {
+      if (!brokerConfig?.is_connected) {
         throw new Error('Broker not properly connected. Please complete the authentication process first.');
       }
 
-      // Use the real Kite API service
-      const { default: KiteAPIService } = await import('./KiteAPIService');
-      const kiteService = new KiteAPIService(
-        brokerConfig.api_key,
-        brokerConfig.api_secret,
-        brokerConfig.access_token
-      );
-
-      // Fetch real holdings and positions
-      const [holdingsResponse, positionsResponse] = await Promise.all([
-        kiteService.getHoldings(),
-        kiteService.getPositions()
+      // Call the Base44 function, which will handle auth securely
+      const [holdingsResult, positionsResult] = await Promise.all([
+        brokerAPI({ endpoint: 'holdings' }),
+        brokerAPI({ endpoint: 'positions' })
       ]);
 
-      const holdings = holdingsResponse.data || []; // Assumes holdingsResponse.data is directly the array
-      const positions = positionsResponse.data.net || []; // Use 'net' positions for current day's net positions
+      const holdingsResponse = holdingsResult.data;
+      const positionsResponse = positionsResult.data;
 
-      // Transform Kite API data to our format
+      if (!holdingsResponse || !positionsResponse) {
+        throw new Error("Failed to get a valid response from the backend function.");
+      }
+      
+      // Check for errors in the function responses
+      if (holdingsResponse.detail || positionsResponse.detail) {
+        const errorDetail = holdingsResponse.detail || positionsResponse.detail;
+        if (errorDetail.includes('No active broker session')) {
+            throw new Error('Broker session not found. Please reconnect to your broker.');
+        } else if (errorDetail.includes('Session expired')) {
+            throw new Error('Broker session expired. Please reconnect to your broker.');
+        } else if (errorDetail.includes('Invalid JWT token')) {
+            throw new Error('Authentication failed. Please log in again.');
+        }
+        throw new Error(errorDetail);
+      }
+      
+      const holdings = holdingsResponse.data || holdingsResponse.holdings || [];
+      const positions = positionsResponse.data?.net || positionsResponse.positions || [];
+
       const transformedData = [
         ...holdings.map(holding => ({
           symbol: holding.tradingsymbol,
@@ -70,22 +82,20 @@ export default function PortfolioImport({ onImportComplete, brokerConfig }) {
           current_price: holding.last_price,
           invested_amount: holding.average_price * holding.quantity,
           current_value: holding.last_price * holding.quantity,
-          pnl: holding.pnl, // Assumes pnl is provided by the simulated service
+          pnl: holding.pnl,
           pnl_percent: holding.average_price !== 0 ? (holding.pnl / (holding.average_price * holding.quantity)) * 100 : 0,
           broker_instrument_token: holding.instrument_token,
           source: 'holdings'
         })),
-        ...positions.filter(pos => pos.quantity !== 0).map(position => ({ // Filter out zero quantity positions
+        ...positions.filter(pos => pos.quantity !== 0).map(position => ({
           symbol: position.tradingsymbol,
           exchange: position.exchange,
           quantity: position.quantity,
           avg_price: position.average_price,
           current_price: position.last_price,
-          // For positions, invested amount is absolute of avg price * quantity (can be negative for shorts)
-          invested_amount: Math.abs(position.average_price * position.quantity), 
+          invested_amount: Math.abs(position.average_price * position.quantity),
           current_value: Math.abs(position.last_price * position.quantity),
           pnl: position.pnl,
-          // P&L percentage for positions can be tricky, using absolute invested amount as base
           pnl_percent: (position.average_price !== 0) ? (position.pnl / Math.abs(position.average_price * position.quantity)) * 100 : 0,
           broker_instrument_token: position.instrument_token,
           source: 'positions'
@@ -93,14 +103,14 @@ export default function PortfolioImport({ onImportComplete, brokerConfig }) {
       ];
 
       setPortfolioData(transformedData);
-      // Select all positions by default if data is successfully loaded
-      setSelectedPositions(new Set(transformedData.map((_, index) => index)));
-      
+      if (transformedData.length > 0) {
+        setSelectedPositions(new Set(transformedData.map((_, index) => index)));
+      }
+
     } catch (error) {
-      console.error('Error fetching real portfolio data:', error);
-      // Display a user-friendly error message
-      setApiError(`Failed to fetch live data: ${error.message}. The backend API endpoints are not yet implemented.`);
-      setSelectedPositions(new Set()); // Clear selections on error
+      console.error('Error fetching portfolio data via function:', error);
+      setApiError(error.message || 'An unknown error occurred while fetching portfolio data.');
+      setSelectedPositions(new Set());
     }
     setIsLoading(false);
   };
@@ -129,18 +139,12 @@ export default function PortfolioImport({ onImportComplete, brokerConfig }) {
 
     const selectedData = portfolioData.filter((_, index) => selectedPositions.has(index));
 
-    // Simulate import progress
     for (let i = 0; i <= 100; i += 10) {
       setImportProgress(i);
       await new Promise(resolve => setTimeout(resolve, 200));
     }
 
     try {
-      // In a real implementation, this would:
-      // 1. Create Position entities from selected data
-      // 2. Set up real-time price updates
-      // 3. Configure AI management flags
-
       onImportComplete(selectedData);
     } catch (error) {
       console.error('Error importing portfolio:', error);
@@ -162,44 +166,8 @@ export default function PortfolioImport({ onImportComplete, brokerConfig }) {
 
   return (
     <div className="space-y-6">
-      {/* Backend Connection Status */}
       <BackendConnectionHelper />
 
-      {/* Backend Implementation Guidance */}
-      <Card className="trading-card border-amber-200 bg-amber-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-amber-800">
-            <Info className="w-5 h-5" />
-            Backend Integration Required
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3 text-amber-800">
-            <p className="text-sm">
-              <strong>Frontend Status:</strong> ✅ Ready and fully implemented
-            </p>
-            <p className="text-sm">
-              <strong>Backend Status:</strong> ⏳ Waiting for API implementation
-            </p>
-            <p className="text-sm">
-              The portfolio import functionality requires backend API endpoints to fetch live data from Kite Connect.
-            </p>
-          </div>
-          <div className="flex gap-3 mt-4">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => window.open('/api-docs', '_blank')}
-              className="border-amber-300 text-amber-700 hover:bg-amber-100"
-            >
-              <Code className="w-4 h-4 mr-2" />
-              View API Specification
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Portfolio Import Status */}
       <Card className="trading-card">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -207,8 +175,8 @@ export default function PortfolioImport({ onImportComplete, brokerConfig }) {
               <Download className="w-5 h-5" />
               Live Portfolio Import
             </span>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={fetchPortfolioData}
               disabled={isLoading || !brokerConfig?.is_connected}
             >
@@ -232,15 +200,14 @@ export default function PortfolioImport({ onImportComplete, brokerConfig }) {
             <div className="text-center py-8">
               <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-red-600 mb-2">
-                Backend Integration Required
+                Failed to fetch live data
               </h3>
               <p className="text-sm text-red-500 mb-4">
                 {apiError}
               </p>
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
                 <p className="text-sm text-yellow-800">
-                  <strong>Note:</strong> Live portfolio data requires backend API integration. 
-                  The frontend is ready - implement the backend endpoints to enable this feature.
+                  <strong>Note:</strong> Ensure your broker account is connected and your session is active.
                 </p>
               </div>
               <Button onClick={fetchPortfolioData} variant="outline">
@@ -254,7 +221,7 @@ export default function PortfolioImport({ onImportComplete, brokerConfig }) {
                 Fetching Live Portfolio...
               </h3>
               <p className="text-sm text-slate-500">
-                Connecting to Zerodha servers and loading your real-time data...
+                Connecting to your backend server and loading your real-time data...
               </p>
             </div>
           ) : portfolioData.length === 0 ? (
@@ -264,19 +231,17 @@ export default function PortfolioImport({ onImportComplete, brokerConfig }) {
                 Ready to Import Live Data
               </h3>
               <p className="text-sm text-slate-500 mb-4">
-                Click "Fetch Live Data" to load your current Zerodha portfolio.
+                Click "Fetch Live Data" to load your current Zerodha portfolio from your backend.
               </p>
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Success Banner */}
               <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                 <p className="text-sm text-green-800">
-                  ✓ Live data loaded successfully from Zerodha • {portfolioData.length} positions found
+                  ✓ Live data loaded successfully from your backend • {portfolioData.length} positions found
                 </p>
               </div>
 
-              {/* Summary Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-slate-50 rounded-lg p-4">
                   <div className="flex items-center justify-between">
@@ -313,7 +278,6 @@ export default function PortfolioImport({ onImportComplete, brokerConfig }) {
                 </div>
               </div>
 
-              {/* Import Progress */}
               {isImporting && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -324,7 +288,6 @@ export default function PortfolioImport({ onImportComplete, brokerConfig }) {
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="flex gap-3">
                 <Button
                   onClick={handleImport}
@@ -353,7 +316,6 @@ export default function PortfolioImport({ onImportComplete, brokerConfig }) {
         </CardContent>
       </Card>
 
-      {/* Portfolio Data Table */}
       {portfolioData.length > 0 && (
         <Card className="trading-card">
           <CardHeader>
@@ -385,7 +347,7 @@ export default function PortfolioImport({ onImportComplete, brokerConfig }) {
                 </TableHeader>
                 <TableBody>
                   {portfolioData.map((position, index) => (
-                    <TableRow key={index} className="hover:bg-slate-50">
+                    <TableRow key={`${position.symbol}-${position.exchange}-${position.broker_instrument_token}-${position.source}`} className="hover:bg-slate-50">
                       <TableCell>
                         <Checkbox
                           checked={selectedPositions.has(index)}
