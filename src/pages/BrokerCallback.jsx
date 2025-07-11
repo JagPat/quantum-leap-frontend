@@ -1,26 +1,99 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function BrokerCallback() {
     const [status, setStatus] = useState('processing');
-    const [message, setMessage] = useState('Finalizing connection with Zerodha...');
-    const location = useLocation();
+    const [message, setMessage] = useState('Processing authentication...');
 
     useEffect(() => {
-        if (window.opener) {
-            // 🔥 CRITICAL FIX: Use wildcard origin to ensure cross-origin communication works
-            const targetOrigin = '*';
-            
-            console.log('🔍 BrokerCallback: Processing URL:', window.location.href);
-            
-            const urlParams = new URLSearchParams(location.search);
-            const requestTokenParam = urlParams.get('request_token');
-
-            console.log('🔍 BrokerCallback: Raw request_token from URL:', requestTokenParam);
-
-            if (requestTokenParam) {
+        console.log('🔄 BrokerCallback: Starting callback processing...');
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const requestTokenParam = urlParams.get('request_token');
+        const statusParam = urlParams.get('status');
+        const userIdParam = urlParams.get('user_id');
+        const errorParam = urlParams.get('error');
+        const action = urlParams.get('action');
+        
+        console.log('🔍 BrokerCallback: URL search params:', window.location.search);
+        console.log('🔍 BrokerCallback: status param:', statusParam);
+        console.log('🔍 BrokerCallback: request_token param:', requestTokenParam);
+        console.log('🔍 BrokerCallback: user_id param:', userIdParam);
+        console.log('🔍 BrokerCallback: error param:', errorParam);
+        
+        // CRITICAL FIX: Support both localhost and production origins
+        const allowedOrigins = [
+            'http://localhost:5173',
+            'http://localhost:3000',
+            window.location.origin
+        ];
+        
+        const targetOrigin = window.opener?.location?.origin || window.location.origin;
+        console.log('🔍 BrokerCallback: Target origin for postMessage:', targetOrigin);
+        
+        try {
+            // NEW: Handle status-based redirects from backend
+            if (statusParam === 'success') {
+                console.log('✅ BrokerCallback: Backend completed token exchange successfully');
+                
+                // CRITICAL FIX: Set localStorage for successful authentication
+                if (userIdParam) {
+                    localStorage.setItem('broker_status', 'Connected');
+                    localStorage.setItem('broker_user_id', userIdParam);
+                    localStorage.setItem('broker_access_token', 'authenticated'); // Placeholder since backend handled exchange
+                    console.log('✅ BrokerCallback: Updated localStorage with broker status');
+                }
+                
+                if (window.opener && !window.opener.closed) {
+                    try {
+                        // CRITICAL FIX: Use localhost origin for postMessage
+                        const targetOrigin = 'http://localhost:5173';
+                        
+                        // Send success message with user data
+                        window.opener.postMessage({
+                            type: 'BROKER_AUTH_SUCCESS',
+                            status: 'success',
+                            user_id: userIdParam,
+                            backend_exchange: true
+                        }, targetOrigin);
+                        
+                        console.log('✅ BrokerCallback: Sent success message to parent window');
+                        
+                        setStatus('success');
+                        setMessage('Authentication successful! Connection established.');
+                        
+                        // Trigger parent window reload to update status
+                        setTimeout(() => {
+                            if (window.opener && !window.opener.closed) {
+                                window.opener.location.reload();
+                            }
+                        }, 1500);
+                        
+                    } catch (postMessageError) {
+                        console.error('❌ BrokerCallback: Failed to send success message to parent:', postMessageError);
+                        setStatus('error');
+                        setMessage('Authentication successful but failed to communicate with parent window.');
+                    }
+                } else {
+                    console.error('❌ BrokerCallback: No valid parent window found');
+                    setStatus('error');
+                    setMessage('Authentication successful but parent window is not available.');
+                }
+            } else if (statusParam === 'error') {
+                console.error('❌ BrokerCallback: Backend reported error:', errorParam);
+                
+                if (window.opener && !window.opener.closed) {
+                    window.opener.postMessage({
+                        type: 'BROKER_AUTH_ERROR',
+                        error: errorParam || 'Backend authentication failed'
+                    }, targetOrigin);
+                }
+                
+                setStatus('error');
+                setMessage(`Authentication failed: ${errorParam || 'Unknown error'}`);
+            } else if (requestTokenParam) {
+                // FALLBACK: Handle request_token-based redirects (existing flow)
                 let cleanRequestToken = requestTokenParam.trim();
                 
                 // Handle case where request_token might be a full URL
@@ -46,47 +119,67 @@ export default function BrokerCallback() {
                 console.log('🔍 BrokerCallback: Clean request_token:', cleanRequestToken);
                 
                 if (cleanRequestToken && cleanRequestToken.length > 5) {
-                    console.log('✅ BrokerCallback: Sending success message to parent');
+                    console.log('✅ BrokerCallback: Sending request_token to parent for frontend exchange');
                     
-                    // Send clean token back to parent window
-                    window.opener.postMessage({
-                        type: 'BROKER_AUTH_SUCCESS',
-                        requestToken: cleanRequestToken
-                    }, targetOrigin);
-                    
-                    setStatus('success');
-                    setMessage('Authentication successful! Closing window...');
+                    if (window.opener && !window.opener.closed) {
+                        try {
+                            // Send clean token back to parent window for frontend exchange
+                            window.opener.postMessage({
+                                type: 'BROKER_AUTH_SUCCESS',
+                                requestToken: cleanRequestToken,
+                                backend_exchange: false
+                            }, targetOrigin);
+                            
+                            setStatus('success');
+                            setMessage('Authentication successful! Completing setup...');
+                        } catch (postMessageError) {
+                            console.error('❌ BrokerCallback: Failed to send message to parent:', postMessageError);
+                            setStatus('error');
+                            setMessage('Authentication successful but failed to communicate with parent window.');
+                        }
+                    } else {
+                        console.error('❌ BrokerCallback: No valid parent window found');
+                        setStatus('error');
+                        setMessage('Authentication successful but parent window is not available.');
+                    }
                 } else {
                     console.error('❌ BrokerCallback: Invalid token - too short or empty');
                     
-                    window.opener.postMessage({
-                        type: 'BROKER_AUTH_ERROR',
-                        error: 'Invalid or empty request token received from Zerodha.'
-                    }, targetOrigin);
+                    if (window.opener && !window.opener.closed) {
+                        window.opener.postMessage({
+                            type: 'BROKER_AUTH_ERROR',
+                            error: 'Invalid or empty request token received from Zerodha.'
+                        }, targetOrigin);
+                    }
                     
                     setStatus('error');
                     setMessage('Invalid token received. Please try again.');
                 }
             } else {
-                console.error('❌ BrokerCallback: No request_token parameter found in URL');
+                console.error('❌ BrokerCallback: No valid parameters found in URL');
                 
                 // Check if we have sess_id directly in URL params
                 const sessId = urlParams.get('sess_id');
                 if (sessId) {
                     console.log('🔍 BrokerCallback: Found sess_id directly:', sessId);
                     
-                    window.opener.postMessage({
-                        type: 'BROKER_AUTH_SUCCESS',
-                        requestToken: sessId
-                    }, targetOrigin);
+                    if (window.opener && !window.opener.closed) {
+                        window.opener.postMessage({
+                            type: 'BROKER_AUTH_SUCCESS',
+                            requestToken: sessId,
+                            backend_exchange: false
+                        }, targetOrigin);
+                    }
                     
                     setStatus('success');
-                    setMessage('Authentication successful! Closing window...');
+                    setMessage('Authentication successful! Completing setup...');
                 } else {
-                    window.opener.postMessage({
-                        type: 'BROKER_AUTH_ERROR',
-                        error: 'Authentication failed. No request token was returned from Zerodha.'
-                    }, targetOrigin);
+                    if (window.opener && !window.opener.closed) {
+                        window.opener.postMessage({
+                            type: 'BROKER_AUTH_ERROR',
+                            error: 'Authentication failed. No valid parameters returned from Zerodha.'
+                        }, targetOrigin);
+                    }
                     
                     setStatus('error');
                     setMessage('Authentication failed. Please try again.');
@@ -102,13 +195,19 @@ export default function BrokerCallback() {
                 }
             }, 3000);
 
-        } else {
-            console.error('❌ BrokerCallback: No window.opener found');
+        } catch (error) {
+            console.error('❌ BrokerCallback: Unexpected error:', error);
             setStatus('error');
-            setMessage('This page should be opened in a popup window. Please close this tab and try again.');
+            setMessage(`Error processing authentication: ${error.message}`);
+            
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({
+                    type: 'BROKER_AUTH_ERROR',
+                    error: `Callback processing error: ${error.message}`
+                }, targetOrigin);
+            }
         }
-
-    }, [location]);
+    }, []);
 
     const StatusIcon = () => {
         switch (status) {

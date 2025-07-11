@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Bot, User, CornerDownLeft, Circle, Zap, RefreshCw } from 'lucide-react';
-import { InvokeLLM } from '@/api/integrations';
+import integrations, { InvokeLLM as NamedInvokeLLM } from '@/api/integrations';
+const InvokeLLM = NamedInvokeLLM || (integrations && integrations.InvokeLLM);
+console.log('INTEGRATIONS EXPORT:', integrations);
 import StrategyPreview from './StrategyPreview';
 
 const strategySchema = {

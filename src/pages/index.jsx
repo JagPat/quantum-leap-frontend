@@ -1,105 +1,35 @@
-import Layout from "./Layout.jsx";
-
-import Trading from "./Trading";
-
-import BrokerIntegration from "./BrokerIntegration";
-
-import ApiSpec from "./ApiSpec";
-
-import StrategyDetail from "./StrategyDetail";
-
-import Settings from "./Settings";
-
-import Portfolio from "./Portfolio";
-
-import TradeHistory from "./TradeHistory";
-
-import MyDashboard from "./MyDashboard";
-
-import Widgets from "./Widgets";
-
-import BrokerCallback from "./BrokerCallback";
-
-import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
-
-const PAGES = {
-    
-    Trading: Trading,
-    
-    BrokerIntegration: BrokerIntegration,
-    
-    ApiSpec: ApiSpec,
-    
-    StrategyDetail: StrategyDetail,
-    
-    Settings: Settings,
-    
-    Portfolio: Portfolio,
-    
-    TradeHistory: TradeHistory,
-    
-    MyDashboard: MyDashboard,
-    
-    Widgets: Widgets,
-    
-    BrokerCallback: BrokerCallback,
-    
-}
-
-function _getCurrentPage(url) {
-    if (url.endsWith('/')) {
-        url = url.slice(0, -1);
-    }
-    let urlLastPart = url.split('/').pop();
-    if (urlLastPart.includes('?')) {
-        urlLastPart = urlLastPart.split('?')[0];
-    }
-
-    const pageName = Object.keys(PAGES).find(page => page.toLowerCase() === urlLastPart.toLowerCase());
-    return pageName || Object.keys(PAGES)[0];
-}
-
-// Create a wrapper component that uses useLocation inside the Router context
-function PagesContent() {
-    const location = useLocation();
-    const currentPage = _getCurrentPage(location.pathname);
-    
-    return (
-        <Layout currentPageName={currentPage}>
-            <Routes>            
-                
-                    <Route path="/" element={<Trading />} />
-                
-                
-                <Route path="/Trading" element={<Trading />} />
-                
-                <Route path="/BrokerIntegration" element={<BrokerIntegration />} />
-                
-                <Route path="/ApiSpec" element={<ApiSpec />} />
-                
-                <Route path="/StrategyDetail" element={<StrategyDetail />} />
-                
-                <Route path="/Settings" element={<Settings />} />
-                
-                <Route path="/Portfolio" element={<Portfolio />} />
-                
-                <Route path="/TradeHistory" element={<TradeHistory />} />
-                
-                <Route path="/MyDashboard" element={<MyDashboard />} />
-                
-                <Route path="/Widgets" element={<Widgets />} />
-                
-                <Route path="/BrokerCallback" element={<BrokerCallback />} />
-                
-            </Routes>
-        </Layout>
-    );
-}
+import React from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import Layout from './Layout'
+import MyDashboard from './MyDashboard'
+import Portfolio from './Portfolio'
+import Trading from './Trading'
+import TradeHistory from './TradeHistory'
+import Settings from './Settings'
+import BrokerIntegration from './BrokerIntegration'
+import BrokerCallback from './BrokerCallback'
+import ApiSpec from './ApiSpec'
+import StrategyDetail from './StrategyDetail'
+import Widgets from './Widgets'
 
 export default function Pages() {
-    return (
-        <Router>
-            <PagesContent />
-        </Router>
-    );
-}
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Layout><MyDashboard /></Layout>} />
+        <Route path="/dashboard" element={<Layout><MyDashboard /></Layout>} />
+        <Route path="/portfolio" element={<Layout><Portfolio /></Layout>} />
+        <Route path="/trading" element={<Layout><Trading /></Layout>} />
+        <Route path="/trading/strategy/:id" element={<Layout><StrategyDetail /></Layout>} />
+        <Route path="/trade-history" element={<Layout><TradeHistory /></Layout>} />
+        <Route path="/broker-integration" element={<Layout><BrokerIntegration /></Layout>} />
+        <Route path="/broker/callback" element={<BrokerCallback />} />
+        <Route path="/broker-callback" element={<BrokerCallback />} />
+        <Route path="/settings" element={<Layout><Settings /></Layout>} />
+        <Route path="/api-spec" element={<Layout><ApiSpec /></Layout>} />
+        <Route path="/widgets" element={<Layout><Widgets /></Layout>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
+  )
+} 

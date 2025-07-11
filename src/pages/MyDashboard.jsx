@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { DashboardWidget } from '@/api/entities';
+import { DashboardWidget, Trade, Position, Strategy } from '@/api/entities';
 import { User } from '@/api/entities'; // Added User import
 import WidgetWrapper from '../components/dashboard/WidgetWrapper';
-import { PlusCircle, Settings, LayoutGrid, Grid3X3, Save, Info, Package, Loader2 } from 'lucide-react';
+import { PlusCircle, Settings, LayoutGrid, Grid3X3, Save, Info, Package, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { portfolioAPI } from '@/api/functions';
 
@@ -43,10 +44,15 @@ const MAX_CUSTOMIZABLE_WIDGETS = 8;
 export default function MyDashboardPage() {
   const [customizableWidgets, setCustomizableWidgets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [portfolioSummary, setPortfolioSummary] = useState(null);
+  const [portfolioData, setPortfolioData] = useState([]);
+  const [trades, setTrades] = useState([]);
+  const [positions, setPositions] = useState([]);
+  const [strategies, setStrategies] = useState([]);
   const [fixedWidgetsProps, setFixedWidgetsProps] = useState({
       tradingStatus: { isEngineRunning: true, activeStrategies: ['RSI Momentum', 'AI Strategy 4'], lastSignal: null, tradingMode: 'sandbox' },
       recentTrades: { trades: [] }
@@ -55,58 +61,60 @@ export default function MyDashboardPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Get current user first
-      const user = await User.me();
-      if (!user || !user.email) {
-        console.error("Could not get current user");
-        setIsLoading(false);
-        return;
-      }
-
-      const [userWidgets, summaryRes] = await Promise.all([
-        DashboardWidget.list('-created_date'),
-        portfolioAPI({ user_id: user.email }),
-      ]);
+      // CRITICAL FIX: Enhanced user identification - prioritize authenticated broker user_id
+      let userIdentifier = null;
       
-      setCustomizableWidgets(userWidgets);
-
-      if (summaryRes?.data) {
-        if (summaryRes.data.status === 'success') {
-          setPortfolioSummary(summaryRes.data.data);
-        } else {
-          console.error("Portfolio API returned error:", summaryRes.data);
-          // Set some default values to prevent UI from breaking
-          setPortfolioSummary({
-            current_value: 0,
-            total_investment: 0,
-            total_pnl: 0,
-            day_pnl: 0
-          });
-        }
+      // First priority: Check for authenticated broker user_id
+      const brokerConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
+      const activeBrokerConfig = brokerConfigs.find(config => config.is_connected && config.access_token);
+      
+      if (activeBrokerConfig?.user_data?.user_id) {
+        userIdentifier = activeBrokerConfig.user_data.user_id;
+        console.log("🔍 [MyDashboard] Using authenticated broker user_id:", userIdentifier);
       } else {
-        console.error("No data received from portfolio API");
-        setPortfolioSummary({
-          current_value: 0,
-          total_investment: 0,
-          total_pnl: 0,
-          day_pnl: 0
-        });
+        // Fallback: Use development user email as string
+        const user = await User.me();
+        userIdentifier = user?.email || 'local@development.com';
+        console.log("🔍 [MyDashboard] No broker authentication found, using fallback email:", userIdentifier);
       }
       
-      // Here you would also fetch data for other fixed widgets like recent trades and engine status
-      // For now, using static data for them
+      console.log("🔍 [MyDashboard] Final userIdentifier:", userIdentifier, "Type:", typeof userIdentifier);
       
+      // CRITICAL FIX: Pass string user ID, not user object
+      const [portfolioResponse, tradesData, positionsData, strategiesData] = await Promise.all([
+        portfolioAPI(userIdentifier), // Pass string, not object
+        Trade.list(),
+        Position.list(),
+        Strategy.list()
+      ]);
+
+      // Handle the new portfolioAPI response format
+      if (portfolioResponse.status === 'no_connection') {
+        console.warn("⚠️ [MyDashboard] No broker connection - showing empty portfolio");
+        setError('Connect to your broker to view portfolio data');
+        setPortfolioData([]);
+        setPortfolioSummary(portfolioResponse.data.summary);
+      } else if (portfolioResponse.status === 'error') {
+        console.error("❌ [MyDashboard] Portfolio API error:", portfolioResponse.message);
+        setError(`Portfolio error: ${portfolioResponse.message}`);
+        setPortfolioData([]);
+        setPortfolioSummary(portfolioResponse.data.summary);
+      } else {
+        // Successful response
+        setPortfolioData(portfolioResponse?.data || []);
+        setPortfolioSummary(portfolioResponse?.data?.summary || null);
+        setError(''); // Clear any previous errors
+      }
+      
+      setTrades(tradesData || []);
+      setPositions(positionsData || []);
+      setStrategies(strategiesData || []);
     } catch (error) {
-      console.error("Failed to load dashboard data:", error);
-      // Set fallback data to prevent UI from breaking
-      setPortfolioSummary({
-        current_value: 0,
-        total_investment: 0,
-        total_pnl: 0,
-        day_pnl: 0
-      });
+      console.error("❌ [MyDashboard] Dashboard load error:", error);
+      setError(`Dashboard load: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
   
   useEffect(() => {
@@ -169,6 +177,26 @@ export default function MyDashboardPage() {
             </Button>
           </div>
         </div>
+        
+        {/* Connection Status Banner */}
+        {error && error.includes('Connect to your broker') && (
+          <div className="mb-6">
+            <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-300">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="flex items-center justify-between">
+                <span>{error}</span>
+                <Button 
+                  size="sm" 
+                  className="bg-amber-500 hover:bg-amber-600 text-slate-900 ml-4"
+                  onClick={() => window.location.href = '/broker-integration'}
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Connect Broker
+                </Button>
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
         
         {/* Fixed Essential Widgets Section */}
         <div className="mb-8">

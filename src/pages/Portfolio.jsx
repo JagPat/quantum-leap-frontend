@@ -21,33 +21,37 @@ export default function Portfolio() {
             setLoading(true);
             setError(null);
             try {
-                const user = await User.me();
-                if (!user || !user.email) {
-                    throw new Error("Could not identify the current user. Please log in again.");
-                }
-
-                const { data, error: apiError } = await portfolioAPI({ user_id: user.email });
-
-                if (apiError || (data && data.status === 'error')) {
-                    console.error("API Error Response:", data);
-                    throw new Error(apiError?.message || data.detail || 'Failed to fetch portfolio data from the backend.');
+                // CRITICAL FIX: Enhanced user identification - prioritize authenticated broker user_id
+                let userIdentifier = null;
+                
+                // First priority: Check for authenticated broker user_id
+                const brokerConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
+                const activeBrokerConfig = brokerConfigs.find(config => config.is_connected && config.access_token);
+                
+                if (activeBrokerConfig?.user_data?.user_id) {
+                    userIdentifier = activeBrokerConfig.user_data.user_id;
+                    console.log("🔍 [Portfolio] Using authenticated broker user_id:", userIdentifier);
+                } else {
+                    // Fallback: Use development user email as string
+                    const user = await User.me();
+                    userIdentifier = user?.email || 'local@development.com';
+                    console.log("🔍 [Portfolio] No broker authentication found, using fallback email:", userIdentifier);
                 }
                 
-                // Assuming the backend returns the portfolio data directly
-                if(data && data.positions) {
-                    setPortfolioData(data);
+                console.log("🔍 [Portfolio] Final userIdentifier:", userIdentifier, "Type:", typeof userIdentifier);
+                
+                // CRITICAL FIX: Pass string user ID, not user object
+                const result = await portfolioAPI(userIdentifier);
+                
+                if (result?.data) {
+                    setPortfolioData(result.data);
                 } else {
-                     // Handle cases where backend might wrap data, e.g. { data: { positions: [] } }
-                     if(data && data.data && data.data.positions) {
-                         setPortfolioData(data.data);
-                     } else {
-                        throw new Error("Portfolio data received from backend is not in the expected format.");
-                     }
+                    console.warn("No portfolio data received");
+                    setPortfolioData([]);
                 }
-
             } catch (err) {
-                setError(err.message);
-                console.error("Error fetching portfolio:", err);
+                console.error("❌ [Portfolio] Error fetching portfolio data:", err);
+                setError("Failed to load portfolio data. Please try again later.");
             } finally {
                 setLoading(false);
             }

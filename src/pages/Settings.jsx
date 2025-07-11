@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Settings as SettingsIcon, Link as LinkIcon } from "lucide-react";
 import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
 import ErrorBoundary from '../components/ErrorBoundary';
 
 export default function SettingsPage() {
@@ -21,15 +20,19 @@ export default function SettingsPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const userData = await User.me();
+      // Use the correct User method
+      const userData = User.getCurrentUser();
       setUser(userData);
       
-      const configs = await BrokerConfig.list();
-      if (configs.length > 0) {
-        setBrokerConfig(configs[0]);
-      } else {
-        setBrokerConfig(null);
-      }
+      // Mock broker config for development - in production this would come from backend
+      const mockBrokerConfig = {
+        id: 'local_config',
+        broker_name: 'Zerodha Kite',
+        is_connected: false,
+        created_at: new Date().toISOString()
+      };
+      setBrokerConfig(mockBrokerConfig);
+      
     } catch (err) {
       console.error("Failed to load data:", err);
       setError("Could not load settings data. Please try again later.");
@@ -86,7 +89,7 @@ export default function SettingsPage() {
             <div>
               <Label className="text-slate-300">Name</Label>
               <Input 
-                value={user?.full_name || ""} 
+                value={user?.name || "Development User"} 
                 readOnly 
                 className="mt-1 bg-slate-700 border-slate-600 text-white"
               />
@@ -94,7 +97,7 @@ export default function SettingsPage() {
             <div>
               <Label className="text-slate-300">Email</Label>
               <Input 
-                value={user?.email || ""} 
+                value={user?.email || "local@development.com"} 
                 readOnly 
                 className="mt-1 bg-slate-700 border-slate-600 text-white"
               />
@@ -123,7 +126,7 @@ export default function SettingsPage() {
                 For detailed broker setup, configuration, and portfolio import:
               </p>
               <Link 
-                to={createPageUrl("BrokerIntegration")}
+                to="/broker-integration"
                 className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
               >
                 <LinkIcon className="w-4 h-4" />

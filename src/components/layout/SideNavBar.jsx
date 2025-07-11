@@ -9,8 +9,9 @@ import {
   History,
   Settings,
   Bot,
-  FileCode,
-  Power
+  Power,
+  Blocks,
+  Link as LinkIcon
 } from 'lucide-react';
 import {
   Tooltip,
@@ -20,27 +21,30 @@ import {
 } from "@/components/ui/tooltip";
 
 const navItems = [
-  { href: 'MyDashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: 'Portfolio', icon: Wallet, label: 'Portfolio' },
-  { href: 'Trading', icon: CandlestickChart, label: 'Trading Engine' },
-  { href: 'TradeHistory', icon: History, label: 'Trade History' },
-  { href: 'ApiSpec', icon: FileCode, label: 'API Spec' },
+  { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/portfolio', icon: Wallet, label: 'Portfolio' },
+  { href: '/trading', icon: CandlestickChart, label: 'Trading Engine' },
+  { href: '/trade-history', icon: History, label: 'Trade History' },
+  { href: '/broker-integration', icon: LinkIcon, label: 'Broker Integration' },
+  { href: '/widgets', icon: Blocks, label: 'Widgets' },
 ];
 
 const bottomNavItems = [
-  { href: 'Settings', icon: Settings, label: 'Settings' },
+  { href: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 const NavItem = ({ href, icon: Icon, label }) => {
   const location = useLocation();
-  const isActive = location.pathname.split('?')[0] === createPageUrl(href);
+  // Handle both direct routes (starting with /) and page names
+  const targetUrl = href.startsWith('/') ? href : createPageUrl(href);
+  const isActive = location.pathname.split('?')[0] === targetUrl;
   
   return (
     <TooltipProvider delayDuration={100}>
       <Tooltip>
         <TooltipTrigger asChild>
           <Link
-            to={createPageUrl(href)}
+            to={targetUrl}
             className={`flex items-center justify-center lg:justify-start gap-4 p-3 rounded-lg transition-colors duration-200 ${
               isActive
                 ? 'bg-amber-500 text-slate-900 shadow-md'

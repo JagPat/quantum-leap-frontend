@@ -20,8 +20,6 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { createPageUrl } from '@/utils';
-import { brokerConnection } from '@/api/functions'; 
-import { brokerDisconnect } from '@/api/functions';
 
 export default function BrokerSetup({ 
   onConfigSaved, 
@@ -43,18 +41,39 @@ export default function BrokerSetup({
 
   useEffect(() => {
     const handleAuthMessage = (event) => {
-        if (event.origin !== window.location.origin) {
+        // Allow messages from Railway backend and same origin
+        const allowedOrigins = [
+            window.location.origin,
+            'https://web-production-de0bc.up.railway.app'
+        ];
+        
+        if (!allowedOrigins.includes(event.origin)) {
+            console.log("🚫 Message from blocked origin:", event.origin);
             return;
         }
         
+        console.log("✅ Received message from allowed origin:", event.origin, event.data);
+        
         if (event.data?.type === 'BROKER_AUTH_SUCCESS') {
-            toast({
-                title: "Authentication Successful",
-                description: "Token received. Please finalize the connection.",
-                variant: "success",
-            });
-            setRequestToken(event.data.requestToken);
-            setStep('complete');
+            // NEW: Handle backend-exchanged tokens
+            if (event.data.backend_exchange) {
+                console.log("🎉 Backend completed token exchange, user_id:", event.data.user_id);
+                
+                // Fetch the session data from backend
+                handleBackendAuthSuccess(event.data.user_id);
+            } else {
+                // EXISTING: Handle frontend token exchange
+                console.log("🔄 Frontend token exchange required, request_token:", event.data.requestToken);
+                
+                toast({
+                    title: "Authentication Successful",
+                    description: "Token received. Please finalize the connection.",
+                    variant: "success",
+                });
+                setRequestToken(event.data.requestToken);
+                setStep('complete');
+            }
+            
             sessionStorage.removeItem('broker_api_key');
             sessionStorage.removeItem('broker_api_secret');
         } else if (event.data?.type === 'BROKER_AUTH_ERROR') {
@@ -78,12 +97,83 @@ export default function BrokerSetup({
     };
   }, [toast]);
 
+  // NEW: Handle backend-exchanged authentication
+  const handleBackendAuthSuccess = async (userId) => {
+    setIsConnecting(true);
+    setError('');
+    
+    try {
+      console.log("🔍 [BrokerSetup] Fetching session data for user:", userId);
+      
+      // Fetch session data from backend
+      const response = await fetch(`https://web-production-de0bc.up.railway.app/api/auth/broker/session?user_id=${userId}`);
+      const sessionData = await response.json();
+      
+      console.log("📡 [BrokerSetup] Session data response:", sessionData);
+      
+      if (sessionData.status === 'success' && sessionData.is_connected) {
+        // Create broker config from session data
+        const brokerConfig = {
+          id: Date.now().toString(),
+          broker_name: 'zerodha',
+          api_key: sessionData.user_data.api_key,
+          user_data: sessionData.user_data,
+          access_token: sessionData.access_token,
+          is_connected: true,
+          connection_status: 'connected',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        console.log("✅ [BrokerSetup] Created broker config:", brokerConfig);
+        
+        // Save to localStorage
+        const existingConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
+        const updatedConfigs = existingConfigs.filter(c => c.broker_name !== 'zerodha');
+        updatedConfigs.push(brokerConfig);
+        localStorage.setItem('brokerConfigs', JSON.stringify(updatedConfigs));
+        
+        // Notify parent component
+        await onConfigSaved(brokerConfig);
+        
+        toast({
+          title: "Connection Successful",
+          description: `Connected to Zerodha as ${sessionData.user_data.user_name || sessionData.user_data.user_id}`,
+          variant: "success",
+        });
+        
+        setStep('connected');
+        
+        // Trigger connection complete callback
+        if (onConnectionComplete) {
+          onConnectionComplete(brokerConfig);
+        }
+      } else {
+        throw new Error(sessionData.message || 'Failed to retrieve session data');
+      }
+    } catch (error) {
+      console.error("❌ [BrokerSetup] Backend auth error:", error);
+      setError(`Failed to complete authentication: ${error.message}`);
+      toast({
+        title: "Authentication Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      setStep('credentials');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
   const getRedirectUrl = () => {
-    return createPageUrl('BrokerCallback');
+    // CRITICAL FIX: Use localhost frontend URL instead of Base44
+    return 'http://localhost:5173/broker-callback';
   };
 
   const getBackendRedirectUrl = () => {
-    return 'https://web-production-de0bc.up.railway.app/api/broker/callback';
+    // CRITICAL FIX: This should point to our localhost backend during development
+    // or keep Railway for production, but ensure backend redirects to correct frontend
+    return 'https://web-production-de0bc.up.railway.app/api/auth/broker/callback';
   };
 
   const brokerInfo = {
@@ -116,7 +206,26 @@ export default function BrokerSetup({
       sessionStorage.setItem('broker_api_key', config.api_key);
       sessionStorage.setItem('broker_api_secret', config.api_secret);
 
-      const authUrl = `https://kite.zerodha.com/connect/login?v=3&api_key=${config.api_key}`;
+      // CRITICAL FIX: Call backend to store credentials before starting OAuth
+      console.log("🔧 [BrokerSetup] Setting up OAuth credentials on backend...");
+      const setupResponse = await fetch(`https://web-production-de0bc.up.railway.app/api/auth/broker/test-oauth?api_key=${config.api_key}&api_secret=${config.api_secret}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      const setupResult = await setupResponse.json();
+      console.log("📡 [BrokerSetup] Backend setup response:", setupResult);
+      
+      if (setupResult.status !== 'success') {
+        throw new Error(setupResult.message || 'Failed to setup OAuth credentials on backend');
+      }
+      
+      // Use the OAuth URL from backend response for consistency
+      const authUrl = setupResult.oauth_url;
+      console.log("🚀 [BrokerSetup] Opening OAuth popup with URL:", authUrl);
+      
       const popup = window.open(authUrl, 'brokerAuth', 'width=800,height=600');
       if (!popup) {
         setError("Popup blocked. Please allow popups for this site.");
@@ -125,9 +234,21 @@ export default function BrokerSetup({
             description: "Please allow popups for this site and try again.",
             variant: "destructive",
         });
+      } else {
+        toast({
+          title: "OAuth Started",
+          description: "Complete the authentication in the popup window.",
+          variant: "default",
+        });
       }
     } catch (e) {
-      setError(`Failed to save initial config: ${e.message}`);
+      console.error("❌ [BrokerSetup] Error in handleCredentialsSubmit:", e);
+      setError(`Failed to setup OAuth: ${e.message}`);
+      toast({
+        title: "Setup Error",
+        description: e.message,
+        variant: "destructive",
+      });
     } finally {
       setIsConnecting(false);
     }
@@ -144,7 +265,7 @@ export default function BrokerSetup({
     setError('');
 
     try {
-      console.log("🚀 [Component] Starting authentication via brokerConnection function...");
+      console.log("🚀 [Component] Starting direct authentication with Railway backend...");
       
       const apiKey = config.api_key || sessionStorage.getItem('broker_api_key');
       const apiSecret = config.api_secret || sessionStorage.getItem('broker_api_secret');
@@ -153,47 +274,104 @@ export default function BrokerSetup({
         throw new Error("API Key or Secret is missing. Please re-enter your credentials.");
       }
       
-      const result = await brokerConnection({
-        request_token: requestToken,
-        api_key: apiKey,
-        api_secret: apiSecret
+      // Clean the request token if it contains a URL
+      let cleanRequestToken = requestToken.trim();
+      if (cleanRequestToken.startsWith('http') || cleanRequestToken.includes('://')) {
+        console.log("🔧 Cleaning URL-format token...");
+        const url = new URL(cleanRequestToken);
+        const urlParams = new URLSearchParams(url.search);
+        
+        if (urlParams.has('request_token')) {
+          cleanRequestToken = urlParams.get('request_token');
+        } else if (urlParams.has('sess_id')) {
+          cleanRequestToken = urlParams.get('sess_id');
+        }
+        console.log("✅ Cleaned token:", cleanRequestToken);
+      }
+      
+      // Direct API call to Railway backend
+      const response = await fetch('https://web-production-de0bc.up.railway.app/api/auth/broker/generate-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          request_token: cleanRequestToken,
+          api_key: apiKey,
+          api_secret: apiSecret
+        })
       });
       
-      const responseData = result.data;
+      const result = await response.json();
+      console.log("📡 Backend response:", result);
 
-      if (responseData.success) {
+      if (result.status === 'success') {
         console.log("✅ [Component] Authentication successful!");
         
-        await onConfigSaved({
-            ...config,
-            ...responseData.data
-        });
+        // CRITICAL FIX: Verify user_data structure before saving
+        if (!result.user_data?.user_id) {
+          console.error("❌ Backend response missing user_id:", result.user_data);
+          setError("Authentication successful but backend returned invalid user data. Please try again.");
+          return;
+        }
+        
+        console.log("✅ Verified user_data structure:", result.user_data);
+        console.log("✅ Verified user_id:", result.user_data.user_id);
+        console.log("✅ Access token length:", result.access_token?.length);
+        
+        // Save the correct data structure
+        const configToSave = {
+          ...config,
+          is_connected: true,
+          access_token: result.access_token,
+          request_token: cleanRequestToken,
+          user_data: result.user_data, // Ensure this is saved correctly
+          connection_status: 'connected'
+        };
+        
+        console.log("💾 [Component] Saving config:", configToSave);
+        
+        await onConfigSaved(configToSave);
+        
+        // CRITICAL: Verify config was saved correctly
+        const savedConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
+        const latestConfig = savedConfigs[savedConfigs.length - 1];
+        
+        console.log("🔍 [Component] Verification - saved config:", latestConfig);
+        console.log("🔍 [Component] Verification - user_data exists:", !!latestConfig?.user_data);
+        console.log("🔍 [Component] Verification - user_id:", latestConfig?.user_data?.user_id);
+        
+        if (!latestConfig?.user_data?.user_id) {
+          console.error("❌ [Component] Config saved but user_data missing! Saved config:", latestConfig);
+          setError("Configuration saved but user data verification failed. Please try reconnecting.");
+          return;
+        }
         
         toast({
-            title: "Success",
-            description: responseData.data.message || "Broker connected successfully!",
+          title: "Success",
+          description: "Broker connected successfully!",
         });
 
         setStep('connected');
         if(onConnectionComplete) onConnectionComplete();
         
       } else {
-        console.error("❌ [Component] Authentication failed:", responseData.data.error_message);
-        setError(responseData.data.error_message || "An unknown authentication error occurred.");
+        console.error("❌ [Component] Authentication failed:", result.message);
+        setError(result.message || "An unknown authentication error occurred.");
         toast({
-            title: "Authentication Failed",
-            description: responseData.data.error_message || "Please check your credentials and try again.",
-            variant: "destructive",
+          title: "Authentication Failed",
+          description: result.message || "Please check your credentials and try again.",
+          variant: "destructive",
         });
       }
       
     } catch (error) {
-      console.error("💥 [Component] Error calling brokerConnection function:", error);
-      setError(`Function call error: ${error.message}`);
+      console.error("💥 [Component] Error calling backend API:", error);
+      setError(`API call error: ${error.message}`);
       toast({
-            title: "Function Error",
-            description: `A critical error occurred: ${error.message}`,
-            variant: "destructive",
+        title: "Connection Error", 
+        description: `Failed to connect to backend: ${error.message}`,
+        variant: "destructive",
       });
     } finally {
       setIsConnecting(false);
@@ -207,10 +385,26 @@ export default function BrokerSetup({
         setIsConnecting(true);
         setError('');
         try {
-            const result = await brokerDisconnect();
+            // Get user_id from existing config or user data
+            const userId = existingConfig?.user_data?.user_id;
             
-            if (!result.data.success) {
-                throw new Error(result.data.detail || 'Failed to invalidate session on the backend.');
+            if (!userId) {
+                throw new Error('User ID not found. Cannot disconnect.');
+            }
+            
+            // Direct API call to Railway backend
+            const response = await fetch(`https://web-production-de0bc.up.railway.app/api/auth/broker/invalidate-session?user_id=${userId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            const result = await response.json();
+            console.log("🔓 Disconnect response:", result);
+            
+            if (result.status !== 'success') {
+                throw new Error(result.message || 'Failed to invalidate session on the backend.');
             }
 
             if (existingConfig) {

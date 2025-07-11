@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { BrokerConfig, ImportedPosition, User } from "@/api/entities";
+import { BrokerConfig as BaseBrokerConfig, ImportedPosition, User } from "@/api/entities";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,8 @@ import {
   AlertTriangle,
   ArrowLeft,
   Wifi,
-  WifiOff
+  WifiOff,
+  RefreshCw
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -21,7 +22,27 @@ import { createPageUrl } from "@/utils";
 import BrokerSetup from "../components/broker/BrokerSetup";
 import PortfolioImport from "../components/broker/PortfolioImport";
 import { useToast } from "@/components/ui/use-toast";
-import { brokerAPI } from "@/api/functions"; // Import Base44 function for heartbeat
+
+// CRITICAL FIX: Defensive import validation with fallback
+const BrokerConfig = (() => {
+  if (!BaseBrokerConfig) {
+    console.error('❌ CRITICAL: BaseBrokerConfig is undefined');
+    return null;
+  }
+  
+  if (typeof BaseBrokerConfig.list !== 'function') {
+    console.error('❌ CRITICAL: BaseBrokerConfig.list is not a function:', typeof BaseBrokerConfig.list);
+    console.error('Available methods:', Object.keys(BaseBrokerConfig));
+    return null;
+  }
+  
+  console.log('✅ BrokerConfig import validated successfully');
+  return BaseBrokerConfig;
+})();
+
+if (!BrokerConfig) {
+  console.error('❌ FATAL: BrokerConfig validation failed. Creating fallback.');
+}
 
 export default function BrokerIntegration() {
   const navigate = useNavigate();
@@ -30,82 +51,272 @@ export default function BrokerIntegration() {
   const [activeTab, setActiveTab] = useState('setup');
   const [isLoading, setIsLoading] = useState(true);
   const [importedPositions, setImportedPositions] = useState([]);
-  const [liveStatus, setLiveStatus] = useState({ state: 'unknown', message: '' });
+  const [liveStatus, setLiveStatus] = useState({ 
+    state: 'unknown', 
+    message: 'Loading...', 
+    lastChecked: null,
+    backendConnected: false 
+  });
+  const [heartbeatInterval, setHeartbeatInterval] = useState(null);
+  const [isCheckingBackend, setIsCheckingBackend] = useState(false);
 
   useEffect(() => {
     loadBrokerConfig();
   }, []);
 
-  // Re-enabled Heartbeat check with the correct function-based approach
+  // Enhanced heartbeat mechanism with smart status management
   useEffect(() => {
-    let intervalId;
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval);
+    }
 
     const checkConnection = async () => {
-        if (brokerConfig && brokerConfig.is_connected) {
-            setLiveStatus(prev => ({ ...prev, state: 'checking' }));
-            
-            try {
-                // Call the Base44 function, which handles auth securely.
-                const result = await brokerAPI({ endpoint: 'profile' });
-                const response = result.data;
+      if (!brokerConfig?.is_connected || !brokerConfig?.access_token) {
+        setLiveStatus(prev => ({ 
+          ...prev, 
+          state: 'disconnected', 
+          message: 'Not connected to broker',
+          lastChecked: new Date().toLocaleTimeString(),
+          backendConnected: false 
+        }));
+        return;
+      }
 
-                if (response && response.status === 'success') {
-                    setLiveStatus({ state: 'connected', message: `Live connection confirmed at ${new Date().toLocaleTimeString()}` });
-                } else {
-                    let errorDetail = response?.detail || 'Connection check failed';
-                    if (errorDetail.includes('No active broker session')) {
-                        errorDetail = 'Broker session not found. Please reconnect.';
-                    } else if (errorDetail.includes('Session expired')) {
-                        errorDetail = 'Broker session expired. Please reconnect.';
-                    } else if (errorDetail.includes('Invalid JWT token')) {
-                        errorDetail = 'Authentication failed. Please log in again.';
-                    }
-                    throw new Error(errorDetail);
-                }
-            } catch (error) {
-                console.error("Heartbeat check failed:", error.message);
-                setLiveStatus({ state: 'disconnected', message: "Connection lost. Please reconnect." });
-                
-                toast({
-                    title: "Broker Connection Lost",
-                    description: error.message,
-                    variant: "destructive",
-                });
-
-                if (intervalId) clearInterval(intervalId); // Stop checking if connection is lost
-            }
+      console.log("🔄 Running heartbeat check...");
+      
+      try {
+        // CRITICAL FIX: Ensure we have proper user_id - don't fallback to 'local_user'
+        const userId = brokerConfig.user_data?.user_id;
+        if (!userId) {
+          console.error("❌ CRITICAL: No user_id found in brokerConfig.user_data:", brokerConfig.user_data);
+          setLiveStatus(prev => ({ 
+            ...prev,
+            state: 'error', 
+            message: 'Invalid configuration: Missing user ID. Please reconnect to broker.',
+            lastChecked: new Date().toLocaleTimeString(),
+            backendConnected: false
+          }));
+          return;
         }
+        
+        console.log("🔍 Checking backend status for user_id:", userId);
+        
+        // Check broker connection via Railway backend
+        const response = await fetch(`https://web-production-de0bc.up.railway.app/api/auth/broker/status?user_id=${userId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const result = await response.json();
+        console.log("🔍 Heartbeat check result:", result);
+        
+        if (result.status === 'success' && result.data?.is_connected) {
+          setLiveStatus(prev => ({ 
+            ...prev,
+            state: 'connected', 
+            message: `Live connection verified at ${new Date().toLocaleTimeString()}`,
+            lastChecked: new Date().toLocaleTimeString(),
+            backendConnected: true
+          }));
+        } else {
+          // Don't immediately disconnect - show warning but maintain local status
+          setLiveStatus(prev => ({ 
+            ...prev,
+            state: 'connected_local', 
+            message: `Connected (Local) - Backend reports: ${result.data?.message || 'Disconnected'}`,
+            lastChecked: new Date().toLocaleTimeString(),
+            backendConnected: false
+          }));
+          
+          console.warn("⚠️ Backend reports disconnected but local config shows connected. Possible session sync issue.");
+        }
+      } catch (error) {
+        console.error("Heartbeat check failed:", error);
+        // Don't immediately disconnect on network errors
+        setLiveStatus(prev => ({ 
+          ...prev,
+          state: prev.state.includes('connected') ? 'connected_local' : 'unknown',
+          message: `Connected (Local) - Backend check failed: ${error.message.substring(0, 50)}...`,
+          lastChecked: new Date().toLocaleTimeString(),
+          backendConnected: false
+        }));
+      }
     };
 
-    // Start heartbeat if broker is connected
-    if (brokerConfig && brokerConfig.is_connected) {
-        checkConnection(); // Check immediately
-        intervalId = setInterval(checkConnection, 60000); // Check every 60 seconds
-    } else if (brokerConfig && !brokerConfig.is_connected) {
-        setLiveStatus({ state: 'disconnected', message: "Not connected to a broker." });
+    // Start periodic heartbeat only if user is connected
+    if (brokerConfig?.is_connected) {
+      console.log("🔄 Starting heartbeat monitoring for connected broker");
+      setLiveStatus(prev => ({ 
+        ...prev,
+        state: 'connected', 
+        message: 'Broker connected - monitoring live status...',
+        lastChecked: new Date().toLocaleTimeString()
+      }));
+      
+      // Initial check after 5 seconds, then every 60 seconds (less aggressive)
+      const initialTimeout = setTimeout(checkConnection, 5000);
+      const interval = setInterval(checkConnection, 60000); // Check every minute
+      setHeartbeatInterval(interval);
+      
+      return () => {
+        clearTimeout(initialTimeout);
+        clearInterval(interval);
+      };
     } else {
-        setLiveStatus({ state: 'unknown', message: "Loading broker configuration..." });
+      setLiveStatus(prev => ({ 
+        ...prev,
+        state: brokerConfig ? 'disconnected' : 'unknown', 
+        message: brokerConfig ? 'Not connected to broker' : 'Loading configuration...',
+        lastChecked: new Date().toLocaleTimeString(),
+        backendConnected: false
+      }));
     }
 
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+      }
     };
   }, [brokerConfig, toast]);
 
   const loadBrokerConfig = async () => {
     setIsLoading(true);
     try {
+      // CRITICAL FIX: Enhanced defensive checks
+      if (!BrokerConfig) {
+        throw new Error('BrokerConfig is not available. Import validation failed.');
+      }
+      
+      if (typeof BrokerConfig.list !== 'function') {
+        console.error('❌ BrokerConfig methods available:', Object.keys(BrokerConfig));
+        throw new Error(`BrokerConfig.list is not a function (type: ${typeof BrokerConfig.list}). Import may have failed.`);
+      }
+      
+      console.log("🔍 [DEBUG] Calling BrokerConfig.list()...");
       const configs = await BrokerConfig.list();
-      if (configs.length > 0) {
+      console.log("📋 Loaded broker configs:", configs);
+      console.log("🔍 Debug - configs length:", configs?.length || 0);
+      
+      if (configs && configs.length > 0) {
         const currentConfig = configs[0];
-        setBrokerConfig(currentConfig);
-        if (currentConfig.is_connected) {
-          setActiveTab('import');
+        console.log("📋 Current broker config:", currentConfig);
+        console.log("🔍 Debug - is_connected value:", currentConfig.is_connected);
+        console.log("🔍 Debug - access_token exists:", !!currentConfig.access_token);
+        
+        // If we have an access token, verify with backend
+        if (currentConfig.access_token && currentConfig.user_data?.user_id) {
+          console.log("🔍 Checking backend status for user:", currentConfig.user_data.user_id);
+          try {
+            const backendResponse = await fetch(
+              `https://web-production-de0bc.up.railway.app/api/auth/broker/status?user_id=${currentConfig.user_data.user_id}`
+            );
+            const backendResult = await backendResponse.json();
+            console.log("🔍 Backend status response:", backendResult);
+            
+            if (backendResult.status === 'success' && backendResult.data?.is_connected) {
+              // Update local config with backend confirmation
+              const updatedConfig = {
+                ...currentConfig,
+                is_connected: true,
+                connection_status: 'connected'
+              };
+              await BrokerConfig.update(currentConfig.id, updatedConfig);
+              setBrokerConfig(updatedConfig);
+              
+              console.log("✅ Backend confirms connection - updating to CONNECTED");
+              setActiveTab('import');
+              setLiveStatus(prev => ({ 
+                ...prev,
+                state: 'connected', 
+                message: 'Connected and verified with backend',
+                lastChecked: new Date().toLocaleTimeString(),
+                backendConnected: true
+              }));
+            } else {
+              // Backend says not connected
+              const updatedConfig = {
+                ...currentConfig,
+                is_connected: false,
+                connection_status: 'disconnected'
+              };
+              await BrokerConfig.update(currentConfig.id, updatedConfig);
+              setBrokerConfig(updatedConfig);
+              
+              console.log("❌ Backend reports disconnected - updating to DISCONNECTED");
+              setLiveStatus(prev => ({ 
+                ...prev,
+                state: 'disconnected', 
+                message: `Backend reports: ${backendResult.data?.message || 'Disconnected'}`,
+                lastChecked: new Date().toLocaleTimeString(),
+                backendConnected: false
+              }));
+            }
+          } catch (backendError) {
+            console.error("Error checking backend status:", backendError);
+            // Keep local config but note backend unavailability
+            setBrokerConfig(currentConfig);
+            setLiveStatus(prev => ({ 
+              ...prev,
+              state: currentConfig.is_connected ? 'connected_local' : 'disconnected',
+              message: `Connected (Local) - Backend unavailable: ${backendError.message}`,
+              lastChecked: new Date().toLocaleTimeString(),
+              backendConnected: false
+            }));
+          }
+        } else if (currentConfig.access_token && !currentConfig.user_data?.user_id) {
+          // CRITICAL: Config has access_token but missing user_data - likely a data corruption issue
+          console.error("❌ CRITICAL: Found access_token but missing user_data.user_id");
+          console.error("Config data:", currentConfig);
+          
+          // Force disconnect to clean up corrupted state
+          const cleanConfig = {
+            ...currentConfig,
+            is_connected: false,
+            access_token: '',
+            connection_status: 'disconnected',
+            error_message: 'Configuration corrupted: Missing user data. Please reconnect.'
+          };
+          await BrokerConfig.update(currentConfig.id, cleanConfig);
+          setBrokerConfig(cleanConfig);
+          
+          setLiveStatus(prev => ({ 
+            ...prev,
+            state: 'error', 
+            message: 'Configuration corrupted: Missing user data. Please reconnect to broker.',
+            lastChecked: new Date().toLocaleTimeString(),
+            backendConnected: false
+          }));
+          
+          toast({
+            title: "Configuration Error",
+            description: "Broker configuration is corrupted. Please reconnect to your broker.",
+            variant: "destructive",
+          });
         } else {
+          // No access token, definitely not connected
+          setBrokerConfig(currentConfig);
+          console.log("❌ No access token - setting to DISCONNECTED");
           setActiveTab('setup');
+          setLiveStatus(prev => ({ 
+            ...prev,
+            state: 'disconnected', 
+            message: 'No access token found',
+            lastChecked: new Date().toLocaleTimeString(),
+            backendConnected: false
+          }));
         }
       } else {
-        setBrokerConfig(null); // Explicitly set to null if no config found
+        console.log("⚠️ No broker configs found - setting to UNKNOWN");
+        setBrokerConfig(null);
+        setLiveStatus(prev => ({ 
+          ...prev,
+          state: 'unknown', 
+          message: 'No broker configuration found',
+          lastChecked: new Date().toLocaleTimeString(),
+          backendConnected: false
+        }));
       }
       
       const positions = await ImportedPosition.list();
@@ -114,9 +325,16 @@ export default function BrokerIntegration() {
       console.error("Error loading broker config:", error);
       toast({
         title: "Error",
-        description: "Failed to load broker configuration.",
+        description: `Failed to load broker configuration: ${error.message}`,
         variant: "destructive",
       });
+      setLiveStatus(prev => ({ 
+        ...prev,
+        state: 'error', 
+        message: `Error loading configuration: ${error.message}`,
+        lastChecked: new Date().toLocaleTimeString(),
+        backendConnected: false
+      }));
     }
     setIsLoading(false);
   };
@@ -130,6 +348,7 @@ export default function BrokerIntegration() {
         savedConfig = await BrokerConfig.create(configData);
       }
       
+      console.log("💾 Config saved:", savedConfig);
       setBrokerConfig(savedConfig);
       
       await User.updateMyUserData({
@@ -137,207 +356,326 @@ export default function BrokerIntegration() {
         broker_type: configData.broker_name
       });
       
+      // Auto-switch to import tab if connected
       if (configData.is_connected) {
         setActiveTab('import');
+        setLiveStatus(prev => ({ 
+          ...prev,
+          state: 'connected', 
+          message: 'Successfully connected to broker!',
+          lastChecked: new Date().toLocaleTimeString()
+        }));
+        toast({
+          title: "Success",
+          description: "Broker connected successfully!",
+        });
+      } else {
+        setActiveTab('setup');
+        setLiveStatus(prev => ({ 
+          ...prev,
+          state: 'disconnected', 
+          message: 'Broker disconnected',
+          lastChecked: new Date().toLocaleTimeString(),
+          backendConnected: false
+        }));
       }
     } catch (error) {
       console.error("Error saving broker config:", error);
       toast({
         title: "Error",
-        description: "Failed to save broker configuration.",
+        description: `Failed to save broker configuration: ${error.message}`,
         variant: "destructive",
       });
-      throw error;
     }
   };
 
   const onConnectionComplete = () => {
+    // Force reload config after connection
     loadBrokerConfig();
+  };
+
+  const handleManualRefresh = async () => {
+    console.log("🔄 Manual refresh triggered");
+    await loadBrokerConfig();
+  };
+
+  const handleCheckBackendStatus = async () => {
+    if (!brokerConfig?.access_token) {
+      toast({
+        title: "No Connection",
+        description: "No active broker connection to check.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCheckingBackend(true);
+    
+    try {
+      // CRITICAL FIX: Ensure we have proper user_id - don't fallback to 'local_user'
+      const userId = brokerConfig.user_data?.user_id;
+      if (!userId) {
+        throw new Error('Missing user ID in broker configuration. Please reconnect to broker.');
+      }
+      
+      console.log("🔍 Manual backend check for user_id:", userId);
+      
+      const response = await fetch(`https://web-production-de0bc.up.railway.app/api/auth/broker/status?user_id=${userId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const result = await response.json();
+      console.log("🔍 Manual backend check result:", result);
+      
+      if (result.status === 'success') {
+        const isBackendConnected = result.data?.is_connected || false;
+        const backendMessage = result.data?.message || 'Unknown status';
+        
+        setLiveStatus(prev => ({ 
+          ...prev,
+          state: isBackendConnected ? 'connected' : 'connected_local',
+          message: isBackendConnected 
+            ? `Backend confirms connection at ${new Date().toLocaleTimeString()}`
+            : `Connected (Local) - Backend: ${backendMessage}`,
+          lastChecked: new Date().toLocaleTimeString(),
+          backendConnected: isBackendConnected
+        }));
+        
+        toast({
+          title: isBackendConnected ? "Backend Connected" : "Backend Disconnected",
+          description: isBackendConnected 
+            ? "Backend confirms your broker connection is active"
+            : `Backend reports: ${backendMessage}`,
+          variant: isBackendConnected ? "default" : "destructive",
+        });
+      } else {
+        throw new Error(result.error || 'Backend status check failed');
+      }
+    } catch (error) {
+      console.error("Manual backend check failed:", error);
+      setLiveStatus(prev => ({ 
+        ...prev,
+        state: 'connected_local',
+        message: `Connected (Local) - Backend unavailable: ${error.message}`,
+        lastChecked: new Date().toLocaleTimeString(),
+        backendConnected: false
+      }));
+      
+      toast({
+        title: "Backend Check Failed",
+        description: `Could not verify backend status: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsCheckingBackend(false);
+    }
   };
 
   const handleImportComplete = async (selectedPositions) => {
     try {
-      const positionPromises = selectedPositions.map(position => 
-        ImportedPosition.create({
-          ...position,
-          is_managed_by_ai: true,
-          import_source: brokerConfig.broker_name,
-          last_price_update: new Date().toISOString()
-        })
-      );
+      // Save selected positions to ImportedPosition
+      for (const position of selectedPositions) {
+        await ImportedPosition.create({
+          symbol: position.symbol,
+          quantity: position.quantity,
+          price: position.price,
+          source: brokerConfig.broker_name || 'Unknown'
+        });
+      }
       
-      const importedData = await Promise.all(positionPromises);
-      setImportedPositions(prev => [...prev, ...importedData]);
+      // Reload positions
+      const positions = await ImportedPosition.list();
+      setImportedPositions(positions);
       
-      navigate(createPageUrl("Portfolio"));
+      toast({
+        title: "Import Complete",
+        description: `Successfully imported ${selectedPositions.length} positions.`,
+      });
     } catch (error) {
       console.error("Error importing positions:", error);
       toast({
-        title: "Error",
-        description: "Failed to import positions.",
+        title: "Import Error",
+        description: "Failed to import some positions.",
         variant: "destructive",
       });
     }
   };
 
   const getConnectionStatus = () => {
-    // Prioritize explicit liveStatus
-    if (liveStatus.state === 'disconnected') return { status: 'Disconnected', color: 'bg-red-100 text-red-800 animate-pulse', icon: <WifiOff className="w-3 h-3 mr-1" /> };
-    if (liveStatus.state === 'checking') return { status: 'Checking...', color: 'bg-yellow-100 text-yellow-800 animate-pulse', icon: <Wifi className="w-3 h-3 mr-1" /> };
-    if (liveStatus.state === 'connected') return { status: 'Connected', color: 'bg-green-100 text-green-800', icon: <CheckCircle className="w-3 h-3 mr-1" /> };
+    const { state, message, lastChecked, backendConnected } = liveStatus;
+    console.log("🎨 Debug - getConnectionStatus called with state:", state, "message:", message);
     
-    // Fallback based on config if liveStatus is 'unknown' or not yet determined
-    if (brokerConfig?.is_connected) {
-      return { status: 'Connected (Config)', color: 'bg-green-100 text-green-800', icon: <CheckCircle className="w-3 h-3 mr-1" /> };
+    switch (state) {
+      case 'connected':
+        return {
+          badge: <Badge className="bg-green-600 text-white">Connected</Badge>,
+          icon: <Wifi className="h-4 w-4 text-green-600" />,
+          message: backendConnected ? message : `${message} (Backend verified)`,
+          color: 'text-green-600'
+        };
+      case 'connected_local':
+        return {
+          badge: <Badge className="bg-yellow-600 text-white">Connected (Local)</Badge>,
+          icon: <AlertTriangle className="h-4 w-4 text-yellow-600" />,
+          message: `${message}`,
+          color: 'text-yellow-600'
+        };
+      case 'disconnected':
+        return {
+          badge: <Badge className="bg-red-600 text-white">Disconnected</Badge>,
+          icon: <WifiOff className="h-4 w-4 text-red-600" />,
+          message: message,
+          color: 'text-red-600'
+        };
+      case 'checking':
+        return {
+          badge: <Badge className="bg-blue-600 text-white">Checking...</Badge>,
+          icon: <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />,
+          message: message,
+          color: 'text-blue-600'
+        };
+      case 'error':
+        return {
+          badge: <Badge className="bg-red-600 text-white">Error</Badge>,
+          icon: <AlertTriangle className="h-4 w-4 text-red-600" />,
+          message: message,
+          color: 'text-red-600'
+        };
+      default:
+        return {
+          badge: <Badge className="bg-gray-600 text-white">Unknown</Badge>,
+          icon: <AlertTriangle className="h-4 w-4 text-gray-600" />,
+          message: message,
+          color: 'text-gray-600'
+        };
     }
-    
-    return { status: 'Not Configured', color: 'bg-slate-100 text-slate-600', icon: null };
   };
 
-  const connectionStatus = getConnectionStatus();
+  const status = getConnectionStatus();
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p>Loading broker configuration...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 space-y-6 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => navigate(createPageUrl("Settings"))}
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link to="/" className="text-slate-400 hover:text-white">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <h1 className="text-2xl font-bold text-white">Broker Integration</h1>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleManualRefresh}
+            className="text-slate-400 border-slate-600 hover:bg-slate-800"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          
+          {brokerConfig?.is_connected && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleCheckBackendStatus}
+              disabled={isCheckingBackend}
+              className="text-slate-400 border-slate-600 hover:bg-slate-800"
             >
-              <ArrowLeft className="w-4 h-4" />
+              {isCheckingBackend ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Wifi className="h-4 w-4 mr-2" />
+              )}
+              Check Backend
             </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-800">Broker Integration</h1>
-              <p className="text-slate-600 mt-1">Connect your broker and import your portfolio</p>
+          )}
+        </div>
+      </div>
+
+      {/* Connection Status Card */}
+      <Card className="bg-slate-800 border-slate-700">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {status.icon}
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold text-white">Broker Status</h3>
+                  {status.badge}
+                </div>
+                <p className={`text-sm ${status.color}`}>
+                  {status.message}
+                </p>
+                {liveStatus.lastChecked && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    Last checked: {liveStatus.lastChecked}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Badge className={`${connectionStatus.color} transition-all`}>
-              {connectionStatus.icon}
-              {connectionStatus.status}
-            </Badge>
-            {brokerConfig?.broker_name && (
-              <Badge variant="outline">
-                {brokerConfig.broker_name.charAt(0).toUpperCase() + brokerConfig.broker_name.slice(1)}
-              </Badge>
+            
+            {brokerConfig && (
+              <div className="text-right">
+                <p className="text-sm text-slate-400">Broker: {brokerConfig.broker_name}</p>
+                <p className="text-xs text-slate-500">User: {brokerConfig.user_data?.user_id || 'Unknown'}</p>
+              </div>
             )}
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <Card className="trading-card">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600">Broker Status</CardTitle>
-              <LinkIcon className="h-4 w-4 text-slate-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-slate-800">
-                {brokerConfig?.is_connected ? 'Configured' : 'Not Configured'}
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                {brokerConfig?.broker_name ? `${brokerConfig.broker_name} integration` : 'No broker configured'}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="trading-card">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600">Imported Positions</CardTitle>
-              <Download className="h-4 w-4 text-slate-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-slate-800">
-                {importedPositions.length}
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Holdings synced
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="trading-card">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600">Live Status</CardTitle>
-              {liveStatus.state === 'connected' && <CheckCircle className="h-4 w-4 text-green-500" />}
-              {liveStatus.state === 'disconnected' && <AlertTriangle className="h-4 w-4 text-red-500" />}
-              {liveStatus.state === 'checking' && <Wifi className="h-4 w-4 text-yellow-500 animate-pulse" />}
-              {liveStatus.state === 'unknown' && <Settings className="h-4 w-4 text-slate-500" />}
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-slate-800">
-                {liveStatus.state.charAt(0).toUpperCase() + liveStatus.state.slice(1)}
-              </div>
-              <p className="text-xs text-slate-500 mt-1 truncate" title={liveStatus.message}>
-                {liveStatus.message}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="setup" className="flex items-center gap-2">
-              <Settings className="w-4 h-4" />
-              Broker Setup
-            </TabsTrigger>
-            <TabsTrigger 
-              value="import" 
-              className="flex items-center gap-2"
-              disabled={!brokerConfig?.is_connected}
-            >
-              <Download className="w-4 h-4" />
-              Portfolio Import
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="setup" className="mt-6">
-            <BrokerSetup 
-              onConfigSaved={handleConfigSaved}
-              existingConfig={brokerConfig}
-              isLoading={isLoading}
-              onConnectionComplete={onConnectionComplete}
-            />
-          </TabsContent>
-
-          <TabsContent value="import" className="mt-6">
-            <PortfolioImport 
-              onImportComplete={handleImportComplete}
-              brokerConfig={brokerConfig}
-            />
-          </TabsContent>
-        </Tabs>
-
-        <Card className="trading-card border-blue-200 bg-blue-50 mt-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-blue-800">
-              <Settings className="w-5 h-5" />
-              Integration Guide
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 text-sm text-blue-800">
-              <div>
-                <strong>Step 1:</strong> Get your API credentials from your broker's developer portal
-              </div>
-              <div>
-                <strong>Step 2:</strong> Enter your API key and secret in the Broker Setup tab
-              </div>
-              <div>
-                <strong>Step 3:</strong> Complete the OAuth authentication flow with your broker
-              </div>
-              <div>
-                <strong>Step 4:</strong> Import your existing portfolio and enable AI management
-              </div>
-              <div className="mt-4 pt-3 border-t border-blue-200">
-                <strong>Security:</strong> All API credentials are encrypted and stored securely. 
-                We never store your broker passwords and cannot access your account without your explicit authorization.
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Main Content */}
+      <Card className="bg-slate-800 border-slate-700">
+        <CardHeader>
+          <CardTitle className="text-xl text-white">
+            Connect your broker and import your portfolio
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 bg-slate-700">
+              <TabsTrigger value="setup" className="data-[state=active]:bg-slate-600">
+                Broker Setup
+              </TabsTrigger>
+              <TabsTrigger value="import" className="data-[state=active]:bg-slate-600">
+                Portfolio Import
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="setup" className="mt-6">
+              <BrokerSetup 
+                config={brokerConfig} 
+                onConfigSaved={handleConfigSaved}
+                onConnectionComplete={onConnectionComplete}
+              />
+            </TabsContent>
+            
+            <TabsContent value="import" className="mt-6">
+              <PortfolioImport 
+                brokerConfig={brokerConfig}
+                onImportComplete={handleImportComplete}
+                importedPositions={importedPositions}
+              />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -45,9 +45,11 @@ export default function PortfolioImport({ onImportComplete, brokerConfig }) {
       }
 
       // Call the Base44 function, which will handle auth securely
+      const userId = brokerConfig?.user_data?.user_id || brokerConfig?.user_id || 'local@development.com';
+      
       const [holdingsResult, positionsResult] = await Promise.all([
-        brokerAPI({ endpoint: 'holdings' }),
-        brokerAPI({ endpoint: 'positions' })
+        brokerAPI({ endpoint: 'holdings', user_id: userId }),
+        brokerAPI({ endpoint: 'positions', user_id: userId })
       ]);
 
       const holdingsResponse = holdingsResult.data;

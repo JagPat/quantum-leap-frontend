@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Mock Authentication</title>
+</head>
+<body>
+    <h1>Create Mock Broker Authentication</h1>
+    <div id="output"></div>
+    <button onclick="createConnectedAuth()">Create Connected Auth</button>
+    <button onclick="createDisconnectedAuth()">Create Disconnected Auth</button>
+    <button onclick="clearAuth()">Clear All Auth</button>
+    <button onclick="checkAuth()">Check Current Auth</button>
+    
+    <script>
+        function log(message) {
+            document.getElementById('output').innerHTML += message + '<br>';
+            console.log(message);
+        }
+        
+        function createConnectedAuth() {
+            log('✅ Creating mock CONNECTED authentication...');
+            
+            const mockConfig = {
+                id: Date.now(),
+                broker_name: 'zerodha',
+                api_key: 'mock_api_key_123',
+                api_secret: 'mock_secret_456',
+                access_token: 'mock_access_token_789',
+                request_token: 'mock_request_token_abc',
+                is_connected: true,
+                connection_status: 'connected',
+                user_data: {
+                    user_id: 'EBE183',
+                    user_name: 'Test User',
+                    email: 'test@example.com'
+                },
+                error_message: null,
+                type: 'broker_config'
+            };
+            
+            localStorage.setItem('brokerConfigs', JSON.stringify([mockConfig]));
+            localStorage.setItem('userData', JSON.stringify({
+                broker_connected: true,
+                broker_type: 'zerodha'
+            }));
+            
+            log('✅ Mock connected authentication created!');
+            log('🔄 Refresh the broker integration page to see the change');
+        }
+        
+        function createDisconnectedAuth() {
+            log('❌ Creating mock DISCONNECTED authentication...');
+            
+            const mockConfig = {
+                id: Date.now(),
+                broker_name: 'zerodha',
+                api_key: 'mock_api_key_123',
+                api_secret: 'mock_secret_456',
+                access_token: '',
+                request_token: '',
+                is_connected: false,
+                connection_status: 'disconnected',
+                user_data: null,
+                error_message: null,
+                type: 'broker_config'
+            };
+            
+            localStorage.setItem('brokerConfigs', JSON.stringify([mockConfig]));
+            localStorage.setItem('userData', JSON.stringify({
+                broker_connected: false,
+                broker_type: null
+            }));
+            
+            log('❌ Mock disconnected authentication created!');
+            log('🔄 Refresh the broker integration page to see the change');
+        }
+        
+        function clearAuth() {
+            log('🗑️ Clearing all authentication data...');
+            localStorage.removeItem('brokerConfigs');
+            localStorage.removeItem('userData');
+            localStorage.removeItem('strategies');
+            localStorage.removeItem('dashboardWidgets');
+            localStorage.removeItem('trades');
+            localStorage.removeItem('positions');
+            localStorage.removeItem('importedPositions');
+            log('🗑️ All authentication data cleared!');
+            log('🔄 Refresh the broker integration page to see the change');
+        }
+        
+        function checkAuth() {
+            log('🔍 Current authentication status:');
+            const brokerConfigs = localStorage.getItem('brokerConfigs');
+            if (brokerConfigs) {
+                const configs = JSON.parse(brokerConfigs);
+                log('📋 Found ' + configs.length + ' broker config(s):');
+                configs.forEach((config, i) => {
+                    log(`   ${i + 1}. ${config.broker_name} - Connected: ${config.is_connected}`);
+                });
+            } else {
+                log('❌ No broker configurations found');
+            }
+        }
+        
+        // Auto-check on load
+        checkAuth();
+    </script>
+</body>
+</html> 
