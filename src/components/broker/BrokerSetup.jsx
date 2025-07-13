@@ -25,7 +25,8 @@ export default function BrokerSetup({
   onConfigSaved, 
   existingConfig = null,
   isLoading = false,
-  onConnectionComplete 
+  onConnectionComplete,
+  liveStatus = null
 }) {
   const { toast } = useToast();
   const [config, setConfig] = useState({
@@ -38,6 +39,9 @@ export default function BrokerSetup({
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState('');
   const [requestToken, setRequestToken] = useState('');
+
+  // Add a derived flag for true connection
+  const isTrulyConnected = (existingConfig?.is_connected && liveStatus?.backendConnected);
 
   useEffect(() => {
     const handleAuthMessage = (event) => {
@@ -492,7 +496,7 @@ export default function BrokerSetup({
         </Card>
         
         <div className="space-y-6">
-          {step === 'credentials' && (
+          {!isTrulyConnected && step === 'credentials' && (
             <Card className="trading-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -581,27 +585,27 @@ export default function BrokerSetup({
             </Card>
           )}
 
-          {step === 'connected' && (
-             <Card className="trading-card border-green-300 bg-green-50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-green-800">
-                    <CheckCircle className="w-5 h-5" />
-                    Broker Connected
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-green-700">
-                    Your {currentBroker.name} account is successfully connected and synchronized.
-                  </p>
-                  <Button 
-                    variant="destructive"
-                    onClick={handleDisconnect}
-                    disabled={isConnecting}
-                  >
-                    {isConnecting ? 'Disconnecting...' : 'Disconnect'}
-                  </Button>
-                </CardContent>
-              </Card>
+          {isTrulyConnected && (
+            <Card className="trading-card border-green-300 bg-green-50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-green-800">
+                  <CheckCircle className="w-5 h-5" />
+                  Broker Connected (Backend Verified)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-green-700">
+                  Your {currentBroker.name} account is successfully connected and synchronized (backend verified).
+                </p>
+                <Button 
+                  variant="destructive"
+                  onClick={handleDisconnect}
+                  disabled={isConnecting}
+                >
+                  {isConnecting ? 'Disconnecting...' : 'Disconnect'}
+                </Button>
+              </CardContent>
+            </Card>
           )}
 
           {error && (

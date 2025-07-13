@@ -99,13 +99,27 @@ export default function Portfolio() {
                                 <CardTitle>Current Holdings</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <PortfolioTable positions={portfolioData.positions} />
+                                {portfolioData && Array.isArray(portfolioData.positions) ? (
+                                    <PortfolioTable 
+                                        positions={portfolioData.positions}
+                                        holdings={portfolioData.holdings || []}
+                                    />
+                                ) : (
+                                    <div className="text-center py-8 text-slate-400">
+                                        <p>No position data available or data is in an invalid format.</p>
+                                        <p className="text-xs mt-2">Check console for API response details.</p>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
-                        <PortfolioAnalytics positions={portfolioData.positions}/>
+                        {portfolioData && Array.isArray(portfolioData.positions) &&
+                            <PortfolioAnalytics positions={portfolioData.positions}/>
+                        }
                     </div>
                      <div className="col-span-1 lg:col-span-2">
-                        <AISummaryPanel positions={portfolioData.positions}/>
+                        {portfolioData && Array.isArray(portfolioData.positions) &&
+                            <AISummaryPanel positions={portfolioData.positions}/>
+                        }
                     </div>
                 </div>
             </Suspense>

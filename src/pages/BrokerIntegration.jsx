@@ -22,6 +22,7 @@ import { createPageUrl } from "@/utils";
 import BrokerSetup from "../components/broker/BrokerSetup";
 import PortfolioImport from "../components/broker/PortfolioImport";
 import { useToast } from "@/components/ui/use-toast";
+import { railwayAPI } from "../api/railwayAPI"; // Import the API wrapper
 
 // CRITICAL FIX: Defensive import validation with fallback
 const BrokerConfig = (() => {
@@ -51,6 +52,7 @@ export default function BrokerIntegration() {
   const [activeTab, setActiveTab] = useState('setup');
   const [isLoading, setIsLoading] = useState(true);
   const [importedPositions, setImportedPositions] = useState([]);
+  const [portfolio, setPortfolio] = useState(null); // Add state for portfolio data
   const [liveStatus, setLiveStatus] = useState({ 
     state: 'unknown', 
     message: 'Loading...', 
@@ -181,6 +183,47 @@ export default function BrokerIntegration() {
     };
   }, [brokerConfig, toast]);
 
+  // Only allow import tab if truly connected (backend verified)
+  useEffect(() => {
+    if (!isLoading) {
+      if (brokerConfig?.is_connected && liveStatus.backendConnected) {
+        setActiveTab('import');
+      } else {
+        setActiveTab('setup');
+      }
+    }
+  }, [brokerConfig, liveStatus.backendConnected, isLoading]);
+
+  const handleFetchLivePortfolio = async () => {
+    if (!brokerConfig?.user_data?.user_id) {
+      toast({
+        title: "Error",
+        description: "User ID not found. Cannot fetch portfolio.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await railwayAPI.fetchLivePortfolio(brokerConfig.user_data.user_id);
+      if (response.status === 'success' && response.snapshot) {
+        setPortfolio(response.snapshot);
+        toast({
+          title: "Success",
+          description: "Live portfolio data fetched successfully.",
+        });
+      } else {
+        throw new Error(response.message || "Failed to fetch portfolio.");
+      }
+    } catch (error) {
+      toast({
+        title: "Error fetching portfolio",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const loadBrokerConfig = async () => {
     setIsLoading(true);
     try {
@@ -232,7 +275,10 @@ export default function BrokerIntegration() {
                 state: 'connected', 
                 message: 'Connected and verified with backend',
                 lastChecked: new Date().toLocaleTimeString(),
-                backendConnected: true
+                backendConnected: true,
+                last_successful_connection: backendResult.data.last_successful_connection,
+                token_expiry: backendResult.data.token_expiry,
+                last_error: backendResult.data.last_error
               }));
             } else {
               // Backend says not connected
@@ -250,7 +296,10 @@ export default function BrokerIntegration() {
                 state: 'disconnected', 
                 message: `Backend reports: ${backendResult.data?.message || 'Disconnected'}`,
                 lastChecked: new Date().toLocaleTimeString(),
-                backendConnected: false
+                backendConnected: false,
+                last_successful_connection: backendResult.data?.last_successful_connection,
+                token_expiry: backendResult.data?.token_expiry,
+                last_error: backendResult.data?.last_error
               }));
             }
           } catch (backendError) {
@@ -441,7 +490,10 @@ export default function BrokerIntegration() {
             ? `Backend confirms connection at ${new Date().toLocaleTimeString()}`
             : `Connected (Local) - Backend: ${backendMessage}`,
           lastChecked: new Date().toLocaleTimeString(),
-          backendConnected: isBackendConnected
+          backendConnected: isBackendConnected,
+          last_successful_connection: result.data?.last_successful_connection,
+          token_expiry: result.data?.token_expiry,
+          last_error: result.data?.last_error
         }));
         
         toast({
@@ -627,6 +679,21 @@ export default function BrokerIntegration() {
                     Last checked: {liveStatus.lastChecked}
                   </p>
                 )}
+                {liveStatus.last_successful_connection && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    Last successful connection: {new Date(liveStatus.last_successful_connection).toLocaleString()}
+                  </p>
+                )}
+                {liveStatus.token_expiry && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    Token expiry: {new Date(liveStatus.token_expiry).toLocaleString()}
+                  </p>
+                )}
+                {liveStatus.last_error && (
+                  <p className="text-xs text-red-400 mt-1">
+                    Last error: {liveStatus.last_error}
+                  </p>
+                )}
               </div>
             </div>
             
@@ -653,7 +720,7 @@ export default function BrokerIntegration() {
               <TabsTrigger value="setup" className="data-[state=active]:bg-slate-600">
                 Broker Setup
               </TabsTrigger>
-              <TabsTrigger value="import" className="data-[state=active]:bg-slate-600">
+              <TabsTrigger value="import" className="data-[state=active]:bg-slate-600" disabled={!(brokerConfig?.is_connected && liveStatus.backendConnected)}>
                 Portfolio Import
               </TabsTrigger>
             </TabsList>
@@ -663,6 +730,7 @@ export default function BrokerIntegration() {
                 config={brokerConfig} 
                 onConfigSaved={handleConfigSaved}
                 onConnectionComplete={onConnectionComplete}
+                liveStatus={liveStatus}
               />
             </TabsContent>
             
@@ -671,6 +739,9 @@ export default function BrokerIntegration() {
                 brokerConfig={brokerConfig}
                 onImportComplete={handleImportComplete}
                 importedPositions={importedPositions}
+                liveStatus={liveStatus}
+                fetchLivePortfolio={handleFetchLivePortfolio}
+                portfolio={portfolio}
               />
             </TabsContent>
           </Tabs>
