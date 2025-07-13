@@ -122,7 +122,7 @@ export default function PortfolioImport({ onImportComplete, fetchLivePortfolio, 
                 Click "Fetch Live Data" to import from your broker.
               </p>
             </div>
-          ) : (
+          ) : portfolio && (
             <>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center">

@@ -68,6 +68,8 @@ export default function BrokerIntegration() {
 
   // Enhanced heartbeat mechanism with smart status management
   useEffect(() => {
+    if (!brokerConfig) return; // Add guard clause to prevent race conditions
+
     if (heartbeatInterval) {
       clearInterval(heartbeatInterval);
     }
