@@ -72,21 +72,22 @@ export default function MyDashboardPage() {
         userIdentifier = activeBrokerConfig.user_data.user_id;
         console.log("🔍 [MyDashboard] Using authenticated broker user_id:", userIdentifier);
       } else {
-        // Fallback: Use development user email as string
-        const user = await User.me();
-        userIdentifier = user?.email || 'local@development.com';
-        console.log("🔍 [MyDashboard] No broker authentication found, using fallback email:", userIdentifier);
+        console.warn("⚠️ [MyDashboard] No authenticated broker found. User needs to connect.");
+        // If no user is found, we should stop loading and prompt for connection.
+        setError('Connect to your broker to continue.');
+        setIsLoading(false);
+        return;
       }
       
       console.log("🔍 [MyDashboard] Final userIdentifier:", userIdentifier, "Type:", typeof userIdentifier);
       
-      // CRITICAL FIX: Pass string user ID, not user object
-      const [portfolioResponse, tradesData, positionsData, strategiesData] = await Promise.all([
-        portfolioAPI(userIdentifier), // Pass string, not object
-        Trade.list(),
-        Position.list(),
-        Strategy.list()
-      ]);
+      // CRITICAL FIX: Only call APIs that are implemented on the new backend
+      const portfolioResponse = await portfolioAPI(userIdentifier);
+
+      // TODO: Implement and call endpoints for trades, positions, and strategies
+      const tradesData = [];
+      const positionsData = [];
+      const strategiesData = [];
 
       // Handle the new portfolioAPI response format
       if (portfolioResponse.status === 'no_connection') {

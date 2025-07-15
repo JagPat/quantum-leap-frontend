@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { createPageUrl } from '@/utils';
+import brokerAPI from '../../services/brokerAPI.js';
 
 export default function BrokerSetup({ 
   onConfigSaved, 
@@ -45,10 +46,15 @@ export default function BrokerSetup({
 
   useEffect(() => {
     const handleAuthMessage = (event) => {
-        // Allow messages from Railway backend and same origin
+        // CRITICAL FIX: Dynamic port support for OAuth callback
         const allowedOrigins = [
-            window.location.origin,
-            'https://web-production-de0bc.up.railway.app'
+            window.location.origin, // Current port (5175, 5174, 5173, etc.)
+            'https://web-production-de0bc.up.railway.app', // Production backend
+            'http://localhost:5173', // Legacy support
+            'http://localhost:5174', // Common dev ports  
+            'http://localhost:5175', // Current dev port
+            'http://localhost:3000', // Alternative dev port
+            'http://localhost:8080'  // Alternative dev port
         ];
         
         if (!allowedOrigins.includes(event.origin)) {
@@ -170,8 +176,8 @@ export default function BrokerSetup({
   };
 
   const getRedirectUrl = () => {
-    // CRITICAL FIX: Use localhost frontend URL instead of Base44
-    return 'http://localhost:5173/broker-callback';
+    // DEPLOYMENT-READY: Dynamic redirect URL that works in all environments
+    return `${window.location.origin}/broker-callback`;
   };
 
   const getBackendRedirectUrl = () => {
@@ -210,24 +216,14 @@ export default function BrokerSetup({
       sessionStorage.setItem('broker_api_key', config.api_key);
       sessionStorage.setItem('broker_api_secret', config.api_secret);
 
-      // CRITICAL FIX: Call backend to store credentials before starting OAuth
+      // Setup OAuth credentials on backend
       console.log("🔧 [BrokerSetup] Setting up OAuth credentials on backend...");
-      const setupResponse = await fetch(`https://web-production-de0bc.up.railway.app/api/auth/broker/test-oauth?api_key=${config.api_key}&api_secret=${config.api_secret}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
       
-      const setupResult = await setupResponse.json();
+      const setupResult = await brokerAPI.setupOAuth(config.api_key, config.api_secret);
       console.log("📡 [BrokerSetup] Backend setup response:", setupResult);
       
-      if (setupResult.status !== 'success') {
-        throw new Error(setupResult.message || 'Failed to setup OAuth credentials on backend');
-      }
-      
-      // Use the OAuth URL from backend response for consistency
       const authUrl = setupResult.oauth_url;
+      
       console.log("🚀 [BrokerSetup] Opening OAuth popup with URL:", authUrl);
       
       const popup = window.open(authUrl, 'brokerAuth', 'width=800,height=600');
@@ -293,20 +289,8 @@ export default function BrokerSetup({
         console.log("✅ Cleaned token:", cleanRequestToken);
       }
       
-      // Direct API call to Railway backend
-      const response = await fetch('https://web-production-de0bc.up.railway.app/api/auth/broker/generate-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          request_token: cleanRequestToken,
-          api_key: apiKey,
-          api_secret: apiSecret
-        })
-      });
-      
-      const result = await response.json();
+      // Generate session via API service
+      const result = await brokerAPI.generateSession(cleanRequestToken, apiKey, apiSecret);
       console.log("📡 Backend response:", result);
 
       if (result.status === 'success') {
@@ -396,20 +380,9 @@ export default function BrokerSetup({
                 throw new Error('User ID not found. Cannot disconnect.');
             }
             
-            // Direct API call to Railway backend
-            const response = await fetch(`https://web-production-de0bc.up.railway.app/api/auth/broker/invalidate-session?user_id=${userId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            });
-            
-            const result = await response.json();
+            // Invalidate session via API service
+            const result = await brokerAPI.invalidateSession(userId);
             console.log("🔓 Disconnect response:", result);
-            
-            if (result.status !== 'success') {
-                throw new Error(result.message || 'Failed to invalidate session on the backend.');
-            }
 
             if (existingConfig) {
                  await onConfigSaved({

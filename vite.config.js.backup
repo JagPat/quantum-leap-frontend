@@ -1,0 +1,52 @@
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  // CRITICAL FIX: Add memory and performance optimizations
+  server: {
+    hmr: {
+      overlay: false, // Reduce memory usage from HMR overlays
+    },
+    watch: {
+      // Reduce file watching to prevent memory leaks
+      ignored: [
+        '**/node_modules/**',
+        '**/.git/**',
+        '**/dist/**',
+        '**/coverage/**',
+        '**/*.log',
+        '**/debug-*.js',
+        '**/test-*.js',
+        '**/.*-test.*',
+        '**/portfolio-debug-report.md'
+      ]
+    }
+  },
+  build: {
+    // Optimize build for memory usage
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          ui: ['@radix-ui/react-accordion', '@radix-ui/react-alert-dialog'],
+          charts: ['recharts'],
+          utils: ['lucide-react', 'date-fns']
+        }
+      }
+    }
+  },
+  // Optimize dependency pre-bundling
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'lucide-react'],
+    exclude: ['@vite/client', '@vite/env']
+  }
+}) 

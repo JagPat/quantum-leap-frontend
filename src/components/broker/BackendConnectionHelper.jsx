@@ -13,7 +13,7 @@ import {
   Database
 } from "lucide-react";
 
-export default function BackendConnectionHelper() {
+export default function BackendConnectionHelper({ brokerName, brokerStatus, lastSync, onDisconnect, onConnectAlternative }) {
   const [connectionStatus, setConnectionStatus] = useState('checking');
   const [backendUrl, setBackendUrl] = useState('/api/broker');
 
@@ -125,6 +125,15 @@ export default function BackendConnectionHelper() {
             Once you implement the backend API using Python (kiteconnect library) or Node.js, 
             the live broker integration will work seamlessly.
           </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-blue-800">Connected to: <b>{brokerName || 'N/A'}</b> | Status: <b>{brokerStatus || 'Unknown'}</b></span>
+          {lastSync && <span className="text-xs text-blue-400 ml-2">Last Sync: {lastSync}</span>}
+        </div>
+        <div className="flex gap-3 mt-2">
+          <Button variant="destructive" size="sm" onClick={onDisconnect}>Disconnect Broker</Button>
+          <Button variant="outline" size="sm" onClick={onConnectAlternative}>Connect Alternative Broker</Button>
         </div>
       </CardContent>
     </Card>

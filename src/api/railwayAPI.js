@@ -123,8 +123,24 @@ class RailwayAPI {
             throw new Error(holdingsResult.message || positionsResult.message || 'Failed to fetch portfolio components');
         }
 
-        const holdings = Array.isArray(holdingsResult.data) ? holdingsResult.data : [];
-        const positions = positionsResult.data && Array.isArray(positionsResult.data.net) ? positionsResult.data.net : [];
+        const holdings = Array.isArray(holdingsResult.data) ? holdingsResult.data : 
+                         (holdingsResult.data && Array.isArray(holdingsResult.data.data) ? holdingsResult.data.data : []);
+        // CRITICAL FIX: Handle both direct array and nested .net structure
+        const positions = Array.isArray(positionsResult.data) ? positionsResult.data : 
+                         (positionsResult.data && Array.isArray(positionsResult.data.net) ? positionsResult.data.net : []);
+        
+        console.log("📊 [getPortfolioData] Data processing results:");
+        console.log("   Holdings count:", holdings.length);
+        console.log("   Positions count:", positions.length);
+        console.log("   Holdings result status:", holdingsResult.status);
+        console.log("   Positions result status:", positionsResult.status);
+        console.log("   Holdings raw data preview:", holdingsResult.data ? JSON.stringify(holdingsResult.data).substring(0, 200) : 'null');
+        console.log("   Positions raw data preview:", positionsResult.data ? JSON.stringify(positionsResult.data).substring(0, 200) : 'null');
+        console.log("   🔧 Holdings extraction: Array.isArray(holdingsResult.data):", Array.isArray(holdingsResult.data));
+        console.log("   🔧 Holdings nested check: holdingsResult.data.data exists:", !!(holdingsResult.data && holdingsResult.data.data));
+        if (holdings.length > 0) {
+            console.log("   ✅ Holdings extracted successfully! Sample:", holdings.slice(0, 2));
+        }
         
         const holdings_value = holdings.reduce((acc, h) => acc + (h.last_price * h.quantity), 0);
         const holdings_pnl = holdings.reduce((acc, h) => acc + h.pnl, 0);
@@ -134,8 +150,14 @@ class RailwayAPI {
         const positions_pnl = positions.reduce((acc, p) => acc + p.pnl, 0);
         const day_pnl_positions = positions.reduce((acc, p) => acc + (p.day_change || 0), 0);
 
+        const total_investment = holdings.reduce((acc, h) => acc + (h.invested_amount || 0), 0) + 
+                                positions.reduce((acc, p) => acc + (p.invested_amount || 0), 0);
+        const current_value = holdings_value + positions_value;
+        
         const summary = {
-            total_value: holdings_value + positions_value,
+            total_investment,
+            current_value,
+            total_value: current_value, // Keep for backward compatibility
             total_pnl: holdings_pnl + positions_pnl,
             day_pnl: day_pnl_holdings + day_pnl_positions,
             holdings_value: holdings_value,
@@ -143,6 +165,11 @@ class RailwayAPI {
         };
 
         const structuredData = { holdings, positions, summary };
+        
+        console.log("📊 [getPortfolioData] Final structured data:");
+        console.log("   Summary:", summary);
+        console.log("   Holdings sample:", holdings.slice(0, 2));
+        console.log("   Positions sample:", positions.slice(0, 2));
         
         return { status: 'success', data: structuredData };
 
@@ -168,6 +195,9 @@ class RailwayAPI {
 
 // Create singleton instance
 const railwayAPIInstance = new RailwayAPI();
+
+// Export the instance as railwayAPI for backward compatibility
+export const railwayAPI = railwayAPIInstance;
 
 // Export individual functions that call the instance methods
 export const generateSession = (requestToken, apiKey, apiSecret) => 

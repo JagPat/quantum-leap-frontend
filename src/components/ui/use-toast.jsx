@@ -1,50 +1,23 @@
-// Inspired by react-hot-toast library
-import { useState, useEffect, createContext, useContext } from "react";
+// Simplified toast implementation to prevent memory leaks
+import { useState, useCallback } from "react";
 
-const TOAST_LIMIT = 20;
-const TOAST_REMOVE_DELAY = 1000000;
+const TOAST_LIMIT = 3;
+const TOAST_REMOVE_DELAY = 3000;
+
+let toastCount = 0;
 
 const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
-  UPDATE_TOAST: "UPDATE_TOAST",
   DISMISS_TOAST: "DISMISS_TOAST",
   REMOVE_TOAST: "REMOVE_TOAST",
 };
 
-let count = 0;
-
 function genId() {
-  count = (count + 1) % Number.MAX_VALUE;
-  return count.toString();
+  toastCount = (toastCount + 1) % 1000;
+  return toastCount.toString();
 }
 
-const toastTimeouts = new Map();
-
-const addToRemoveQueue = (toastId) => {
-  if (toastTimeouts.has(toastId)) {
-    return;
-  }
-
-  const timeout = setTimeout(() => {
-    toastTimeouts.delete(toastId);
-    dispatch({
-      type: actionTypes.REMOVE_TOAST,
-      toastId,
-    });
-  }, TOAST_REMOVE_DELAY);
-
-  toastTimeouts.set(toastId, timeout);
-};
-
-const clearFromRemoveQueue = (toastId) => {
-  const timeout = toastTimeouts.get(toastId);
-  if (timeout) {
-    clearTimeout(timeout);
-    toastTimeouts.delete(toastId);
-  }
-};
-
-export const reducer = (state, action) => {
+const reducer = (state, action) => {
   switch (action.type) {
     case actionTypes.ADD_TOAST:
       return {
@@ -63,16 +36,6 @@ export const reducer = (state, action) => {
     case actionTypes.DISMISS_TOAST: {
       const { toastId } = action;
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
-      if (toastId) {
-        addToRemoveQueue(toastId);
-      } else {
-        state.toasts.forEach((toast) => {
-          addToRemoveQueue(toast.id);
-        });
-      }
-
       return {
         ...state,
         toasts: state.toasts.map((t) =>
@@ -86,12 +49,6 @@ export const reducer = (state, action) => {
       };
     }
     case actionTypes.REMOVE_TOAST:
-      if (action.toastId === undefined) {
-        return {
-          ...state,
-          toasts: [],
-        };
-      }
       return {
         ...state,
         toasts: state.toasts.filter((t) => t.id !== action.toastId),
@@ -100,7 +57,6 @@ export const reducer = (state, action) => {
 };
 
 const listeners = [];
-
 let memoryState = { toasts: [] };
 
 function dispatch(action) {
@@ -118,9 +74,8 @@ function toast({ ...props }) {
       type: actionTypes.UPDATE_TOAST,
       toast: { ...props, id },
     });
-
-  const dismiss = () =>
-    dispatch({ type: actionTypes.DISMISS_TOAST, toastId: id });
+  
+  const dismiss = () => dispatch({ type: actionTypes.DISMISS_TOAST, toastId: id });
 
   dispatch({
     type: actionTypes.ADD_TOAST,
@@ -134,8 +89,12 @@ function toast({ ...props }) {
     },
   });
 
+  setTimeout(() => {
+    dispatch({ type: actionTypes.REMOVE_TOAST, toastId: id });
+  }, TOAST_REMOVE_DELAY);
+
   return {
-    id,
+    id: id,
     dismiss,
     update,
   };
@@ -144,7 +103,7 @@ function toast({ ...props }) {
 function useToast() {
   const [state, setState] = useState(memoryState);
 
-  useEffect(() => {
+  useState(() => {
     listeners.push(setState);
     return () => {
       const index = listeners.indexOf(setState);
@@ -152,7 +111,7 @@ function useToast() {
         listeners.splice(index, 1);
       }
     };
-  }, [state]);
+  });
 
   return {
     ...state,
