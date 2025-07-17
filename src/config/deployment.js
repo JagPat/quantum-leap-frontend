@@ -47,18 +47,18 @@ const getApiEndpoints = () => {
   const baseUrl = getBackendUrl();
   return {
     auth: {
-      testOAuth: `${baseUrl}/api/auth/broker/test-oauth`,
-      generateSession: `${baseUrl}/api/auth/broker/generate-session`,
-      invalidateSession: `${baseUrl}/api/auth/broker/invalidate-session`,
-      checkStatus: `${baseUrl}/api/auth/broker/status`,
-      getSession: `${baseUrl}/api/auth/broker/session`,
-      callback: `${baseUrl}/api/auth/broker/callback`
+      testOAuth: `${baseUrl}/broker/test-oauth`,
+      generateSession: `${baseUrl}/broker/generate-session`,
+      invalidateSession: `${baseUrl}/broker/invalidate-session`,
+      checkStatus: `${baseUrl}/broker/status`,
+      getSession: `${baseUrl}/broker/session`,
+      callback: `${baseUrl}/broker/callback`
     },
     broker: {
-      holdings: `${baseUrl}/api/broker/holdings`,
-      positions: `${baseUrl}/api/broker/positions`,
-      profile: `${baseUrl}/api/broker/profile`,
-      margins: `${baseUrl}/api/broker/margins`
+      holdings: `${baseUrl}/portfolio/holdings`,
+      positions: `${baseUrl}/portfolio/positions`,
+      profile: `${baseUrl}/broker/profile`,
+      margins: `${baseUrl}/broker/margins`
     },
     portfolio: {
       data: `${baseUrl}/api/portfolio/data`,

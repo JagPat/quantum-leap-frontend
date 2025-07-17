@@ -116,7 +116,7 @@ export default function BrokerSetup({
       console.log("🔍 [BrokerSetup] Fetching session data for user:", userId);
       
       // Fetch session data from backend
-      const response = await fetch(`https://web-production-de0bc.up.railway.app/api/auth/broker/session?user_id=${userId}`);
+      const response = await fetch(`https://web-production-de0bc.up.railway.app/broker/session?user_id=${userId}`);
       const sessionData = await response.json();
       
       console.log("📡 [BrokerSetup] Session data response:", sessionData);
@@ -181,9 +181,8 @@ export default function BrokerSetup({
   };
 
   const getBackendRedirectUrl = () => {
-    // CRITICAL FIX: This should point to our localhost backend during development
-    // or keep Railway for production, but ensure backend redirects to correct frontend
-    return 'https://web-production-de0bc.up.railway.app/api/auth/broker/callback';
+    // CRITICAL FIX: This should point to our Railway backend with correct auth prefix
+    return 'https://web-production-de0bc.up.railway.app/broker/callback';
   };
 
   const brokerInfo = {

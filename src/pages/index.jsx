@@ -7,6 +7,7 @@ import ErrorBoundary from '../components/ErrorBoundary'
 
 // Lazy load all heavy components for optimal performance
 const Portfolio = React.lazy(() => import('./Portfolio'))
+const PortfolioNew = React.lazy(() => import('./PortfolioNew'))
 const AI = React.lazy(() => import('./AI'))
 const Trading = React.lazy(() => import('./Trading'))
 const TradeHistory = React.lazy(() => import('./TradeHistory'))
@@ -17,6 +18,7 @@ const ApiSpec = React.lazy(() => import('./ApiSpec'))
 const StrategyDetail = React.lazy(() => import('./StrategyDetail'))
 const Widgets = React.lazy(() => import('./Widgets'))
 const Phase23TestDashboard = React.lazy(() => import('../components/dashboard/Phase23TestDashboard'))
+const OAuthTestDashboard = React.lazy(() => import('../components/testing/OAuthTestDashboard'))
 
 // Enhanced loading component for better UX
 const LoadingFallback = ({ text = "Loading..." }) => (
@@ -62,6 +64,14 @@ export default function Pages() {
         <Route path="/portfolio" element={
           <Layout>
             <LazyWrapper fallbackText="Loading Portfolio...">
+              <PortfolioNew />
+            </LazyWrapper>
+          </Layout>
+        } />
+        
+        <Route path="/portfolio-old" element={
+          <Layout>
+            <LazyWrapper fallbackText="Loading Old Portfolio...">
               <Portfolio />
             </LazyWrapper>
           </Layout>
@@ -141,6 +151,14 @@ export default function Pages() {
           <Layout>
             <LazyWrapper fallbackText="Loading Phase 2.3 Test Dashboard...">
               <Phase23TestDashboard />
+            </LazyWrapper>
+          </Layout>
+        } />
+        
+        <Route path="/oauth-test" element={
+          <Layout>
+            <LazyWrapper fallbackText="Loading OAuth Test Dashboard...">
+              <OAuthTestDashboard />
             </LazyWrapper>
           </Layout>
         } />

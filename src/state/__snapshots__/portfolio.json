@@ -1,0 +1,73 @@
+{
+  "portfolio_state": {
+    "status": "operational",
+    "service": "portfolio_management",
+    "message": "Portfolio service is running",
+    "last_sync": "2024-07-16T15:30:00.000Z",
+    "data": {
+      "holdings": [
+        {
+          "tradingsymbol": "RELIANCE",
+          "quantity": 100,
+          "average_price": 2500.00,
+          "last_price": 2550.00,
+          "market_value": 255000.00,
+          "unrealized_pnl": 5000.00
+        },
+        {
+          "tradingsymbol": "INFY",
+          "quantity": 50,
+          "average_price": 1500.00,
+          "last_price": 1520.00,
+          "market_value": 76000.00,
+          "unrealized_pnl": 1000.00
+        }
+      ],
+      "positions": [
+        {
+          "tradingsymbol": "TCS",
+          "quantity": 25,
+          "average_price": 3800.00,
+          "last_price": 3850.00,
+          "market_value": 96250.00,
+          "unrealized_pnl": 1250.00
+        }
+      ],
+      "summary": {
+        "total_holdings_value": 331000.00,
+        "total_positions_value": 96250.00,
+        "total_unrealized_pnl": 7250.00,
+        "last_updated": "2024-07-16T15:30:00.000Z"
+      }
+    }
+  },
+  "broker_state": {
+    "status": "operational",
+    "service": "broker_integration",
+    "message": "Broker service is running",
+    "endpoints": {
+      "holdings": "/api/broker/holdings",
+      "positions": "/api/broker/positions",
+      "profile": "/api/broker/profile",
+      "margins": "/api/broker/margins"
+    }
+  },
+  "ai_state": {
+    "status": "no_key",
+    "message": "BYOAI mode - no AI key configured",
+    "mode": "BYOAI (Bring Your Own AI)",
+    "features": {
+      "strategy_generation": "available",
+      "copilot_analysis": "available",
+      "signals": "available"
+    }
+  },
+  "trading_state": {
+    "status": "operational",
+    "service": "trading_operations",
+    "message": "Trading service is running",
+    "endpoints": {
+      "positions": "/api/trading/positions"
+    }
+  }
+} 

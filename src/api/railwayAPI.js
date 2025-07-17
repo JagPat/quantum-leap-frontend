@@ -157,7 +157,7 @@ class RailwayAPI {
   }
 
   async getBrokerMargins(userId) {
-    return this.request(`/api/broker/margins?user_id=${userId}`);
+    return this.request(`/broker/margins?user_id=${userId}`);
   }
 
   // ========================================
@@ -175,12 +175,12 @@ class RailwayAPI {
 
   async testBrokerOAuth(userId) {
     // This endpoint is not yet implemented - returns not_implemented status
-    return this.request(`/api/auth/broker/test-oauth?user_id=${userId}`);
+    return this.request(`/broker/test-oauth?user_id=${userId}`);
   }
 
   async getBrokerAuthStatus(userId) {
     // This endpoint is not yet implemented - returns not_implemented status
-    return this.request(`/api/auth/broker/status?user_id=${userId}`);
+    return this.request(`/broker/status?user_id=${userId}`);
   }
 
   // ========================================
