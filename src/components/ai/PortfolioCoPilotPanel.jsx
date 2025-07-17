@@ -1,0 +1,412 @@
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { 
+  Shield, 
+  TrendingUp, 
+  PieChart, 
+  Target,
+  AlertTriangle,
+  CheckCircle,
+  RefreshCw,
+  Activity,
+  BarChart3,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  Zap
+} from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { usePortfolioCoPilot } from '@/hooks/useAI';
+
+export default function PortfolioCoPilotPanel({ portfolioData, onRefresh }) {
+  const { toast } = useToast();
+  const { analysis, recommendations, analyzePortfolioData, loading, error } = usePortfolioCoPilot();
+  
+  const [lastAnalysis, setLastAnalysis] = useState(null);
+
+  useEffect(() => {
+    if (portfolioData && portfolioData.holdings) {
+      handleAnalyze();
+    }
+  }, [portfolioData]);
+
+  const handleAnalyze = async () => {
+    try {
+      if (!portfolioData || !portfolioData.holdings) {
+        toast({
+          title: "No Portfolio Data",
+          description: "Please connect your broker account to analyze your portfolio",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const result = await analyzePortfolioData(portfolioData);
+      setLastAnalysis(new Date());
+      
+      toast({
+        title: "Analysis Complete",
+        description: "Portfolio analysis and recommendations updated",
+      });
+
+    } catch (err) {
+      toast({
+        title: "Analysis Failed",
+        description: err.message || "Failed to analyze portfolio",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getHealthColor = (score) => {
+    if (score >= 80) return 'text-green-600';
+    if (score >= 60) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  const getHealthDescription = (score) => {
+    if (score >= 80) return 'Excellent';
+    if (score >= 60) return 'Good';
+    if (score >= 40) return 'Fair';
+    return 'Needs Attention';
+  };
+
+  const getRiskColor = (level) => {
+    switch (level?.toLowerCase()) {
+      case 'low': return 'text-green-600 bg-green-50 border-green-200';
+      case 'medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      case 'high': return 'text-red-600 bg-red-50 border-red-200';
+      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatPercentage = (value) => {
+    return `${(value * 100).toFixed(1)}%`;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              AI Portfolio Co-Pilot
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              {lastAnalysis && (
+                <span className="text-sm text-gray-500">
+                  Last analyzed: {lastAnalysis.toLocaleTimeString()}
+                </span>
+              )}
+              <Button onClick={handleAnalyze} disabled={loading} size="sm">
+                <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                {loading ? 'Analyzing...' : 'Analyze Portfolio'}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      {/* Error Display */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Portfolio Health Score */}
+      {analysis?.portfolio_health && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Portfolio Health Score
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="text-center">
+                <div className={`text-3xl font-bold ${getHealthColor(analysis.portfolio_health.overall_score)}`}>
+                  {analysis.portfolio_health.overall_score}/100
+                </div>
+                <div className="text-lg text-gray-600">
+                  {getHealthDescription(analysis.portfolio_health.overall_score)}
+                </div>
+              </div>
+              
+              <Progress 
+                value={analysis.portfolio_health.overall_score} 
+                className="w-full"
+              />
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {analysis.portfolio_health.components && Object.entries(analysis.portfolio_health.components).map(([key, value]) => (
+                  <div key={key} className="text-center">
+                    <div className="text-sm text-gray-600 capitalize mb-1">
+                      {key.replace(/_/g, ' ')}
+                    </div>
+                    <div className={`text-lg font-semibold ${getHealthColor(value)}`}>
+                      {typeof value === 'number' ? value : '—'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Risk Analysis */}
+      {analysis?.risk_analysis && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Risk Assessment
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {analysis.risk_analysis.overall_risk_level && (
+                <div className="flex items-center justify-between">
+                  <span>Overall Risk Level:</span>
+                  <Badge className={getRiskColor(analysis.risk_analysis.overall_risk_level)}>
+                    {analysis.risk_analysis.overall_risk_level}
+                  </Badge>
+                </div>
+              )}
+              
+              {analysis.risk_analysis.concentration_risk && (
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm">Concentration Risk:</span>
+                    <span className="text-sm font-medium">
+                      {formatPercentage(analysis.risk_analysis.concentration_risk)}
+                    </span>
+                  </div>
+                  <Progress value={analysis.risk_analysis.concentration_risk * 100} />
+                </div>
+              )}
+              
+              {analysis.risk_analysis.volatility && (
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm">Portfolio Volatility:</span>
+                    <span className="text-sm font-medium">
+                      {formatPercentage(analysis.risk_analysis.volatility)}
+                    </span>
+                  </div>
+                  <Progress value={analysis.risk_analysis.volatility * 100} />
+                </div>
+              )}
+              
+              {analysis.risk_analysis.beta && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Market Beta:</span>
+                  <span className="text-sm font-medium">
+                    {analysis.risk_analysis.beta.toFixed(2)}
+                  </span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          
+          {/* Diversification Analysis */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PieChart className="h-5 w-5" />
+                Diversification
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {analysis.diversification_analysis?.hhi_index && (
+                <div className="flex items-center justify-between">
+                  <span>Diversification Score:</span>
+                  <Badge variant={analysis.diversification_analysis.hhi_index < 0.15 ? 'default' : 'destructive'}>
+                    {analysis.diversification_analysis.hhi_index < 0.15 ? 'Well Diversified' : 'Concentrated'}
+                  </Badge>
+                </div>
+              )}
+              
+              {analysis.diversification_analysis?.sector_allocation && (
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Sector Allocation:</h4>
+                  <div className="space-y-2">
+                    {Object.entries(analysis.diversification_analysis.sector_allocation)
+                      .sort(([,a], [,b]) => b - a)
+                      .slice(0, 5)
+                      .map(([sector, weight]) => (
+                      <div key={sector} className="flex justify-between items-center">
+                        <span className="text-sm capitalize">{sector}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-20 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full" 
+                              style={{ width: `${weight * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-medium w-12 text-right">
+                            {formatPercentage(weight)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Rebalancing Recommendations */}
+      {recommendations?.rebalancing_suggestions && (
+        <Card className="border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5" />
+              AI Rebalancing Recommendations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {recommendations.rebalancing_suggestions.map((suggestion, index) => (
+                <div key={index} className="bg-white p-4 rounded-lg border">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h4 className="font-medium">{suggestion.symbol}</h4>
+                      <p className="text-sm text-gray-600">{suggestion.reason}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center gap-1">
+                        {suggestion.action === 'buy' ? (
+                          <ArrowUpCircle className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <ArrowDownCircle className="h-4 w-4 text-red-600" />
+                        )}
+                        <Badge className={suggestion.action === 'buy' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+                          {suggestion.action.toUpperCase()}
+                        </Badge>
+                      </div>
+                      {suggestion.target_allocation && (
+                        <div className="text-sm text-gray-600 mt-1">
+                          Target: {formatPercentage(suggestion.target_allocation)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {(suggestion.current_price || suggestion.suggested_price) && (
+                    <div className="flex justify-between items-center text-sm">
+                      {suggestion.current_price && (
+                        <span>Current: {formatCurrency(suggestion.current_price)}</span>
+                      )}
+                      {suggestion.suggested_price && (
+                        <span>Target: {formatCurrency(suggestion.suggested_price)}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Key Insights */}
+      {(analysis?.key_insights || recommendations?.insights) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Key Insights
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {(analysis?.key_insights || recommendations?.insights || []).map((insight, index) => (
+                <div key={index} className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm text-gray-700">{insight}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Performance Metrics */}
+      {analysis?.performance_metrics && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Performance Metrics
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {Object.entries(analysis.performance_metrics).map(([key, value]) => (
+                <div key={key} className="text-center p-3 bg-gray-50 rounded-lg">
+                  <div className="text-sm text-gray-600 capitalize mb-1">
+                    {key.replace(/_/g, ' ')}
+                  </div>
+                  <div className="text-lg font-semibold">
+                    {typeof value === 'number' 
+                      ? key.includes('return') || key.includes('change')
+                        ? formatPercentage(value)
+                        : value.toFixed(2)
+                      : value
+                    }
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No Analysis State */}
+      {!analysis && !loading && (
+        <Card className="border-dashed">
+          <CardContent className="pt-6">
+            <div className="text-center py-8">
+              <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-600 mb-2">
+                Portfolio Analysis Not Available
+              </h3>
+              <p className="text-gray-500 mb-4">
+                {portfolioData?.holdings 
+                  ? 'Click "Analyze Portfolio" to get AI-powered insights and recommendations'
+                  : 'Connect your broker account to analyze your portfolio'
+                }
+              </p>
+              {portfolioData?.holdings && (
+                <Button onClick={handleAnalyze}>
+                  <Shield className="mr-2 h-4 w-4" />
+                  Analyze Portfolio
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+} 

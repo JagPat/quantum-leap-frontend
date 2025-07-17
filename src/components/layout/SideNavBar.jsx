@@ -9,6 +9,7 @@ import {
   History,
   Settings,
   Bot,
+  Brain,
   Power,
   Blocks,
   Link as LinkIcon
@@ -23,6 +24,7 @@ import {
 const navItems = [
   { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/portfolio', icon: Wallet, label: 'Portfolio' },
+  { href: '/ai', icon: Brain, label: 'AI Engine' },
   { href: '/trading', icon: CandlestickChart, label: 'Trading Engine' },
   { href: '/trade-history', icon: History, label: 'Trade History' },
   { href: '/broker-integration', icon: LinkIcon, label: 'Broker Integration' },

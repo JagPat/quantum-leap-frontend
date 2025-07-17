@@ -1,7 +1,8 @@
 // Railway Backend API Service
-// Replaces Base44 SDK with direct API calls to our Railway backend
+// Direct API calls to Railway backend for optimal performance
 
-const BACKEND_URL = 'https://web-production-de0bc.up.railway.app';
+// const BACKEND_URL = 'http://127.0.0.1:8000'; // Local development
+const BACKEND_URL = 'https://web-production-de0bc.up.railway.app'; // Production
 
 class RailwayAPI {
   constructor() {
@@ -32,18 +33,23 @@ class RailwayAPI {
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     
+    // Define which endpoints require authentication
     const requiresAuth = endpoint.includes('/api/portfolio/') || 
-                         endpoint.includes('/api/broker/status-header') ||
-                         endpoint.includes('/api/broker/invalidate-session');
+                         endpoint.includes('/api/broker/') ||
+                         endpoint.includes('/api/trading/') ||
+                         endpoint.includes('/api/ai/') ||
+                         endpoint.includes('/broker/') ||
+                         endpoint.includes('/ai/');
     
     const authHeaders = requiresAuth ? this.getAuthHeaders() : {};
     
     if (requiresAuth && (!authHeaders.Authorization || !authHeaders['X-User-ID'])) {
-      console.error(`❌ [RailwayAPI] Missing authorization for authenticated endpoint: ${endpoint}`);
+      console.warn(`⚠️ [RailwayAPI] Missing authorization for authenticated endpoint: ${endpoint}`);
       return { 
-          status: 'error', 
-          message: 'Missing authorization header. Please ensure you are connected to your broker.', 
-          data: null 
+          status: 'unauthorized', 
+          message: 'Please connect to your broker to access this feature.', 
+          data: null,
+          requiresAuth: true
       };
     }
     
@@ -63,23 +69,46 @@ class RailwayAPI {
       const response = await fetch(url, config);
       
       if (!response.ok) {
+        if (response.status === 401) {
+          console.warn(`⚠️ [RailwayAPI] Unauthorized (401) for ${endpoint} - user needs to connect broker`);
+          return {
+            status: 'unauthorized',
+            message: 'Please connect to your broker to access this feature.',
+            data: null,
+            requiresAuth: true
+          };
+        }
+        
+        if (response.status === 404) {
+          console.warn(`⚠️ [RailwayAPI] Endpoint not found (404) for ${endpoint} - feature not yet implemented`);
+          return {
+            status: 'not_implemented',
+            message: 'This feature is planned but not yet implemented.',
+            data: null,
+            endpoint: endpoint
+          };
+        }
+        
         const errorData = await response.json().catch(() => ({ detail: response.statusText }));
         throw new Error(errorData.detail || `HTTP ${response.status}`);
       }
       
       const data = await response.json();
-      console.log(`✅ [RailwayAPI] Success for ${endpoint}`);
-      return { status: 'success', data };
-
+      
+      console.log(`✅ [RailwayAPI] Success:`, data);
+      return data;
     } catch (error) {
-      console.error(`❌ [RailwayAPI] Error for ${endpoint}:`, error);
-      return { status: 'error', message: error.message, data: null };
+      console.error(`❌ [RailwayAPI] Error:`, error);
+      throw error;
     }
   }
 
+  // ========================================
   // Broker Authentication Functions
+  // ========================================
+
   async generateSession(requestToken, apiKey, apiSecret) {
-    return this.request('/api/auth/broker/generate-session', {
+    return this.request('/broker/generate-session', {
       method: 'POST',
       body: JSON.stringify({
         request_token: requestToken,
@@ -90,139 +119,227 @@ class RailwayAPI {
   }
 
   async invalidateSession(userId) {
-    return this.request(`/api/broker/invalidate-session?user_id=${userId}`, {
+    return this.request(`/broker/invalidate-session?user_id=${userId}`, {
       method: 'POST',
     });
   }
 
   async checkConnectionStatus(userId) {
+    return this.request(`/broker/session?user_id=${userId}`);
+  }
+
+  async getBrokerSession(userId) {
+    return this.request(`/broker/session?user_id=${userId}`);
+  }
+
+  async getBrokerProfile(userId) {
+    return this.request(`/broker/profile?user_id=${userId}`);
+  }
+
+  // ========================================
+  // Broker Functions (Available Endpoints)
+  // ========================================
+
+  async getBrokerStatus() {
+    return this.request('/api/broker/status');
+  }
+
+  async getBrokerHoldings(userId) {
+    return this.request(`/api/broker/holdings?user_id=${userId}`);
+  }
+
+  async getBrokerPositions(userId) {
+    return this.request(`/api/broker/positions?user_id=${userId}`);
+  }
+
+  async getBrokerProfile(userId) {
+    return this.request(`/api/broker/profile?user_id=${userId}`);
+  }
+
+  async getBrokerMargins(userId) {
+    return this.request(`/api/broker/margins?user_id=${userId}`);
+  }
+
+  // ========================================
+  // Missing Broker Endpoints (Frontend Expected)
+  // ========================================
+
+  async getBrokerOrders(userId) {
+    // This endpoint is not yet implemented - returns not_implemented status
+    return this.request(`/api/broker/orders?user_id=${userId}`);
+  }
+
+  // ========================================
+  // Auth Functions (Available Endpoints)
+  // ========================================
+
+  async testBrokerOAuth(userId) {
+    // This endpoint is not yet implemented - returns not_implemented status
+    return this.request(`/api/auth/broker/test-oauth?user_id=${userId}`);
+  }
+
+  async getBrokerAuthStatus(userId) {
+    // This endpoint is not yet implemented - returns not_implemented status
     return this.request(`/api/auth/broker/status?user_id=${userId}`);
   }
 
+  // ========================================
   // Portfolio Functions
-  async fetchLivePortfolio() {
-    return this.request('/api/portfolio/fetch-live', {
+  // ========================================
+
+  async getPortfolioData(userId) {
+    return this.request(`/api/portfolio/latest?user_id=${userId}`);
+  }
+
+  async fetchLivePortfolio(userId) {
+    return this.request(`/api/portfolio/fetch-live?user_id=${userId}`, {
       method: 'POST',
     });
   }
 
-  async getLatestPortfolio() {
-    return this.request('/api/portfolio/latest');
-  }
-
-  async getPortfolioData(userId) {
-    try {
-        console.log("🚀 [getPortfolioData] Fetching full portfolio for user:", userId);
-
-        const [holdingsResult, positionsResult] = await Promise.all([
-            this.getHoldings(userId),
-            this.getPositions(userId)
-        ]);
-
-        if (holdingsResult.status === 'error' || positionsResult.status === 'error') {
-            throw new Error(holdingsResult.message || positionsResult.message || 'Failed to fetch portfolio components');
-        }
-
-        const holdings = Array.isArray(holdingsResult.data) ? holdingsResult.data : 
-                         (holdingsResult.data && Array.isArray(holdingsResult.data.data) ? holdingsResult.data.data : []);
-        // CRITICAL FIX: Handle both direct array and nested .net structure
-        const positions = Array.isArray(positionsResult.data) ? positionsResult.data : 
-                         (positionsResult.data && Array.isArray(positionsResult.data.net) ? positionsResult.data.net : []);
-        
-        console.log("📊 [getPortfolioData] Data processing results:");
-        console.log("   Holdings count:", holdings.length);
-        console.log("   Positions count:", positions.length);
-        console.log("   Holdings result status:", holdingsResult.status);
-        console.log("   Positions result status:", positionsResult.status);
-        console.log("   Holdings raw data preview:", holdingsResult.data ? JSON.stringify(holdingsResult.data).substring(0, 200) : 'null');
-        console.log("   Positions raw data preview:", positionsResult.data ? JSON.stringify(positionsResult.data).substring(0, 200) : 'null');
-        console.log("   🔧 Holdings extraction: Array.isArray(holdingsResult.data):", Array.isArray(holdingsResult.data));
-        console.log("   🔧 Holdings nested check: holdingsResult.data.data exists:", !!(holdingsResult.data && holdingsResult.data.data));
-        if (holdings.length > 0) {
-            console.log("   ✅ Holdings extracted successfully! Sample:", holdings.slice(0, 2));
-        }
-        
-        const holdings_value = holdings.reduce((acc, h) => acc + (h.last_price * h.quantity), 0);
-        const holdings_pnl = holdings.reduce((acc, h) => acc + h.pnl, 0);
-        const day_pnl_holdings = holdings.reduce((acc, h) => acc + h.day_change, 0);
-
-        const positions_value = positions.reduce((acc, p) => acc + (p.last_price * p.quantity), 0);
-        const positions_pnl = positions.reduce((acc, p) => acc + p.pnl, 0);
-        const day_pnl_positions = positions.reduce((acc, p) => acc + (p.day_change || 0), 0);
-
-        const total_investment = holdings.reduce((acc, h) => acc + (h.invested_amount || 0), 0) + 
-                                positions.reduce((acc, p) => acc + (p.invested_amount || 0), 0);
-        const current_value = holdings_value + positions_value;
-        
-        const summary = {
-            total_investment,
-            current_value,
-            total_value: current_value, // Keep for backward compatibility
-            total_pnl: holdings_pnl + positions_pnl,
-            day_pnl: day_pnl_holdings + day_pnl_positions,
-            holdings_value: holdings_value,
-            positions_value: positions_value
-        };
-
-        const structuredData = { holdings, positions, summary };
-        
-        console.log("📊 [getPortfolioData] Final structured data:");
-        console.log("   Summary:", summary);
-        console.log("   Holdings sample:", holdings.slice(0, 2));
-        console.log("   Positions sample:", positions.slice(0, 2));
-        
-        return { status: 'success', data: structuredData };
-
-    } catch (error) {
-        console.error("❌ [getPortfolioData] Error:", error);
-        return { status: 'error', message: error.message, data: null };
-    }
-  }
-
+  // Legacy method for backward compatibility
   async getHoldings(userId) {
-    return this.request(`/api/portfolio/holdings?user_id=${userId}`);
+    return this.getPortfolioData(userId);
   }
 
+  // Legacy method for backward compatibility
   async getPositions(userId) {
-    return this.request(`/api/portfolio/positions?user_id=${userId}`);
+    return this.getPortfolioData(userId);
   }
 
+  // ========================================
+  // AI Functions
+  // ========================================
+
+  async getAIStrategies(userId) {
+    // This endpoint doesn't exist yet, return empty array for now
+    return { data: [] };
+  }
+
+  async generateAIStrategy(userId, data) {
+    return this.request(`/api/ai/strategy?user_id=${userId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getAIAnalysis(userId, data) {
+    // This endpoint is not yet implemented - returns not_implemented status
+    return this.request(`/api/ai/analysis?user_id=${userId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getAISignals(userId) {
+    return this.request(`/api/ai/signals?user_id=${userId}`);
+  }
+
+  async getAIInsightsCrowd(userId) {
+    return this.request(`/api/ai/insights/crowd?user_id=${userId}`);
+  }
+
+  async getAIInsightsTrending(userId) {
+    return this.request(`/api/ai/insights/trending?user_id=${userId}`);
+  }
+
+  async getCopilotAnalysis(userId, data) {
+    return this.request(`/api/ai/copilot/analyze?user_id=${userId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getCopilotRecommendations(userId) {
+    return this.request(`/api/ai/copilot/recommendations?user_id=${userId}`);
+  }
+
+  async getPerformanceAnalytics(userId) {
+    // This endpoint is not yet implemented - returns not_implemented status
+    return this.request(`/api/ai/analytics/performance?user_id=${userId}`);
+  }
+
+  async getStrategyAnalytics(userId, strategyId) {
+    // This endpoint is not yet implemented - returns not_implemented status
+    return this.request(`/api/ai/analytics/strategy/${strategyId}?user_id=${userId}`);
+  }
+
+  async getStrategyClustering(userId) {
+    // This endpoint is not yet implemented - returns not_implemented status
+    return this.request(`/api/ai/clustering/strategies?user_id=${userId}`);
+  }
+
+  async submitAIFeedback(userId, data) {
+    // This endpoint is not yet implemented - returns not_implemented status
+    return this.request(`/api/ai/feedback/outcome?user_id=${userId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getFeedbackInsights(userId) {
+    // This endpoint is not yet implemented - returns not_implemented status
+    return this.request(`/api/ai/feedback/insights?user_id=${userId}`);
+  }
+
+  async getAIStatus(userId) {
+    return this.request(`/api/ai/status?user_id=${userId}`);
+  }
+
+  async getAISessions(userId) {
+    return this.request(`/api/ai/sessions?user_id=${userId}`);
+  }
+
+  // ========================================
+  // AI Preferences (BYOAI)
+  // ========================================
+
+  async getAIPreferences(userId) {
+    return this.request(`/api/ai/preferences?user_id=${userId}`);
+  }
+
+  async updateAIPreferences(userId, preferences) {
+    return this.request(`/api/ai/preferences?user_id=${userId}`, {
+      method: 'POST',
+      body: JSON.stringify(preferences),
+    });
+  }
+
+  async validateAIKey(userId, provider, apiKey) {
+    return this.request(`/api/ai/validate-key?user_id=${userId}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        provider: provider,
+        api_key: apiKey,
+      }),
+    });
+  }
+
+  // ========================================
   // Health Check
+  // ========================================
+
   async healthCheck() {
     return this.request('/health');
   }
+
+  async getVersion() {
+    return this.request('/version');
+  }
+
+  async getReadyz() {
+    return this.request('/readyz');
+  }
+
+  async getAIHealth() {
+    return this.request('/api/ai/status');
+  }
+
+  async getTradingStatus() {
+    return this.request('/api/trading/status');
+  }
 }
 
-// Create singleton instance
-const railwayAPIInstance = new RailwayAPI();
-
-// Export the instance as railwayAPI for backward compatibility
-export const railwayAPI = railwayAPIInstance;
-
-// Export individual functions that call the instance methods
-export const generateSession = (requestToken, apiKey, apiSecret) => 
-  railwayAPIInstance.generateSession(requestToken, apiKey, apiSecret);
-
-export const invalidateSession = (userId) => 
-  railwayAPIInstance.invalidateSession(userId);
-
-export const checkConnectionStatus = (userId) => 
-  railwayAPIInstance.checkConnectionStatus(userId);
-
-export const getPortfolioData = (userId) => 
-  railwayAPIInstance.getPortfolioData(userId);
-
-export const getPositions = (userId) => 
-  railwayAPIInstance.getPositions(userId);
-
-export const getHoldings = (userId) => 
-  railwayAPIInstance.getHoldings(userId);
-
-export const fetchLivePortfolio = () =>
-  railwayAPIInstance.fetchLivePortfolio();
-
-export const getLatestPortfolio = () =>
-  railwayAPIInstance.getLatestPortfolio();
-
-export const healthCheck = () => 
-  railwayAPIInstance.healthCheck();
+// Export singleton instance
+export const railwayAPI = new RailwayAPI();
+export default railwayAPI;

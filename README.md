@@ -1,8 +1,12 @@
-# Base44 App
+# Quantum Leap Trading Platform
 
+A modern AI-first trading platform built with React and Vite.
 
-This app was created automatically by Base44.
-It's a Vite+React app that communicates with the Base44 API.
+## Features
+- AI-powered trading strategies with BYOAI (Bring Your Own AI) architecture
+- Real-time portfolio management and broker integration
+- Advanced analytics and performance tracking
+- Secure per-user AI provider management
 
 ## Running the app
 
@@ -17,4 +21,4 @@ npm run dev
 npm run build
 ```
 
-For more information and support, please contact Base44 support at app@base44.com.
+For more information, please refer to the project documentation.

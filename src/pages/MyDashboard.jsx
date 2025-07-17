@@ -12,17 +12,31 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { portfolioAPI } from '@/api/functions';
 
-// Import all possible widgets
-import PortfolioAnalytics from '../components/portfolio/PortfolioAnalytics';
-import TradeHistoryTable from '../components/dashboard/TradeHistoryTable';
-import AIRecommendationsPanel from '../components/portfolio/AIRecommendationsPanel';
-import PerformanceComparisonTool from '../components/portfolio/PerformanceComparisonTool';
-import StrategyAttributionView from '../components/portfolio/StrategyAttributionView';
+// Lazy load heavy widgets to dramatically improve initial dashboard performance
+const PortfolioAnalytics = React.lazy(() => import('../components/portfolio/PortfolioAnalytics'));
+const TradeHistoryTable = React.lazy(() => import('../components/dashboard/TradeHistoryTable'));
+const AIRecommendationsPanel = React.lazy(() => import('../components/portfolio/AIRecommendationsPanel'));
+const PerformanceComparisonTool = React.lazy(() => import('../components/portfolio/PerformanceComparisonTool'));
+const StrategyAttributionView = React.lazy(() => import('../components/portfolio/StrategyAttributionView'));
+
+// Import lightweight widgets that can load immediately
 import PortfolioSummaryCards from '../components/portfolio/PortfolioSummaryCards';
 import TradingStatus from '../components/dashboard/TradingStatus';
 import RecentTrades from '../components/dashboard/RecentTrades';
+import AISignalsWidget from '../components/dashboard/AISignalsWidget';
+import BYOAIStatusWidget from '../components/dashboard/BYOAIStatusWidget';
 
-// Map string type to actual component
+// Loading fallback for lazy widgets
+const LoadingFallback = ({ title }) => (
+  <div className="flex items-center justify-center min-h-[200px]">
+    <div className="flex items-center space-x-2">
+      <Loader2 className="h-5 w-5 animate-spin text-amber-500" />
+      <span className="text-slate-400">Loading {title}...</span>
+    </div>
+  </div>
+);
+
+// Map string type to actual component (including lazy loaded ones)
 const widgetMap = {
   PortfolioAnalytics,
   TradeHistoryTable,
@@ -31,10 +45,12 @@ const widgetMap = {
   StrategyAttributionView,
   PortfolioSummaryCards,
   TradingStatus,
-  RecentTrades
+  RecentTrades,
+  AISignalsWidget,
+  BYOAIStatusWidget
 };
 
-// Available widget types for customizable section
+// Available widget types for customizable section (only heavy widgets)
 const CUSTOMIZABLE_WIDGET_TYPES = Object.keys(widgetMap).filter(type => 
   !['PortfolioSummaryCards', 'TradingStatus', 'RecentTrades'].includes(type)
 );
@@ -53,15 +69,17 @@ export default function MyDashboardPage() {
   const [trades, setTrades] = useState([]);
   const [positions, setPositions] = useState([]);
   const [strategies, setStrategies] = useState([]);
+  const [deferredDataLoaded, setDeferredDataLoaded] = useState(false);
   const [fixedWidgetsProps, setFixedWidgetsProps] = useState({
       tradingStatus: { isEngineRunning: true, activeStrategies: ['RSI Momentum', 'AI Strategy 4'], lastSignal: null, tradingMode: 'sandbox' },
       recentTrades: { trades: [] }
   });
 
+  // Enhanced progressive loading - load essential data first, defer heavy operations
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // CRITICAL FIX: Enhanced user identification - prioritize authenticated broker user_id
+      // PHASE 1: Load essential data first for immediate dashboard display
       let userIdentifier = null;
       
       // First priority: Check for authenticated broker user_id
@@ -71,50 +89,87 @@ export default function MyDashboardPage() {
       if (activeBrokerConfig?.user_data?.user_id) {
         userIdentifier = activeBrokerConfig.user_data.user_id;
         console.log("🔍 [MyDashboard] Using authenticated broker user_id:", userIdentifier);
-      } else {
-        console.warn("⚠️ [MyDashboard] No authenticated broker found. User needs to connect.");
-        // If no user is found, we should stop loading and prompt for connection.
-        setError('Connect to your broker to continue.');
-        setIsLoading(false);
-        return;
-      }
-      
-      console.log("🔍 [MyDashboard] Final userIdentifier:", userIdentifier, "Type:", typeof userIdentifier);
-      
-      // CRITICAL FIX: Only call APIs that are implemented on the new backend
-      const portfolioResponse = await portfolioAPI(userIdentifier);
+        
+        // Only call portfolio API if we have a valid user
+        const portfolioResponse = await portfolioAPI(userIdentifier);
 
-      // TODO: Implement and call endpoints for trades, positions, and strategies
-      const tradesData = [];
-      const positionsData = [];
-      const strategiesData = [];
-
-      // Handle the new portfolioAPI response format
-      if (portfolioResponse.status === 'no_connection') {
-        console.warn("⚠️ [MyDashboard] No broker connection - showing empty portfolio");
-        setError('Connect to your broker to view portfolio data');
-        setPortfolioData([]);
-        setPortfolioSummary(portfolioResponse.data.summary);
-      } else if (portfolioResponse.status === 'error') {
-        console.error("❌ [MyDashboard] Portfolio API error:", portfolioResponse.message);
-        setError(`Portfolio error: ${portfolioResponse.message}`);
-        setPortfolioData([]);
-        setPortfolioSummary(portfolioResponse.data.summary);
+        // Handle the new portfolioAPI response format
+        if (portfolioResponse.status === 'no_connection') {
+          console.warn("⚠️ [MyDashboard] No broker connection - showing empty portfolio");
+          setError('Connect to your broker to view portfolio data');
+          setPortfolioData([]);
+          setPortfolioSummary(portfolioResponse.data.summary);
+        } else if (portfolioResponse.status === 'error') {
+          console.error("❌ [MyDashboard] Portfolio API error:", portfolioResponse.message);
+          setError(`Portfolio error: ${portfolioResponse.message}`);
+          setPortfolioData([]);
+          setPortfolioSummary(portfolioResponse.data.summary);
+        } else {
+          // Successful response
+          setPortfolioData(portfolioResponse?.data || []);
+          setPortfolioSummary(portfolioResponse?.data?.summary || null);
+          setError(''); // Clear any previous errors
+        }
       } else {
-        // Successful response
-        setPortfolioData(portfolioResponse?.data || []);
-        setPortfolioSummary(portfolioResponse?.data?.summary || null);
-        setError(''); // Clear any previous errors
+        // No authenticated user found
+        console.warn("⚠️ [MyDashboard] No authenticated user found - showing default state");
+        setError('Please authenticate with your broker to view portfolio data');
+        setPortfolioData([]);
+        setPortfolioSummary({
+          total_invested: 0,
+          current_value: 0,
+          total_pnl: 0,
+          day_pnl: 0,
+          total_pnl_percentage: 0,
+          day_pnl_percentage: 0
+        });
       }
+
+      // Load customizable widgets from localStorage
+      const savedWidgets = JSON.parse(localStorage.getItem('customizableWidgets') || '[]');
+      setCustomizableWidgets(savedWidgets);
       
-      setTrades(tradesData || []);
-      setPositions(positionsData || []);
-      setStrategies(strategiesData || []);
+      setIsLoading(false); // Show dashboard immediately with essential data
+      
+      // PHASE 2: Defer heavy data loading to background
+      setTimeout(() => {
+        loadDeferredData();
+      }, 100); // Small delay to let essential UI render first
+      
     } catch (error) {
-      console.error("❌ [MyDashboard] Dashboard load error:", error);
-      setError(`Dashboard load: ${error.message}`);
-    } finally {
+      console.error("❌ [MyDashboard] Error loading essential data:", error);
+      setError(`Failed to load dashboard: ${error.message}`);
       setIsLoading(false);
+    }
+  };
+
+  // Deferred data loading for heavy operations
+  const loadDeferredData = async () => {
+    if (deferredDataLoaded) return;
+    
+    try {
+      // Load heavy data in background without blocking UI
+      const [tradesData, positionsData, strategiesData] = await Promise.allSettled([
+        Trade.list().catch(() => []),
+        Position.list().catch(() => []), 
+        Strategy.list().catch(() => [])
+      ]);
+
+      setTrades(tradesData.status === 'fulfilled' ? tradesData.value : []);
+      setPositions(positionsData.status === 'fulfilled' ? positionsData.value : []);
+      setStrategies(strategiesData.status === 'fulfilled' ? strategiesData.value : []);
+      
+      // Update fixed widget props with real data
+      setFixedWidgetsProps(prev => ({
+        ...prev,
+        recentTrades: { trades: tradesData.status === 'fulfilled' ? tradesData.value.slice(0, 5) : [] }
+      }));
+      
+      setDeferredDataLoaded(true);
+      console.log("✅ [MyDashboard] Deferred data loaded successfully");
+    } catch (error) {
+      console.error("⚠️ [MyDashboard] Error loading deferred data:", error);
+      // Don't show error for deferred data - dashboard already functional
     }
   };
   
@@ -219,9 +274,15 @@ export default function MyDashboardPage() {
               </WidgetWrapper>
             </div>
             
-            <div className="lg:col-span-8">
+            <div className="lg:col-span-4">
               <WidgetWrapper title="Recent Activity" isFixed={true} isEditMode={false}>
                 <RecentTrades {...fixedWidgetsProps.recentTrades} />
+              </WidgetWrapper>
+            </div>
+            
+            <div className="lg:col-span-4">
+              <WidgetWrapper title="AI Provider Status" isFixed={true} isEditMode={false}>
+                <BYOAIStatusWidget />
               </WidgetWrapper>
             </div>
           </div>
@@ -293,7 +354,9 @@ export default function MyDashboardPage() {
                               isFixed={false}
                             >
                               {WidgetComponent ? (
-                                <WidgetComponent {...widget.props_config} isDashboardWidget={true} />
+                                <React.Suspense fallback={<LoadingFallback title={widget.widget_type} />}>
+                                  <WidgetComponent {...widget.props_config} isDashboardWidget={true} />
+                                </React.Suspense>
                               ) : (
                                 <div className="text-slate-400">Unknown Widget Type</div>
                               )}

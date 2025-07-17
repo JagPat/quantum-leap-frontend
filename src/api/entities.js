@@ -1,5 +1,5 @@
-// Mock entities to replace Base44 entities
-// These are data structure definitions for the application
+// Trading platform entities with optimized local storage
+// Lightweight data structure definitions for the application
 
 export const Trade = {
   create: (data) => {
@@ -12,12 +12,11 @@ export const Trade = {
   
   list: () => {
     const trades = JSON.parse(localStorage.getItem('trades') || '[]');
-    // If no trades exist, return some mock data
+    // Provide minimal mock data only if needed
     if (trades.length === 0) {
       const mockTrades = [
         { id: 1, symbol: 'AAPL', quantity: 100, price: 150.25, side: 'buy', timestamp: new Date().toISOString() },
-        { id: 2, symbol: 'GOOGL', quantity: 50, price: 2500.75, side: 'buy', timestamp: new Date(Date.now() - 3600000).toISOString() },
-        { id: 3, symbol: 'MSFT', quantity: 75, price: 300.50, side: 'sell', timestamp: new Date(Date.now() - 7200000).toISOString() }
+        { id: 2, symbol: 'GOOGL', quantity: 50, price: 2500.75, side: 'buy', timestamp: new Date(Date.now() - 3600000).toISOString() }
       ];
       localStorage.setItem('trades', JSON.stringify(mockTrades));
       return Promise.resolve(mockTrades);

@@ -1,13 +1,5 @@
-// Import Railway API instead of Base44
-import { 
-  generateSession, 
-  invalidateSession, 
-  checkConnectionStatus, 
-  getPortfolioData, 
-  getPositions, 
-  getHoldings,
-  healthCheck 
-} from './railwayAPI';
+// Import Railway API instance
+import { railwayAPI } from './railwayAPI';
 
 // Helper function to extract user ID as string from various input types
 const extractUserId = (userInput) => {
@@ -86,7 +78,7 @@ export const portfolioAPI = async (userInput) => {
       has_api_key: !!activeConfig.api_key
     });
     
-    return await getPortfolioData(userId);
+    return await railwayAPI.getPortfolioData(userId);
   } catch (error) {
     console.error("❌ [portfolioAPI] Error:", error);
     // Return empty data instead of throwing error to prevent dashboard crashes
@@ -109,11 +101,11 @@ export const portfolioAPI = async (userInput) => {
 };
 
 // Export functions with Base44-compatible names for backward compatibility
-export const helloWorld = healthCheck;
-export const manualAuthCheck = checkConnectionStatus;
-export const brokerConnection = generateSession;
-export const debugJWT = checkConnectionStatus;
-export const brokerDisconnect = invalidateSession;
+export const helloWorld = railwayAPI.healthCheck;
+export const manualAuthCheck = railwayAPI.checkConnectionStatus;
+export const brokerConnection = railwayAPI.generateSession;
+export const debugJWT = railwayAPI.checkConnectionStatus;
+export const brokerDisconnect = railwayAPI.invalidateSession;
 
 // Create a proper brokerAPI function that handles multiple endpoints
 export const brokerAPI = async ({ endpoint, user_id }) => {
@@ -133,9 +125,9 @@ export const brokerAPI = async ({ endpoint, user_id }) => {
   
   switch (endpoint) {
     case 'holdings':
-      return { data: await getHoldings(userId) };
+      return { data: await railwayAPI.getHoldings(userId) };
     case 'positions':
-      return { data: await getPositions(userId) };
+      return { data: await railwayAPI.getPositions(userId) };
     default:
       throw new Error(`Unknown endpoint: ${endpoint}`);
   }

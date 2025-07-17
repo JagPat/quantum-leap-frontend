@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { portfolioAPI } from '@/api/functions';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,8 +26,28 @@ import {
   ArrowDown,
   Wallet,
   Target,
-  Activity
+  Activity,
+  Shield,
+  Loader2,
+  Brain
 } from "lucide-react";
+
+// Lazy load AI Co-Pilot component to improve initial page load
+const PortfolioCoPilotPanel = React.lazy(() => import('@/components/ai/PortfolioCoPilotPanel'));
+
+// Loading component for AI Co-Pilot
+const AICoPilotLoading = () => (
+  <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+    <div className="flex items-center space-x-2">
+      <Brain className="h-6 w-6 animate-pulse text-amber-500" />
+      <Loader2 className="h-5 w-5 animate-spin text-amber-500" />
+    </div>
+    <div className="text-center">
+      <p className="text-slate-300 text-lg font-medium">Loading AI Co-Pilot...</p>
+      <p className="text-slate-500 text-sm mt-1">Analyzing your portfolio...</p>
+    </div>
+  </div>
+);
 
 export default function Portfolio() {
     const [portfolioData, setPortfolioData] = useState(null);
@@ -415,7 +435,7 @@ export default function Portfolio() {
 
                 {/* Main Content Tabs */}
                 <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
-                    <TabsList className="grid w-full grid-cols-4 bg-white rounded-xl shadow-sm p-1">
+                    <TabsList className="grid w-full grid-cols-5 bg-white rounded-xl shadow-sm p-1">
                         <TabsTrigger value="overview" className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white">
                             Overview
                         </TabsTrigger>
@@ -427,6 +447,10 @@ export default function Portfolio() {
                         </TabsTrigger>
                         <TabsTrigger value="analytics" className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white">
                             Analytics
+                        </TabsTrigger>
+                        <TabsTrigger value="copilot" className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+                            <Shield className="w-4 h-4 mr-1" />
+                            AI Co-Pilot
                         </TabsTrigger>
                     </TabsList>
 
@@ -762,6 +786,16 @@ export default function Portfolio() {
                                 </CardContent>
                             </Card>
                         </div>
+                    </TabsContent>
+
+                    {/* AI Co-Pilot Tab */}
+                    <TabsContent value="copilot" className="space-y-6">
+                        <Suspense fallback={<AICoPilotLoading />}>
+                            <PortfolioCoPilotPanel 
+                                portfolioData={portfolioData}
+                                onRefresh={fetchPortfolioData}
+                            />
+                        </Suspense>
                     </TabsContent>
                 </Tabs>
             </div>
