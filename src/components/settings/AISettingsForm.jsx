@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,9 +97,21 @@ export default function AISettingsForm() {
   const [validateBeforeSaving, setValidateBeforeSaving] = useState(true);
   const [validationResults, setValidationResults] = useState({});
   const [hasChanges, setHasChanges] = useState(false);
+  
+  // Ref to track validation timeouts
+  const validationTimeouts = useRef({});
 
   useEffect(() => {
     loadCurrentSettings();
+  }, []);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(validationTimeouts.current).forEach(timeoutId => {
+        if (timeoutId) clearTimeout(timeoutId);
+      });
+    };
   }, []);
 
   useEffect(() => {
@@ -154,14 +166,20 @@ export default function AISettingsForm() {
         headers: { 'Content-Type': 'application/json' }
       });
       
+      console.log(`🔍 [validateApiKey] ${provider} response:`, response);
+      
+      // Backend returns direct response: { valid: boolean, provider: string, message: string }
       const result = {
-        valid: response.data?.valid || false,
-        message: response.data?.message || 'Validation failed'
+        valid: response.valid || false,
+        message: response.message || 'Validation failed'
       };
+      
+      console.log(`🔍 [validateApiKey] ${provider} result:`, result);
       
       setValidationResults(prev => ({ ...prev, [provider]: result }));
       return result;
     } catch (error) {
+      console.error(`❌ [validateApiKey] ${provider} error:`, error);
       const result = { valid: false, message: 'Validation request failed' };
       setValidationResults(prev => ({ ...prev, [provider]: result }));
       return result;
@@ -185,10 +203,16 @@ export default function AISettingsForm() {
       });
     }
 
+    // Clear any existing timeout for this provider
+    if (validationTimeouts.current[provider]) {
+      clearTimeout(validationTimeouts.current[provider]);
+    }
+
     // Auto-validate if key looks complete and validateBeforeSaving is enabled
     if (validateBeforeSaving && value.trim() && value.length > 20) {
       // Debounce validation to avoid too many API calls
-      setTimeout(() => {
+      validationTimeouts.current[provider] = setTimeout(() => {
+        console.log(`🔍 [handleKeyChange] Auto-validating ${provider} key`);
         validateApiKey(provider, value);
       }, 1000);
     }
