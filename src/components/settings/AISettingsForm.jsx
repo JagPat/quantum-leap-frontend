@@ -347,8 +347,12 @@ export default function AISettingsForm() {
 
   const getKeyStatusBadge = (provider) => {
     const hasKey = currentSettings[`has_${provider}_key`];
-    if (hasKey) {
-      return <Badge variant="outline" className="border-green-200 text-green-700">Configured</Badge>;
+    const isValid = validationResults[provider]?.valid;
+    
+    if (isValid) {
+      return <Badge variant="outline" className="border-green-200 text-green-700">Valid</Badge>;
+    } else if (hasKey) {
+      return <Badge variant="outline" className="border-yellow-200 text-yellow-700">Configured</Badge>;
     }
     return <Badge variant="outline" className="border-gray-200 text-gray-500">Not Set</Badge>;
   };
@@ -364,20 +368,38 @@ export default function AISettingsForm() {
 
   const getAvailableProviders = () => {
     const available = [];
-    if (currentSettings.has_openai_key) available.push('OpenAI');
-    if (currentSettings.has_claude_key) available.push('Claude');
-    if (currentSettings.has_gemini_key) available.push('Gemini');
+    // Check both saved settings and current validation results
+    if (currentSettings.has_openai_key || validationResults.openai?.valid) available.push('OpenAI');
+    if (currentSettings.has_claude_key || validationResults.claude?.valid) available.push('Claude');
+    if (currentSettings.has_gemini_key || validationResults.gemini?.valid) available.push('Gemini');
     return available;
   };
 
   const getSetupStatus = () => {
     const available = getAvailableProviders();
+    const savedCount = [currentSettings.has_openai_key, currentSettings.has_claude_key, currentSettings.has_gemini_key].filter(Boolean).length;
+    const validCount = Object.values(validationResults).filter(result => result?.valid).length;
+    
     if (available.length === 0) {
       return { status: 'not-configured', message: 'No API keys configured', color: 'text-red-600' };
     } else if (available.length === 1) {
-      return { status: 'basic', message: `Using ${available[0]}`, color: 'text-yellow-600' };
+      const provider = available[0];
+      const isValid = validationResults[provider.toLowerCase()]?.valid;
+      const isSaved = currentSettings[`has_${provider.toLowerCase()}_key`];
+      
+      if (isValid && !isSaved) {
+        return { status: 'basic', message: `${provider} key validated (not saved)`, color: 'text-yellow-600' };
+      } else if (isValid && isSaved) {
+        return { status: 'basic', message: `Using ${provider}`, color: 'text-green-600' };
+      } else {
+        return { status: 'basic', message: `Using ${provider}`, color: 'text-yellow-600' };
+      }
     } else {
-      return { status: 'optimal', message: `${available.length} providers available`, color: 'text-green-600' };
+      if (validCount > savedCount) {
+        return { status: 'optimal', message: `${available.length} providers available (${validCount} validated, ${savedCount} saved)`, color: 'text-green-600' };
+      } else {
+        return { status: 'optimal', message: `${available.length} providers available`, color: 'text-green-600' };
+      }
     }
   };
 
