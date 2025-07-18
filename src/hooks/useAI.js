@@ -5,6 +5,7 @@ import { railwayAPI } from '@/api/railwayAPI';
 export const useAI = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [threadId, setThreadId] = useState(null);
   const abortControllerRef = useRef(null);
 
   // Generic request handler with abort support
@@ -43,13 +44,89 @@ export const useAI = () => {
     }
   }, []);
 
+  // OpenAI Assistants API
+  const sendAssistantMessage = useCallback(async (message, context = null) => {
+    try {
+      const response = await makeRequest('/api/ai/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message,
+          thread_id: threadId,
+          context
+        })
+      });
+
+      // Update thread ID if it's a new thread
+      if (response.thread_id && response.thread_id !== threadId) {
+        setThreadId(response.thread_id);
+      }
+
+      return response;
+    } catch (err) {
+      console.error('Error sending assistant message:', err);
+      throw err;
+    }
+  }, [makeRequest, threadId]);
+
+  const getAssistantStatus = useCallback(async () => {
+    return await makeRequest('/api/ai/status');
+  }, [makeRequest]);
+
+  const getThreadMessages = useCallback(async (threadId, limit = 10) => {
+    // Thread management not implemented in current backend
+    return {
+      status: 'not_implemented',
+      messages: [],
+      message: 'Thread management not yet implemented'
+    };
+  }, [makeRequest]);
+
+  const deleteThread = useCallback(async (threadId) => {
+    // Thread management not implemented in current backend
+    return {
+      status: 'not_implemented',
+      message: 'Thread management not yet implemented'
+    };
+  }, [makeRequest]);
+
+  const getUserThreadId = useCallback(async () => {
+    // Thread management not implemented in current backend
+    return {
+      status: 'not_implemented',
+      thread_id: null,
+      message: 'Thread management not yet implemented'
+    };
+  }, [makeRequest]);
+
+  const clearUserThread = useCallback(async () => {
+    // Thread management not implemented in current backend
+    setThreadId(null);
+    return {
+      status: 'not_implemented',
+      message: 'Thread management not yet implemented'
+    };
+  }, [makeRequest]);
+
+  // Initialize thread ID on mount
+  const initializeThread = useCallback(async () => {
+    try {
+      const response = await getUserThreadId();
+      if (response.thread_id) {
+        setThreadId(response.thread_id);
+      }
+    } catch (err) {
+      console.log('No existing thread found, will create new one on first message');
+    }
+  }, [getUserThreadId]);
+
   // AI Preferences
   const getAIPreferences = useCallback(async () => {
-    return await makeRequest('/api/auth/ai/preferences');
+    return await makeRequest('/api/ai/preferences');
   }, [makeRequest]);
 
   const updateAIPreferences = useCallback(async (preferences) => {
-    return await makeRequest('/api/auth/ai/preferences', {
+    return await makeRequest('/api/ai/preferences', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(preferences)
@@ -57,7 +134,7 @@ export const useAI = () => {
   }, [makeRequest]);
 
   const validateAPIKey = useCallback(async (provider, apiKey) => {
-    return await makeRequest('/api/auth/ai/validate-key', {
+    return await makeRequest('/api/ai/validate-key', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ provider, api_key: apiKey })
@@ -65,7 +142,7 @@ export const useAI = () => {
   }, [makeRequest]);
 
   const clearAIPreferences = useCallback(async () => {
-    return await makeRequest('/api/auth/ai/preferences', {
+    return await makeRequest('/api/ai/preferences', {
       method: 'DELETE'
     });
   }, [makeRequest]);
@@ -186,7 +263,17 @@ export const useAI = () => {
   return {
     loading,
     error,
+    threadId,
     cancelRequest,
+    
+    // OpenAI Assistants API
+    sendAssistantMessage,
+    getAssistantStatus,
+    getThreadMessages,
+    deleteThread,
+    getUserThreadId,
+    clearUserThread,
+    initializeThread,
     
     // Preferences
     getAIPreferences,
@@ -252,30 +339,132 @@ export const useStrategyGeneration = () => {
   };
 };
 
+// OpenAI Assistants specialized hook
+export const useOpenAIAssistant = () => {
+  const {
+    sendAssistantMessage,
+    getAssistantStatus,
+    getThreadMessages,
+    deleteThread,
+    getUserThreadId,
+    clearUserThread,
+    initializeThread,
+    threadId,
+    loading,
+    error
+  } = useAI();
+
+  const [messages, setMessages] = useState([]);
+  const [assistantStatus, setAssistantStatus] = useState(null);
+
+  // Load thread messages
+  const loadThreadMessages = useCallback(async () => {
+    if (!threadId) return;
+    
+    try {
+      const response = await getThreadMessages(threadId);
+      setMessages(response.messages || []);
+    } catch (err) {
+      console.error('Failed to load thread messages:', err);
+    }
+  }, [getThreadMessages, threadId]);
+
+  // Send message and update messages
+  const sendMessage = useCallback(async (message, context = null) => {
+    try {
+      const response = await sendAssistantMessage(message, context);
+      
+      // Add user message
+      const userMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: message,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Add assistant response
+      const assistantMessage = {
+        id: response.message_id || `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: response.reply,
+        timestamp: new Date().toISOString()
+      };
+      
+      setMessages(prev => [...prev, userMessage, assistantMessage]);
+      
+      return response;
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      throw err;
+    }
+  }, [sendAssistantMessage]);
+
+  // Get assistant status
+  const loadAssistantStatus = useCallback(async () => {
+    try {
+      const status = await getAssistantStatus();
+      setAssistantStatus(status);
+    } catch (err) {
+      console.error('Failed to load assistant status:', err);
+    }
+  }, [getAssistantStatus]);
+
+  // Clear conversation
+  const clearConversation = useCallback(async () => {
+    try {
+      await clearUserThread();
+      setMessages([]);
+    } catch (err) {
+      console.error('Failed to clear conversation:', err);
+    }
+  }, [clearUserThread]);
+
+  return {
+    messages,
+    assistantStatus,
+    threadId,
+    loading,
+    error,
+    sendMessage,
+    loadThreadMessages,
+    loadAssistantStatus,
+    clearConversation,
+    initializeThread
+  };
+};
+
 export const usePortfolioCoPilot = () => {
   const { analyzePortfolio, getRebalanceRecommendations, loading, error } = useAI();
   const [analysis, setAnalysis] = useState(null);
-  const [recommendations, setRecommendations] = useState(null);
+  const [recommendations, setRecommendations] = useState([]);
 
-  const analyzePortfolioData = useCallback(async (portfolioData) => {
+  const analyzeCurrentPortfolio = useCallback(async (portfolioData) => {
     try {
-      const analysisData = await analyzePortfolio(portfolioData);
-      setAnalysis(analysisData);
-      
-      const recommendationsData = await getRebalanceRecommendations(portfolioData);
-      setRecommendations(recommendationsData);
-      
-      return { analysis: analysisData, recommendations: recommendationsData };
+      const result = await analyzePortfolio(portfolioData);
+      setAnalysis(result);
+      return result;
     } catch (err) {
-      console.error('Portfolio analysis failed:', err);
+      console.error('Failed to analyze portfolio:', err);
       throw err;
     }
-  }, [analyzePortfolio, getRebalanceRecommendations]);
+  }, [analyzePortfolio]);
+
+  const getRebalanceSuggestions = useCallback(async (portfolioData) => {
+    try {
+      const result = await getRebalanceRecommendations(portfolioData);
+      setRecommendations(result?.recommendations || []);
+      return result;
+    } catch (err) {
+      console.error('Failed to get rebalance recommendations:', err);
+      throw err;
+    }
+  }, [getRebalanceRecommendations]);
 
   return {
     analysis,
     recommendations,
-    analyzePortfolioData,
+    analyzeCurrentPortfolio,
+    getRebalanceSuggestions,
     loading,
     error
   };
@@ -283,26 +472,32 @@ export const usePortfolioCoPilot = () => {
 
 export const useCrowdIntelligence = () => {
   const { getCrowdInsights, getTrendingInsights, loading, error } = useAI();
-  const [crowdData, setCrowdData] = useState(null);
-  const [trendingData, setTrendingData] = useState(null);
+  const [crowdInsights, setCrowdInsights] = useState([]);
+  const [trendingInsights, setTrendingInsights] = useState([]);
 
-  const refreshInsights = useCallback(async () => {
+  const loadCrowdInsights = useCallback(async () => {
     try {
-      const [crowd, trending] = await Promise.all([
-        getCrowdInsights(),
-        getTrendingInsights()
-      ]);
-      setCrowdData(crowd);
-      setTrendingData(trending);
+      const result = await getCrowdInsights();
+      setCrowdInsights(result?.insights || []);
     } catch (err) {
-      console.error('Failed to refresh insights:', err);
+      console.error('Failed to load crowd insights:', err);
     }
-  }, [getCrowdInsights, getTrendingInsights]);
+  }, [getCrowdInsights]);
+
+  const loadTrendingInsights = useCallback(async () => {
+    try {
+      const result = await getTrendingInsights();
+      setTrendingInsights(result?.insights || []);
+    } catch (err) {
+      console.error('Failed to load trending insights:', err);
+    }
+  }, [getTrendingInsights]);
 
   return {
-    crowdData,
-    trendingData,
-    refreshInsights,
+    crowdInsights,
+    trendingInsights,
+    loadCrowdInsights,
+    loadTrendingInsights,
     loading,
     error
   };

@@ -485,6 +485,17 @@ export default function BrokerIntegration() {
         const isBackendConnected = result.data?.is_connected || false;
         const backendMessage = result.data?.message || 'Unknown status';
         
+        // Update local broker config state to reflect backend connection
+        if (brokerConfig) {
+          const updatedConfigs = configs.map(config => 
+            config.id === brokerConfig.id 
+              ? { ...config, is_connected: isBackendConnected, backend_status: isBackendConnected ? 'connected' : 'disconnected' }
+              : config
+          );
+          localStorage.setItem('brokerConfigs', JSON.stringify(updatedConfigs));
+          setBrokerConfig({ ...brokerConfig, is_connected: isBackendConnected, backend_status: isBackendConnected ? 'connected' : 'disconnected' });
+        }
+        
         setLiveStatus(prev => ({ 
           ...prev,
           state: isBackendConnected ? 'connected' : 'connected_local',

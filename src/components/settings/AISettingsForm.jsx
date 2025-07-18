@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Bot, 
   Key, 
@@ -19,16 +20,46 @@ import {
   Save,
   RefreshCw,
   Trash2,
-  Shield
+  Shield,
+  Info,
+  Sparkles,
+  Zap,
+  Brain,
+  Globe,
+  Activity
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { railwayAPI } from '@/api/railwayAPI';
 
 const AI_PROVIDERS = [
-  { value: 'auto', label: 'Auto (Recommended)', description: 'Let the system choose the best provider for each task' },
-  { value: 'openai', label: 'OpenAI (GPT-4)', description: 'Best for strategy generation and complex analysis' },
-  { value: 'claude', label: 'Claude (Anthropic)', description: 'Excellent for technical analysis and reasoning' },
-  { value: 'gemini', label: 'Google Gemini', description: 'Great for market sentiment and data analysis' }
+  { 
+    value: 'auto', 
+    label: 'Smart Auto-Selection', 
+    description: 'System automatically chooses the best available provider for each task',
+    icon: Sparkles,
+    benefits: ['No configuration needed', 'Uses your best available API', 'Automatic fallback']
+  },
+  { 
+    value: 'openai', 
+    label: 'OpenAI GPT-4', 
+    description: 'Best for strategy generation and complex analysis',
+    icon: Brain,
+    benefits: ['Most advanced reasoning', 'Best for complex strategies', 'Widely supported']
+  },
+  { 
+    value: 'claude', 
+    label: 'Claude (Anthropic)', 
+    description: 'Excellent for technical analysis and reasoning',
+    icon: Zap,
+    benefits: ['Strong technical analysis', 'Good for risk assessment', 'Fast responses']
+  },
+  { 
+    value: 'gemini', 
+    label: 'Google Gemini', 
+    description: 'Great for market sentiment and data analysis',
+    icon: Globe,
+    benefits: ['Good market insights', 'Cost-effective', 'Fast processing']
+  }
 ];
 
 export default function AISettingsForm() {
@@ -36,6 +67,7 @@ export default function AISettingsForm() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [validating, setValidating] = useState({});
+  const [activeTab, setActiveTab] = useState('setup');
   
   // Form state
   const [preferences, setPreferences] = useState({
@@ -80,19 +112,28 @@ export default function AISettingsForm() {
   const loadCurrentSettings = async () => {
     setLoading(true);
     try {
-      const response = await railwayAPI.request('/ai/preferences');
+      const response = await railwayAPI.request('/api/ai/preferences');
       if (response.status === 'success' && response.data?.preferences) {
         setCurrentSettings(response.data.preferences);
         setPreferences(prev => ({
           ...prev,
           preferred_ai_provider: response.data.preferences.preferred_ai_provider || 'auto'
         }));
+      } else if (response.status === 'unauthorized') {
+        console.warn('User not authenticated for AI preferences');
+        // Set default settings for unauthenticated users
+        setCurrentSettings({
+          preferred_ai_provider: 'auto',
+          has_openai_key: false,
+          has_claude_key: false,
+          has_gemini_key: false
+        });
       }
     } catch (error) {
       console.error('Failed to load AI settings:', error);
       toast({
         title: "Error",
-        description: "Failed to load current AI settings.",
+        description: "Failed to load current AI settings. Please connect to your broker first.",
         variant: "destructive",
       });
     }
@@ -104,7 +145,7 @@ export default function AISettingsForm() {
     
     setValidating(prev => ({ ...prev, [provider]: true }));
     try {
-      const response = await railwayAPI.request('/ai/validate-key', {
+      const response = await railwayAPI.request('/api/ai/validate-key', {
         method: 'POST',
         body: JSON.stringify({
           provider: provider,
@@ -142,6 +183,14 @@ export default function AISettingsForm() {
         delete newResults[provider];
         return newResults;
       });
+    }
+
+    // Auto-validate if key looks complete and validateBeforeSaving is enabled
+    if (validateBeforeSaving && value.trim() && value.length > 20) {
+      // Debounce validation to avoid too many API calls
+      setTimeout(() => {
+        validateApiKey(provider, value);
+      }, 1000);
     }
   };
 
@@ -199,7 +248,7 @@ export default function AISettingsForm() {
         gemini_api_key: preferences.gemini_api_key || null
       };
 
-      const response = await railwayAPI.request('/ai/preferences', {
+      const response = await railwayAPI.request('/api/ai/preferences', {
         method: 'POST',
         body: JSON.stringify(requestBody),
         headers: { 'Content-Type': 'application/json' }
@@ -207,27 +256,18 @@ export default function AISettingsForm() {
 
       if (response.status === 'success') {
         toast({
-          title: "Settings Saved",
-          description: "Your AI preferences have been saved successfully.",
+          title: "Success",
+          description: "AI settings saved successfully!",
         });
-        
-        // Clear form and reload current settings
-        setPreferences(prev => ({
-          ...prev,
-          openai_api_key: '',
-          claude_api_key: '',
-          gemini_api_key: ''
-        }));
-        setValidationResults({});
-        await loadCurrentSettings();
+        await loadCurrentSettings(); // Refresh current settings
       } else {
-        throw new Error(response.data?.message || 'Save failed');
+        throw new Error(response.message || 'Failed to save settings');
       }
     } catch (error) {
       console.error('Failed to save AI settings:', error);
       toast({
-        title: "Save Failed",
-        description: error.message || "Failed to save AI preferences.",
+        title: "Error",
+        description: "Failed to save AI settings. Please try again.",
         variant: "destructive",
       });
     }
@@ -235,21 +275,28 @@ export default function AISettingsForm() {
   };
 
   const handleClearAll = async () => {
-    if (!confirm('Are you sure you want to clear all AI settings? This will remove all your API keys and reset preferences.')) {
+    if (!confirm('Are you sure you want to clear all AI settings? This will remove all API keys and reset to defaults.')) {
       return;
     }
 
+    setSaving(true);
     try {
-      const response = await railwayAPI.request('/ai/preferences', {
-        method: 'DELETE'
+      const response = await railwayAPI.request('/api/ai/preferences', {
+        method: 'POST',
+        body: JSON.stringify({
+          preferred_ai_provider: 'auto',
+          openai_api_key: null,
+          claude_api_key: null,
+          gemini_api_key: null
+        }),
+        headers: { 'Content-Type': 'application/json' }
       });
 
       if (response.status === 'success') {
         toast({
-          title: "Settings Cleared",
-          description: "All AI preferences have been cleared.",
+          title: "Success",
+          description: "All AI settings cleared successfully!",
         });
-        
         setPreferences({
           preferred_ai_provider: 'auto',
           openai_api_key: '',
@@ -258,52 +305,56 @@ export default function AISettingsForm() {
         });
         setValidationResults({});
         await loadCurrentSettings();
-      } else {
-        throw new Error(response.data?.message || 'Clear failed');
       }
     } catch (error) {
       console.error('Failed to clear AI settings:', error);
       toast({
-        title: "Clear Failed",
-        description: "Failed to clear AI preferences.",
+        title: "Error",
+        description: "Failed to clear AI settings.",
         variant: "destructive",
       });
     }
+    setSaving(false);
   };
 
   const toggleKeyVisibility = (provider) => {
-    setShowKeys(prev => ({
-      ...prev,
-      [provider]: !prev[provider]
-    }));
+    setShowKeys(prev => ({ ...prev, [provider]: !prev[provider] }));
   };
 
   const getKeyStatusBadge = (provider) => {
     const hasKey = currentSettings[`has_${provider}_key`];
-    const preview = currentSettings[`${provider}_key_preview`];
-    
-    if (hasKey && preview) {
-      return (
-        <Badge variant="secondary" className="ml-2">
-          <Key className="w-3 h-3 mr-1" />
-          {preview}
-        </Badge>
-      );
+    if (hasKey) {
+      return <Badge variant="outline" className="border-green-200 text-green-700">Configured</Badge>;
     }
-    return null;
+    return <Badge variant="outline" className="border-gray-200 text-gray-500">Not Set</Badge>;
   };
 
   const getValidationIcon = (provider) => {
-    if (validating[provider]) {
-      return <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />;
-    }
-    
     const result = validationResults[provider];
     if (!result) return null;
     
     return result.valid ? 
       <CheckCircle className="w-4 h-4 text-green-500" /> : 
       <XCircle className="w-4 h-4 text-red-500" />;
+  };
+
+  const getAvailableProviders = () => {
+    const available = [];
+    if (currentSettings.has_openai_key) available.push('OpenAI');
+    if (currentSettings.has_claude_key) available.push('Claude');
+    if (currentSettings.has_gemini_key) available.push('Gemini');
+    return available;
+  };
+
+  const getSetupStatus = () => {
+    const available = getAvailableProviders();
+    if (available.length === 0) {
+      return { status: 'not-configured', message: 'No API keys configured', color: 'text-red-600' };
+    } else if (available.length === 1) {
+      return { status: 'basic', message: `Using ${available[0]}`, color: 'text-yellow-600' };
+    } else {
+      return { status: 'optimal', message: `${available.length} providers available`, color: 'text-green-600' };
+    }
   };
 
   if (loading) {
@@ -325,15 +376,17 @@ export default function AISettingsForm() {
     );
   }
 
+  const setupStatus = getSetupStatus();
+
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bot className="w-5 h-5" />
-          AI Provider Settings
+          AI Configuration
         </CardTitle>
         <CardDescription>
-          Configure your personal AI provider preferences and API keys for enhanced trading analysis.
+          Configure your AI providers for enhanced trading analysis and decision-making.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -345,224 +398,343 @@ export default function AISettingsForm() {
           </AlertDescription>
         </Alert>
 
-        {/* Provider Preference */}
-        <div className="space-y-3">
-          <Label htmlFor="provider-select" className="text-base font-medium">
-            Preferred AI Provider
-          </Label>
-          <Select
-            value={preferences.preferred_ai_provider}
-            onValueChange={(value) => setPreferences(prev => ({ ...prev, preferred_ai_provider: value }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select your preferred provider" />
-            </SelectTrigger>
-            <SelectContent>
-              {AI_PROVIDERS.map((provider) => (
-                <SelectItem key={provider.value} value={provider.value}>
-                  <div className="flex flex-col">
-                    <span className="font-medium">{provider.label}</span>
-                    <span className="text-sm text-muted-foreground">{provider.description}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Separator />
-
-        {/* API Keys Section */}
-        <div className="space-y-4">
+        {/* Setup Status */}
+        <div className="p-4 bg-gray-50 rounded-lg">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium">API Keys</h3>
-            <div className="flex items-center space-x-2">
-              <Switch
-                checked={validateBeforeSaving}
-                onCheckedChange={setValidateBeforeSaving}
-              />
-              <Label htmlFor="validate-keys" className="text-sm">
-                Validate keys before saving
-              </Label>
+            <div>
+              <h3 className="font-medium">Current Setup</h3>
+              <p className={`text-sm ${setupStatus.color}`}>{setupStatus.message}</p>
             </div>
-          </div>
-
-          {/* OpenAI */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="openai-key" className="flex items-center gap-2">
-                OpenAI API Key
-                {getKeyStatusBadge('openai')}
-              </Label>
-              <div className="flex items-center gap-2">
-                {getValidationIcon('openai')}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleValidateKey('openai')}
-                  disabled={!preferences.openai_api_key || validating.openai}
-                >
-                  Test
-                </Button>
-              </div>
+            <div className="flex items-center gap-2">
+              {setupStatus.status === 'optimal' && <CheckCircle className="w-5 h-5 text-green-600" />}
+              {setupStatus.status === 'basic' && <AlertCircle className="w-5 h-5 text-yellow-600" />}
+              {setupStatus.status === 'not-configured' && <XCircle className="w-5 h-5 text-red-600" />}
             </div>
-            <div className="relative">
-              <Input
-                id="openai-key"
-                type={showKeys.openai ? "text" : "password"}
-                placeholder="sk-..."
-                value={preferences.openai_api_key}
-                onChange={(e) => handleKeyChange('openai', e.target.value)}
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                onClick={() => toggleKeyVisibility('openai')}
-              >
-                {showKeys.openai ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </Button>
-            </div>
-            {validationResults.openai && (
-              <p className={`text-sm ${validationResults.openai.valid ? 'text-green-600' : 'text-red-600'}`}>
-                {validationResults.openai.message}
-              </p>
-            )}
-          </div>
-
-          {/* Claude */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="claude-key" className="flex items-center gap-2">
-                Claude API Key
-                {getKeyStatusBadge('claude')}
-              </Label>
-              <div className="flex items-center gap-2">
-                {getValidationIcon('claude')}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleValidateKey('claude')}
-                  disabled={!preferences.claude_api_key || validating.claude}
-                >
-                  Test
-                </Button>
-              </div>
-            </div>
-            <div className="relative">
-              <Input
-                id="claude-key"
-                type={showKeys.claude ? "text" : "password"}
-                placeholder="sk-ant-..."
-                value={preferences.claude_api_key}
-                onChange={(e) => handleKeyChange('claude', e.target.value)}
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                onClick={() => toggleKeyVisibility('claude')}
-              >
-                {showKeys.claude ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </Button>
-            </div>
-            {validationResults.claude && (
-              <p className={`text-sm ${validationResults.claude.valid ? 'text-green-600' : 'text-red-600'}`}>
-                {validationResults.claude.message}
-              </p>
-            )}
-          </div>
-
-          {/* Gemini */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="gemini-key" className="flex items-center gap-2">
-                Gemini API Key
-                {getKeyStatusBadge('gemini')}
-              </Label>
-              <div className="flex items-center gap-2">
-                {getValidationIcon('gemini')}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleValidateKey('gemini')}
-                  disabled={!preferences.gemini_api_key || validating.gemini}
-                >
-                  Test
-                </Button>
-              </div>
-            </div>
-            <div className="relative">
-              <Input
-                id="gemini-key"
-                type={showKeys.gemini ? "text" : "password"}
-                placeholder="AI..."
-                value={preferences.gemini_api_key}
-                onChange={(e) => handleKeyChange('gemini', e.target.value)}
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                onClick={() => toggleKeyVisibility('gemini')}
-              >
-                {showKeys.gemini ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </Button>
-            </div>
-            {validationResults.gemini && (
-              <p className={`text-sm ${validationResults.gemini.valid ? 'text-green-600' : 'text-red-600'}`}>
-                {validationResults.gemini.message}
-              </p>
-            )}
           </div>
         </div>
 
-        <Separator />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="setup">Quick Setup</TabsTrigger>
+            <TabsTrigger value="advanced">Advanced Configuration</TabsTrigger>
+          </TabsList>
 
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between pt-4">
-          <Button
-            variant="outline"
-            onClick={handleClearAll}
-            className="text-red-600 hover:text-red-700"
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Clear All Settings
-          </Button>
-          
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={loadCurrentSettings}
-              disabled={loading}
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={!hasChanges || saving}
-            >
-              {saving ? (
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4 mr-2" />
-              )}
-              Save Settings
-            </Button>
-          </div>
-        </div>
+          {/* Quick Setup Tab */}
+          <TabsContent value="setup" className="space-y-6">
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-start gap-3">
+                  <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-blue-900">How it works</h4>
+                    <p className="text-sm text-blue-700 mt-1">
+                      You only need <strong>one API key</strong> to get started. The system will automatically 
+                      use the best available provider for each task. Add more providers for better reliability and performance.
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-        {/* Help Text */}
-        <Alert>
-          <AlertCircle className="w-4 h-4" />
-          <AlertDescription>
-            <strong>Need API keys?</strong><br />
-            • OpenAI: Visit <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">platform.openai.com</a><br />
-            • Claude: Visit <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">console.anthropic.com</a><br />
-            • Gemini: Visit <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Google AI Studio</a>
-          </AlertDescription>
-        </Alert>
+              {/* Provider Selection */}
+              <div className="space-y-3">
+                <Label className="text-base font-medium">AI Provider Strategy</Label>
+                <Select
+                  value={preferences.preferred_ai_provider}
+                  onValueChange={(value) => setPreferences(prev => ({ ...prev, preferred_ai_provider: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select your preferred strategy" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AI_PROVIDERS.map((provider) => {
+                      const IconComponent = provider.icon;
+                      return (
+                        <SelectItem key={provider.value} value={provider.value}>
+                          <div className="flex items-start gap-3 py-1">
+                            <IconComponent className="w-5 h-5 mt-0.5" />
+                            <div className="flex-1">
+                              <div className="font-medium">{provider.label}</div>
+                              <div className="text-sm text-muted-foreground">{provider.description}</div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {provider.benefits.join(' • ')}
+                              </div>
+                            </div>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* API Key Input */}
+              <div className="space-y-4">
+                <Label className="text-base font-medium">API Key (Required)</Label>
+                <div className="space-y-3">
+                  {/* OpenAI */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="flex items-center gap-2">
+                        <Brain className="w-4 h-4" />
+                        OpenAI API Key
+                        {getKeyStatusBadge('openai')}
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        {getValidationIcon('openai')}
+                        <Button
+                          variant={validationResults.openai?.valid ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleValidateKey('openai')}
+                          disabled={!preferences.openai_api_key || validating.openai}
+                        >
+                          {validating.openai ? 'Testing...' : validationResults.openai?.valid ? 'Valid' : 'Test'}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <Input
+                        type={showKeys.openai ? "text" : "password"}
+                        placeholder="sk-... (Get from OpenAI dashboard)"
+                        value={preferences.openai_api_key}
+                        onChange={(e) => handleKeyChange('openai', e.target.value)}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                        onClick={() => toggleKeyVisibility('openai')}
+                      >
+                        {showKeys.openai ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                    {validating.openai && (
+                      <p className="text-sm text-blue-600 flex items-center gap-2">
+                        <Activity className="w-4 h-4 animate-spin" />
+                        Validating...
+                      </p>
+                    )}
+                    {validationResults.openai && !validating.openai && (
+                      <p className={`text-sm flex items-center gap-2 ${validationResults.openai.valid ? 'text-green-600' : 'text-red-600'}`}>
+                        {validationResults.openai.valid ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                        {validationResults.openai.message}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Claude */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="flex items-center gap-2">
+                        <Zap className="w-4 h-4" />
+                        Claude API Key (Optional)
+                        {getKeyStatusBadge('claude')}
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        {getValidationIcon('claude')}
+                        <Button
+                          variant={validationResults.claude?.valid ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleValidateKey('claude')}
+                          disabled={!preferences.claude_api_key || validating.claude}
+                        >
+                          {validating.claude ? 'Testing...' : validationResults.claude?.valid ? 'Valid' : 'Test'}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <Input
+                        type={showKeys.claude ? "text" : "password"}
+                        placeholder="sk-ant-... (Get from Anthropic dashboard)"
+                        value={preferences.claude_api_key}
+                        onChange={(e) => handleKeyChange('claude', e.target.value)}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                        onClick={() => toggleKeyVisibility('claude')}
+                      >
+                        {showKeys.claude ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                    {validating.claude && (
+                      <p className="text-sm text-blue-600 flex items-center gap-2">
+                        <Activity className="w-4 h-4 animate-spin" />
+                        Validating...
+                      </p>
+                    )}
+                    {validationResults.claude && !validating.claude && (
+                      <p className={`text-sm flex items-center gap-2 ${validationResults.claude.valid ? 'text-green-600' : 'text-red-600'}`}>
+                        {validationResults.claude.valid ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                        {validationResults.claude.message}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Gemini */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="flex items-center gap-2">
+                        <Globe className="w-4 h-4" />
+                        Gemini API Key (Optional)
+                        {getKeyStatusBadge('gemini')}
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        {getValidationIcon('gemini')}
+                        <Button
+                          variant={validationResults.gemini?.valid ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleValidateKey('gemini')}
+                          disabled={!preferences.gemini_api_key || validating.gemini}
+                        >
+                          {validating.gemini ? 'Testing...' : validationResults.gemini?.valid ? 'Valid' : 'Test'}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <Input
+                        type={showKeys.gemini ? "text" : "password"}
+                        placeholder="AI... (Get from Google AI Studio)"
+                        value={preferences.gemini_api_key}
+                        onChange={(e) => handleKeyChange('gemini', e.target.value)}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                        onClick={() => toggleKeyVisibility('gemini')}
+                      >
+                        {showKeys.gemini ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                    {validating.gemini && (
+                      <p className="text-sm text-blue-600 flex items-center gap-2">
+                        <Activity className="w-4 h-4 animate-spin" />
+                        Validating...
+                      </p>
+                    )}
+                    {validationResults.gemini && !validating.gemini && (
+                      <p className={`text-sm flex items-center gap-2 ${validationResults.gemini.valid ? 'text-green-600' : 'text-red-600'}`}>
+                        {validationResults.gemini.valid ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                        {validationResults.gemini.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Setup Actions */}
+              <div className="flex items-center justify-between pt-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={validateBeforeSaving}
+                    onCheckedChange={setValidateBeforeSaving}
+                  />
+                  <Label className="text-sm">Validate keys before saving</Label>
+                </div>
+                
+                <Button
+                  onClick={handleSave}
+                  disabled={!hasChanges || saving}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {saving ? (
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-2" />
+                  )}
+                  Save Configuration
+                </Button>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Advanced Configuration Tab */}
+          <TabsContent value="advanced" className="space-y-6">
+            <div className="space-y-4">
+              <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-yellow-900">Advanced Configuration</h4>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      Fine-tune your AI settings, manage existing keys, and configure advanced options.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Current Configuration Status */}
+              <div className="space-y-3">
+                <h4 className="font-medium">Current Configuration</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Brain className="w-4 h-4" />
+                      <span className="font-medium text-sm">OpenAI</span>
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {currentSettings.has_openai_key ? 
+                        `Configured (${currentSettings.openai_key_preview})` : 
+                        'Not configured'
+                      }
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="w-4 h-4" />
+                      <span className="font-medium text-sm">Claude</span>
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {currentSettings.has_claude_key ? 
+                        `Configured (${currentSettings.claude_key_preview})` : 
+                        'Not configured'
+                      }
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Globe className="w-4 h-4" />
+                      <span className="font-medium text-sm">Gemini</span>
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {currentSettings.has_gemini_key ? 
+                        `Configured (${currentSettings.gemini_key_preview})` : 
+                        'Not configured'
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Advanced Actions */}
+              <div className="space-y-3">
+                <h4 className="font-medium">Advanced Actions</h4>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={loadCurrentSettings}
+                    disabled={loading}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh Settings
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={handleClearAll}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Clear All Settings
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );

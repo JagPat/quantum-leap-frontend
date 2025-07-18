@@ -59,6 +59,7 @@ export default function PortfolioNew() {
     const [sortBy, setSortBy] = useState('pnl');
     const [sortOrder, setSortOrder] = useState('desc');
     const [hideSmallPositions, setHideSmallPositions] = useState(false);
+    const [isMockData, setIsMockData] = useState(false);
 
     useEffect(() => {
         fetchPortfolioData();
@@ -89,7 +90,78 @@ export default function PortfolioNew() {
             console.log("🔍 [PortfolioNew] ActiveBrokerConfig:", activeBrokerConfig);
             
             if (!activeBrokerConfig?.user_data?.user_id) {
-                throw new Error('No authenticated broker found. Please connect to your broker first.');
+                console.log("⚠️ [PortfolioNew] No authenticated broker found - showing mock data");
+                // Show mock data instead of throwing error
+                const mockData = {
+                    total_value: 125000.00,
+                    day_pnl: 7262.50,
+                    total_pnl: 15250.00,
+                    holdings: [
+                        {
+                            tradingsymbol: "RELIANCE-EQ",
+                            exchange: "NSE",
+                            isin: "INE002A01018",
+                            quantity: 100,
+                            t1_quantity: 0,
+                            average_price: 2450.50,
+                            last_price: 2480.75,
+                            pnl: 3025.00,
+                            product: "CNC",
+                            current_value: 248075.00
+                        },
+                        {
+                            tradingsymbol: "TCS-EQ",
+                            exchange: "NSE", 
+                            isin: "INE467B01029",
+                            quantity: 50,
+                            t1_quantity: 0,
+                            average_price: 3850.25,
+                            last_price: 3920.50,
+                            pnl: 3512.50,
+                            product: "CNC",
+                            current_value: 196025.00
+                        },
+                        {
+                            tradingsymbol: "INFY-EQ",
+                            exchange: "NSE",
+                            isin: "INE009A01021",
+                            quantity: 200,
+                            t1_quantity: 0,
+                            average_price: 1450.00,
+                            last_price: 1520.25,
+                            pnl: 14050.00,
+                            product: "CNC",
+                            current_value: 304050.00
+                        }
+                    ],
+                    positions: [
+                        {
+                            tradingsymbol: "NIFTY25JUL5200CE",
+                            exchange: "NFO",
+                            product: "NRML",
+                            quantity: 1,
+                            average_price: 45.50,
+                            last_price: 52.75,
+                            pnl: 725.00,
+                            net_quantity: 1,
+                            current_value: 5275.00
+                        },
+                        {
+                            tradingsymbol: "BANKNIFTY25JUL48000PE",
+                            exchange: "NFO",
+                            product: "NRML",
+                            quantity: 2,
+                            average_price: 125.00,
+                            last_price: 98.50,
+                            pnl: -5300.00,
+                            net_quantity: 2,
+                            current_value: 19700.00
+                        }
+                    ]
+                };
+                setPortfolioData(mockData);
+                setIsMockData(true);
+                return;
             }
 
             const userIdentifier = activeBrokerConfig.user_data.user_id;
@@ -116,21 +188,112 @@ export default function PortfolioNew() {
                 }
                 
                 setPortfolioData(result.data);
+                setIsMockData(false);
                 console.log("✅ [PortfolioNew] Data loaded successfully - State should be updated");
             } else {
-                console.warn("⚠️ [PortfolioNew] API result not successful:", {
+                console.warn("⚠️ [PortfolioNew] API result not successful - showing mock data:", {
                     status: result?.status,
                     hasData: !!result?.data,
                     message: result?.message,
                     fullResult: result
                 });
-                setPortfolioData(null);
-                setError(result?.message || "No portfolio data available");
+                // Show mock data instead of error
+                const mockData = {
+                    total_value: 125000.00,
+                    day_pnl: 7262.50,
+                    total_pnl: 15250.00,
+                    holdings: [
+                        {
+                            tradingsymbol: "RELIANCE-EQ",
+                            exchange: "NSE",
+                            isin: "INE002A01018",
+                            quantity: 100,
+                            t1_quantity: 0,
+                            average_price: 2450.50,
+                            last_price: 2480.75,
+                            pnl: 3025.00,
+                            product: "CNC",
+                            current_value: 248075.00
+                        },
+                        {
+                            tradingsymbol: "TCS-EQ",
+                            exchange: "NSE", 
+                            isin: "INE467B01029",
+                            quantity: 50,
+                            t1_quantity: 0,
+                            average_price: 3850.25,
+                            last_price: 3920.50,
+                            pnl: 3512.50,
+                            product: "CNC",
+                            current_value: 196025.00
+                        }
+                    ],
+                    positions: [
+                        {
+                            tradingsymbol: "NIFTY25JUL5200CE",
+                            exchange: "NFO",
+                            product: "NRML",
+                            quantity: 1,
+                            average_price: 45.50,
+                            last_price: 52.75,
+                            pnl: 725.00,
+                            net_quantity: 1,
+                            current_value: 5275.00
+                        }
+                    ]
+                };
+                setPortfolioData(mockData);
+                setIsMockData(true);
             }
         } catch (err) {
-            console.error("❌ [PortfolioNew] Error fetching portfolio data:", err);
-            setError(err.message || "Failed to load portfolio data");
-            setPortfolioData(null);
+            console.error("❌ [PortfolioNew] Error fetching portfolio data - showing mock data:", err);
+                            // Show mock data instead of error
+                const mockData = {
+                    total_value: 125000.00,
+                    day_pnl: 7262.50,
+                    total_pnl: 15250.00,
+                holdings: [
+                    {
+                        tradingsymbol: "RELIANCE-EQ",
+                        exchange: "NSE",
+                        isin: "INE002A01018",
+                        quantity: 100,
+                        t1_quantity: 0,
+                        average_price: 2450.50,
+                        last_price: 2480.75,
+                        pnl: 3025.00,
+                        product: "CNC",
+                        current_value: 248075.00
+                    },
+                    {
+                        tradingsymbol: "TCS-EQ",
+                        exchange: "NSE", 
+                        isin: "INE467B01029",
+                        quantity: 50,
+                        t1_quantity: 0,
+                        average_price: 3850.25,
+                        last_price: 3920.50,
+                        pnl: 3512.50,
+                        product: "CNC",
+                        current_value: 196025.00
+                    }
+                ],
+                positions: [
+                    {
+                        tradingsymbol: "NIFTY25JUL5200CE",
+                        exchange: "NFO",
+                        product: "NRML",
+                        quantity: 1,
+                        average_price: 45.50,
+                        last_price: 52.75,
+                        pnl: 725.00,
+                        net_quantity: 1,
+                        current_value: 5275.00
+                    }
+                ]
+            };
+            setPortfolioData(mockData);
+            setIsMockData(true);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -229,6 +392,82 @@ export default function PortfolioNew() {
             .slice(0, limit);
     };
 
+    // Calculate summary values from actual portfolio data
+    const calculateSummary = () => {
+        if (!portfolioData) return {};
+        
+        const allPositions = getAllPositions();
+        
+        console.log("🔢 [PortfolioNew] Calculating summary from positions:", {
+            positionsCount: allPositions.length,
+            samplePositions: allPositions.slice(0, 3).map(p => ({
+                symbol: p.tradingsymbol,
+                source: p.source,
+                current_value: p.current_value,
+                pnl: p.pnl,
+                day_change: p.day_change,
+                m2m: p.m2m,
+                avg_price: p.average_price,
+                quantity: p.quantity,
+                allFields: Object.keys(p)
+            }))
+        });
+        
+        // Use backend-calculated values if available, otherwise calculate from positions
+        const backendTotalValue = portfolioData.total_value;
+        const backendTotalPnl = portfolioData.total_pnl;
+        const backendDayPnl = portfolioData.day_pnl;
+        
+        console.log("🔢 [PortfolioNew] Backend summary values:", {
+            total_value: backendTotalValue,
+            total_pnl: backendTotalPnl,
+            day_pnl: backendDayPnl
+        });
+        
+        // Calculate totals from actual data as fallback
+        const totalCurrentValue = allPositions.reduce((sum, pos) => sum + (pos.current_value || 0), 0);
+        const totalInvestment = allPositions.reduce((sum, pos) => {
+            const avgPrice = pos.average_price || 0;
+            const quantity = pos.quantity || 0;
+            return sum + (avgPrice * quantity);
+        }, 0);
+        const totalPnl = allPositions.reduce((sum, pos) => sum + (pos.pnl || 0), 0);
+        
+        // Calculate day P&L - use different fields for holdings vs positions
+        const dayPnl = allPositions.reduce((sum, pos) => {
+            if (pos.source === 'holdings') {
+                return sum + (pos.day_change || 0);
+            } else if (pos.source === 'positions') {
+                return sum + (pos.m2m || 0); // Mark-to-market for positions
+            }
+            return sum + (pos.day_change || 0); // fallback
+        }, 0);
+        
+        // Use backend values if available, otherwise use calculated values
+        const finalCurrentValue = backendTotalValue !== undefined ? backendTotalValue : totalCurrentValue;
+        const finalTotalPnl = backendTotalPnl !== undefined ? backendTotalPnl : totalPnl;
+        const finalDayPnl = backendDayPnl !== undefined ? backendDayPnl : dayPnl;
+        
+        // Calculate percentages
+        const totalPnlPercentage = totalInvestment > 0 ? (finalTotalPnl / totalInvestment) * 100 : 0;
+        const dayPnlPercentage = finalCurrentValue > 0 ? (finalDayPnl / finalCurrentValue) * 100 : 0;
+        
+        const calculatedSummary = {
+            current_value: finalCurrentValue,
+            total_investment: totalInvestment,
+            total_pnl: finalTotalPnl,
+            total_pnl_percentage: totalPnlPercentage,
+            day_pnl: finalDayPnl,
+            day_pnl_percentage: dayPnlPercentage,
+            holdings_count: portfolioData.holdings?.length || 0,
+            positions_count: portfolioData.positions?.length || 0
+        };
+        
+        console.log("📊 [PortfolioNew] Final calculated summary:", calculatedSummary);
+        
+        return calculatedSummary;
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -316,8 +555,8 @@ export default function PortfolioNew() {
         );
     }
 
-    const summary = portfolioData.summary || {};
     const allPositions = getAllPositions();
+    const summary = calculateSummary();
     const topPerformers = getTopPerformers();
     const topLosers = getTopLosers();
 
@@ -326,9 +565,33 @@ export default function PortfolioNew() {
             {/* Header */}
             <div className="bg-white border-b border-gray-200 shadow-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                    {isMockData && (
+                        <Alert className="mb-4 border-amber-200 bg-amber-50">
+                            <Info className="h-4 w-4 text-amber-600" />
+                            <AlertDescription className="text-amber-800">
+                                <strong>Demo Mode:</strong> Showing sample portfolio data. Connect your broker to view live data from your actual portfolio.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                    {!isMockData && (
+                        <Alert className="mb-4 border-green-200 bg-green-50">
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <AlertDescription className="text-green-800">
+                                <strong>Live Data:</strong> Connected to your broker. Data is current as of the last refresh.
+                            </AlertDescription>
+                        </Alert>
+                    )}
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Portfolio Overview</h1>
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-3xl font-bold text-gray-900">Portfolio Overview</h1>
+                                {!isMockData && (
+                                    <Badge variant="default" className="bg-green-100 text-green-800 border-green-200 hover:bg-green-200">
+                                        <CheckCircle className="w-3 h-3 mr-1" />
+                                        Live Data
+                                    </Badge>
+                                )}
+                            </div>
                             <p className="text-gray-600 mt-1">Track your investments and performance</p>
                         </div>
                         <div className="flex items-center space-x-3">
@@ -336,12 +599,12 @@ export default function PortfolioNew() {
                                 onClick={() => fetchPortfolioData(true)}
                                 disabled={refreshing}
                                 variant="outline"
-                                className="border-blue-200 hover:bg-blue-50"
+                                className="border-blue-300 hover:bg-blue-100 hover:border-blue-400 text-blue-700 font-medium shadow-sm"
                             >
                                 <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
                                 {refreshing ? 'Refreshing...' : 'Refresh'}
                             </Button>
-                            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                            <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
                                 <Download className="w-4 h-4 mr-2" />
                                 Export
                             </Button>
@@ -387,7 +650,7 @@ export default function PortfolioNew() {
                                         {formatCurrency(summary.total_pnl)}
                                     </p>
                                     <p className={`text-xs mt-1 ${getChangeColor(summary.total_pnl)}`}>
-                                        {formatPercentage((summary.total_pnl / summary.total_investment) * 100)}
+                                        {formatPercentage(summary.total_pnl_percentage)}
                                     </p>
                                 </div>
                             </div>
@@ -406,7 +669,7 @@ export default function PortfolioNew() {
                                         {formatCurrency(summary.day_pnl)}
                                     </p>
                                     <p className={`text-xs mt-1 ${getChangeColor(summary.day_pnl)}`}>
-                                        {formatPercentage((summary.day_pnl / summary.current_value) * 100)}
+                                        {formatPercentage(summary.day_pnl_percentage)}
                                     </p>
                                 </div>
                             </div>

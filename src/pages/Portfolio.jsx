@@ -336,12 +336,12 @@ export default function Portfolio() {
                                 onClick={() => fetchPortfolioData(true)}
                                 disabled={refreshing}
                                 variant="outline"
-                                className="border-blue-200 hover:bg-blue-50"
+                                className="border-blue-300 hover:bg-blue-100 hover:border-blue-400 text-blue-700 font-medium shadow-sm"
                             >
                                 <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
                                 {refreshing ? 'Refreshing...' : 'Refresh'}
                             </Button>
-                            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                            <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
                                 <Download className="w-4 h-4 mr-2" />
                                 Export
                             </Button>

@@ -75,7 +75,7 @@ export default function StrategyGenerationPanel() {
       const configs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
       const activeConfig = configs.find(config => config.is_connected);
       if (activeConfig?.user_data?.user_id) {
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/ai/preferences`, {
+        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/preferences`, {
           headers: {
             'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`,
             'X-User-ID': activeConfig.user_data.user_id

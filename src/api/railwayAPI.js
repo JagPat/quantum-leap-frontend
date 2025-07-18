@@ -16,9 +16,11 @@ class RailwayAPI {
       const activeConfig = configs.find(config => config.is_connected && config.access_token);
       
       if (activeConfig && activeConfig.api_key && activeConfig.access_token) {
+        const user_id = activeConfig.user_data?.user_id || activeConfig.user_id || 'unknown';
+        console.log('🔐 [RailwayAPI] Using auth headers for user:', user_id);
         return {
           'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`,
-          'X-User-ID': activeConfig.user_data?.user_id || 'unknown'
+          'X-User-ID': user_id
         };
       }
       
@@ -39,7 +41,8 @@ class RailwayAPI {
                          endpoint.includes('/api/trading/') ||
                          endpoint.includes('/api/ai/') ||
                          endpoint.includes('/broker/') ||
-                         endpoint.includes('/ai/');
+                         endpoint.includes('/ai/') ||
+                         endpoint.includes('/auth/');
     
     const authHeaders = requiresAuth ? this.getAuthHeaders() : {};
     
@@ -188,11 +191,11 @@ class RailwayAPI {
   // ========================================
 
   async getPortfolioData(userId) {
-    return this.request(`/api/portfolio/latest?user_id=${userId}`);
+    return this.request(`/api/portfolio/latest-simple?user_id=${userId}`);
   }
 
   async fetchLivePortfolio(userId) {
-    return this.request(`/api/portfolio/fetch-live?user_id=${userId}`, {
+    return this.request(`/api/portfolio/fetch-live-simple?user_id=${userId}`, {
       method: 'POST',
     });
   }

@@ -29,6 +29,7 @@ const PortfolioCoPilotPanel = React.lazy(() => import('@/components/ai/Portfolio
 const FeedbackPanel = React.lazy(() => import('@/components/ai/FeedbackPanel'));
 const StrategyInsightsPanel = React.lazy(() => import('@/components/ai/StrategyInsightsPanel'));
 const CrowdIntelligencePanel = React.lazy(() => import('@/components/ai/CrowdIntelligencePanel'));
+const OpenAIAssistantChat = React.lazy(() => import('@/components/ai/OpenAIAssistantChat'));
 
 // Individual loading components for each AI panel
 const AITabLoading = ({ title, description }) => (
@@ -52,13 +53,21 @@ const loadingComponents = {
   copilot: <AITabLoading title="Portfolio Co-Pilot" description="Analyzing portfolio health..." />,
   feedback: <AITabLoading title="Feedback System" description="Loading learning interface..." />,
   insights: <AITabLoading title="Strategy Insights" description="Processing strategy analytics..." />,
-  crowd: <AITabLoading title="Crowd Intelligence" description="Gathering community insights..." />
+  crowd: <AITabLoading title="Crowd Intelligence" description="Gathering community insights..." />,
+  assistant: <AITabLoading title="OpenAI Assistant" description="Initializing AI assistant..." />
 };
 
 // AI Settings should be lightweight, so keep as regular import
 import AISettingsForm from '@/components/settings/AISettingsForm';
 
 const AI_TABS = [
+  {
+    value: 'assistant',
+    label: 'AI Assistant',
+    icon: Brain,
+    description: 'Chat with OpenAI Assistant for trading insights',
+    component: OpenAIAssistantChat
+  },
   {
     value: 'strategy',
     label: 'Strategy Generator',
@@ -121,7 +130,7 @@ export default function AIPage() {
   const { toast } = useToast();
   const { getAIStatus, getAIHealth } = useAI();
   
-  const [activeTab, setActiveTab] = useState('strategy');
+  const [activeTab, setActiveTab] = useState('assistant');
   const [aiStatus, setAiStatus] = useState(null);
   const [portfolioData, setPortfolioData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -144,6 +153,20 @@ export default function AIPage() {
 
   const checkAIStatus = async () => {
     try {
+      // Check if user is authenticated first
+      const configs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
+      const activeConfig = configs.find(config => config.is_connected && config.access_token);
+      
+      if (!activeConfig) {
+        console.warn('No authenticated broker found for AI status check');
+        setAiStatus({ 
+          status: 'unauthenticated', 
+          message: 'Please connect to your broker to access AI features' 
+        });
+        setLoading(false);
+        return;
+      }
+      
       const [status, health] = await Promise.all([
         getAIStatus(),
         getAIHealth()
@@ -152,10 +175,8 @@ export default function AIPage() {
       
       // Check user's AI provider status for BYOAI
       try {
-        const configs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-        const activeConfig = configs.find(config => config.is_connected);
         if (activeConfig?.user_data?.user_id) {
-          const userPrefs = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/ai/preferences`, {
+          const userPrefs = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/preferences`, {
             headers: {
               'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`,
               'X-User-ID': activeConfig.user_data.user_id
@@ -171,6 +192,10 @@ export default function AIPage() {
       }
     } catch (err) {
       console.error('Failed to check AI status:', err);
+      setAiStatus({ 
+        status: 'error', 
+        message: 'Failed to check AI status. Please ensure you are connected to your broker.' 
+      });
     } finally {
       setLoading(false);
     }
@@ -252,6 +277,26 @@ export default function AIPage() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Authentication Alert */}
+      {aiStatus?.status === 'unauthenticated' && (
+        <Alert variant="destructive" className="border-red-200 bg-red-50">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="text-red-800">
+            <strong>Authentication Required:</strong> {aiStatus.message}
+            <div className="mt-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => window.location.href = '/settings'}
+                className="border-red-300 text-red-700 hover:bg-red-100"
+              >
+                Go to Settings
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+      
       {/* AI Status Header */}
       <Card>
         <CardHeader>

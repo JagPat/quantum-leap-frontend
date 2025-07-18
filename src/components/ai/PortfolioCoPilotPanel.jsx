@@ -27,12 +27,26 @@ export default function PortfolioCoPilotPanel({ portfolioData, onRefresh }) {
   const { analysis, recommendations, analyzePortfolioData, loading, error } = usePortfolioCoPilot();
   
   const [lastAnalysis, setLastAnalysis] = useState(null);
+  const [tradingDecisions, setTradingDecisions] = useState([]);
+  const [portfolioHealth, setPortfolioHealth] = useState(null);
+  const [marketInsights, setMarketInsights] = useState([]);
+  const [autoTradingRecommendations, setAutoTradingRecommendations] = useState([]);
 
   useEffect(() => {
     if (portfolioData && portfolioData.holdings) {
       handleAnalyze();
     }
   }, [portfolioData]);
+
+  useEffect(() => {
+    if (analysis?.analysis) {
+      const analysisData = analysis.analysis;
+      setTradingDecisions(analysisData.trading_decisions || []);
+      setPortfolioHealth(analysisData.portfolio_health || {});
+      setMarketInsights(analysisData.market_insights || []);
+      setAutoTradingRecommendations(analysisData.auto_trading_recommendations || []);
+    }
+  }, [analysis]);
 
   const handleAnalyze = async () => {
     try {
@@ -129,8 +143,117 @@ export default function PortfolioCoPilotPanel({ portfolioData, onRefresh }) {
         </Alert>
       )}
 
+      {/* AI Trading Decisions - Auto-Trading Focus */}
+      {tradingDecisions.length > 0 && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5" />
+              AI Trading Decisions
+            </CardTitle>
+            <CardDescription>
+              Actionable decisions for auto-trading based on AI analysis
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {tradingDecisions.map((decision, index) => (
+                <div key={index} className="bg-white p-4 rounded-lg border border-blue-200">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="font-semibold text-lg">{decision.symbol}</h4>
+                        <Badge 
+                          className={
+                            decision.action === 'BUY' ? 'bg-green-100 text-green-700 border-green-300' :
+                            decision.action === 'SELL' ? 'bg-red-100 text-red-700 border-red-300' :
+                            'bg-yellow-100 text-yellow-700 border-yellow-300'
+                          }
+                        >
+                          {decision.action}
+                        </Badge>
+                        <Badge 
+                          variant="outline" 
+                          className={
+                            decision.urgency === 'HIGH' ? 'border-red-300 text-red-700' :
+                            decision.urgency === 'MEDIUM' ? 'border-yellow-300 text-yellow-700' :
+                            'border-green-300 text-green-700'
+                          }
+                        >
+                          {decision.urgency} Priority
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-2">{decision.reason}</p>
+                      <div className="flex items-center gap-4 text-sm">
+                        <span className="font-medium">Confidence: {(decision.confidence * 100).toFixed(0)}%</span>
+                        {decision.price_target && (
+                          <span>Target: {formatCurrency(decision.price_target)}</span>
+                        )}
+                        {decision.stop_loss && (
+                          <span>Stop Loss: {formatCurrency(decision.stop_loss)}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Auto-Trading Recommendations */}
+      {autoTradingRecommendations.length > 0 && (
+        <Card className="border-purple-200 bg-purple-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Auto-Trading Recommendations
+            </CardTitle>
+            <CardDescription>
+              AI-powered recommendations for automated trading
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {autoTradingRecommendations.map((recommendation, index) => (
+                <div key={index} className="flex items-start gap-3 bg-white p-3 rounded-lg border border-purple-200">
+                  <CheckCircle className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm text-gray-700">{recommendation}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Market Insights */}
+      {marketInsights.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Market Insights
+            </CardTitle>
+            <CardDescription>
+              AI-generated market analysis and trends
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {marketInsights.map((insight, index) => (
+                <div key={index} className="flex items-start gap-3 bg-white p-3 rounded-lg border border-amber-200">
+                  <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm text-gray-700">{insight}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Portfolio Health Score */}
-      {analysis?.portfolio_health && (
+      {portfolioHealth && (
         <Card className="border-blue-200 bg-blue-50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -141,30 +264,38 @@ export default function PortfolioCoPilotPanel({ portfolioData, onRefresh }) {
           <CardContent>
             <div className="space-y-4">
               <div className="text-center">
-                <div className={`text-3xl font-bold ${getHealthColor(analysis.portfolio_health.overall_score)}`}>
-                  {analysis.portfolio_health.overall_score}/100
+                <div className={`text-3xl font-bold ${getHealthColor(portfolioHealth.overall_score)}`}>
+                  {portfolioHealth.overall_score}/100
                 </div>
                 <div className="text-lg text-gray-600">
-                  {getHealthDescription(analysis.portfolio_health.overall_score)}
+                  {getHealthDescription(portfolioHealth.overall_score)}
                 </div>
               </div>
               
               <Progress 
-                value={analysis.portfolio_health.overall_score} 
+                value={portfolioHealth.overall_score} 
                 className="w-full"
               />
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {analysis.portfolio_health.components && Object.entries(analysis.portfolio_health.components).map(([key, value]) => (
-                  <div key={key} className="text-center">
-                    <div className="text-sm text-gray-600 capitalize mb-1">
-                      {key.replace(/_/g, ' ')}
-                    </div>
-                    <div className={`text-lg font-semibold ${getHealthColor(value)}`}>
-                      {typeof value === 'number' ? value : '—'}
-                    </div>
+                <div className="text-center">
+                  <div className="text-sm text-gray-600 mb-1">Risk Level</div>
+                  <Badge className={getRiskColor(portfolioHealth.risk_level)}>
+                    {portfolioHealth.risk_level}
+                  </Badge>
+                </div>
+                <div className="text-center">
+                  <div className="text-sm text-gray-600 mb-1">Diversification</div>
+                  <div className={`text-lg font-semibold ${getHealthColor(portfolioHealth.diversification_score * 100)}`}>
+                    {(portfolioHealth.diversification_score * 100).toFixed(0)}%
                   </div>
-                ))}
+                </div>
+                <div className="text-center">
+                  <div className="text-sm text-gray-600 mb-1">Concentration Risk</div>
+                  <div className={`text-lg font-semibold ${getHealthColor(100 - portfolioHealth.concentration_risk * 100)}`}>
+                    {(portfolioHealth.concentration_risk * 100).toFixed(0)}%
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>
