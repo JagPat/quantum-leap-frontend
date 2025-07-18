@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useStrategyGeneration } from '@/hooks/useAI';
+import FeatureNotImplemented from '@/components/ui/feature-not-implemented';
 
 const STRATEGY_TYPES = [
   { value: 'momentum', label: 'Momentum', description: 'Follow trending assets' },
@@ -124,6 +125,17 @@ export default function StrategyGenerationPanel() {
       };
 
       const result = await generateStrategy(request);
+      
+      // Check if the feature is not implemented
+      if (result && result.status === 'not_implemented') {
+        setGeneratedStrategy(result);
+        toast({
+          title: "Feature Coming Soon",
+          description: "Strategy generation is planned but not yet implemented",
+        });
+        return;
+      }
+      
       setGeneratedStrategy(result);
       
       toast({
@@ -320,66 +332,78 @@ export default function StrategyGenerationPanel() {
 
       {/* Generated Strategy Display */}
       {generatedStrategy && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                Generated Strategy
-              </span>
-              <div className="flex gap-2">
-                <Button onClick={handleSaveStrategy} size="sm">
-                  <Bookmark className="mr-2 h-4 w-4" />
-                  Save
-                </Button>
-                <Button onClick={handleDiscardStrategy} variant="outline" size="sm">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Discard
-                </Button>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline">{generatedStrategy.strategy_type}</Badge>
-                <Badge className={getRiskColor(generatedStrategy.risk_level)}>
-                  {generatedStrategy.risk_level} Risk
-                </Badge>
-                <Badge className={getConfidenceColor(generatedStrategy.confidence_score)}>
-                  {Math.round(generatedStrategy.confidence_score * 100)}% Confidence
-                </Badge>
-                <Badge variant="outline">{generatedStrategy.timeframe}</Badge>
-                {generatedStrategy.provider_used && (
-                  <Badge className="text-blue-600 bg-blue-100 border-blue-300">
-                    <Shield className="h-3 w-3 mr-1" />
-                    {generatedStrategy.provider_used.toUpperCase()}
-                  </Badge>
-                )}
-              </div>
-              
-              <div className="bg-white p-4 rounded-lg">
-                <h4 className="font-medium mb-2">Strategy Details:</h4>
-                <p className="text-gray-700 whitespace-pre-wrap">{generatedStrategy.strategy_content}</p>
-              </div>
-              
-              {generatedStrategy.expected_return && (
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1">
-                    <TrendingUp className="h-4 w-4 text-green-600" />
-                    <span className="text-sm">Expected Return: {generatedStrategy.expected_return}%</span>
+        <>
+          {/* Feature Not Implemented Display */}
+          {generatedStrategy.status === 'not_implemented' ? (
+            <FeatureNotImplemented
+              feature={generatedStrategy.feature}
+              message={generatedStrategy.message}
+              plannedFeatures={generatedStrategy.planned_features}
+              frontendExpectation={generatedStrategy.frontend_expectation}
+            />
+          ) : (
+            <Card className="border-blue-200 bg-blue-50">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Target className="h-5 w-5" />
+                    Generated Strategy
+                  </span>
+                  <div className="flex gap-2">
+                    <Button onClick={handleSaveStrategy} size="sm">
+                      <Bookmark className="mr-2 h-4 w-4" />
+                      Save
+                    </Button>
+                    <Button onClick={handleDiscardStrategy} variant="outline" size="sm">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Discard
+                    </Button>
                   </div>
-                  {generatedStrategy.max_drawdown && (
-                    <div className="flex items-center gap-1">
-                      <Shield className="h-4 w-4 text-red-600" />
-                      <span className="text-sm">Max Drawdown: {generatedStrategy.max_drawdown}%</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline">{generatedStrategy.strategy_type}</Badge>
+                    <Badge className={getRiskColor(generatedStrategy.risk_level)}>
+                      {generatedStrategy.risk_level} Risk
+                    </Badge>
+                    <Badge className={getConfidenceColor(generatedStrategy.confidence_score)}>
+                      {Math.round(generatedStrategy.confidence_score * 100)}% Confidence
+                    </Badge>
+                    <Badge variant="outline">{generatedStrategy.timeframe}</Badge>
+                    {generatedStrategy.provider_used && (
+                      <Badge className="text-blue-600 bg-blue-100 border-blue-300">
+                        <Shield className="h-3 w-3 mr-1" />
+                        {generatedStrategy.provider_used.toUpperCase()}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <div className="bg-white p-4 rounded-lg">
+                    <h4 className="font-medium mb-2">Strategy Details:</h4>
+                    <p className="text-gray-700 whitespace-pre-wrap">{generatedStrategy.strategy_content}</p>
+                  </div>
+                  
+                  {generatedStrategy.expected_return && (
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-1">
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                        <span className="text-sm">Expected Return: {generatedStrategy.expected_return}%</span>
+                      </div>
+                      {generatedStrategy.max_drawdown && (
+                        <div className="flex items-center gap-1">
+                          <Shield className="h-4 w-4 text-red-600" />
+                          <span className="text-sm">Max Drawdown: {generatedStrategy.max_drawdown}%</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
       {/* Saved Strategies */}

@@ -26,11 +26,23 @@ export const useAI = () => {
         signal: abortControllerRef.current.signal
       });
 
+      // Handle different response statuses
       if (response.status === 'error') {
         throw new Error(response.message || 'AI request failed');
       }
 
-      return response.data;
+      // Handle not_implemented status gracefully
+      if (response.status === 'not_implemented') {
+        console.log(`Feature not yet implemented: ${endpoint}`);
+        return {
+          status: 'not_implemented',
+          message: response.message,
+          feature: response.feature,
+          planned_features: response.planned_features
+        };
+      }
+
+      return response.data || response;
     } catch (err) {
       if (err.name === 'AbortError') {
         console.log('Request aborted');
