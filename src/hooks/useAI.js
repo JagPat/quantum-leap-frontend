@@ -54,7 +54,7 @@ export const useAI = () => {
       console.log('🧠 [useAI] Loading AI data for user:', userId);
 
       // Load AI preferences first
-      const preferencesResponse = await railwayAPI.request('/ai/preferences', {
+      const preferencesResponse = await railwayAPI.request('/api/ai/preferences', {
         method: 'GET',
         headers: {
           'X-User-ID': userId,
@@ -67,9 +67,9 @@ export const useAI = () => {
       // Transform preferences to match frontend expectations
       const transformedPreferences = {
         preferred_ai_provider: preferencesResponse.preferences?.preferred_ai_provider || 'auto',
-        has_openai_key: !!preferencesResponse.preferences?.openai_api_key,
-        has_claude_key: !!preferencesResponse.preferences?.claude_api_key,
-        has_gemini_key: !!preferencesResponse.preferences?.gemini_api_key,
+        has_openai_key: !!preferencesResponse.preferences?.has_openai_key,
+        has_claude_key: !!preferencesResponse.preferences?.has_claude_key,
+        has_gemini_key: !!preferencesResponse.preferences?.has_gemini_key,
         openai_key_preview: preferencesResponse.preferences?.openai_key_preview || '',
         claude_key_preview: preferencesResponse.preferences?.claude_key_preview || '',
         gemini_key_preview: preferencesResponse.preferences?.gemini_key_preview || ''
