@@ -1,0 +1,122 @@
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { usePersistentAuth } from '@/hooks/usePersistentAuth';
+
+const AuthContext = createContext();
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+export const AuthProvider = ({ children }) => {
+  const {
+    isAuthenticated,
+    userData,
+    isLoading,
+    connectionStatus,
+    lastChecked,
+    refreshSession,
+    logout
+  } = usePersistentAuth();
+
+  const [aiStatus, setAiStatus] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  // Load AI status when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated && userData) {
+      loadAIStatus();
+    } else {
+      setAiStatus(null);
+    }
+  }, [isAuthenticated, userData]);
+
+  const loadAIStatus = async () => {
+    if (!userData?.user_id) return;
+
+    setAiLoading(true);
+    try {
+      console.log('🔐 [AuthContext] Loading AI status for user:', userData.user_id);
+      
+      // Get stored broker config for API calls
+      const storedConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
+      const activeConfig = storedConfigs.find(config => 
+        config.is_connected && 
+        config.user_data?.user_id === userData.user_id
+      );
+
+      if (!activeConfig) {
+        console.warn('🔐 [AuthContext] No active broker config found for AI status');
+        setAiStatus({ status: 'unauthenticated', message: 'No broker connection' });
+        return;
+      }
+
+      // Check AI status
+      const [statusResponse, healthResponse] = await Promise.all([
+        fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/status`, {
+          headers: {
+            'X-User-ID': userData.user_id,
+            'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
+          }
+        }),
+        fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/health`, {
+          headers: {
+            'X-User-ID': userData.user_id,
+            'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
+          }
+        })
+      ]);
+
+      const statusData = await statusResponse.json();
+      const healthData = await healthResponse.json();
+
+      setAiStatus({
+        ...statusData,
+        ...healthData,
+        lastChecked: new Date().toISOString()
+      });
+
+      console.log('✅ [AuthContext] AI status loaded:', statusData);
+    } catch (error) {
+      console.error('❌ [AuthContext] Failed to load AI status:', error);
+      setAiStatus({ 
+        status: 'error', 
+        message: 'Failed to load AI status',
+        error: error.message 
+      });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const refreshAIStatus = async () => {
+    await loadAIStatus();
+  };
+
+  const value = {
+    // Authentication state
+    isAuthenticated,
+    userData,
+    isLoading,
+    connectionStatus,
+    lastChecked,
+    
+    // AI state
+    aiStatus,
+    aiLoading,
+    
+    // Actions
+    refreshSession,
+    logout,
+    refreshAIStatus
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+}; 

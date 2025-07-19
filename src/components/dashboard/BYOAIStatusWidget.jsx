@@ -31,7 +31,7 @@ export default function BYOAIStatusWidget() {
       const activeConfig = configs.find(config => config.is_connected);
       
       if (activeConfig?.user_data?.user_id) {
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/preferences`, {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/preferences`, {
           headers: {
             'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`,
             'X-User-ID': activeConfig.user_data.user_id
@@ -40,7 +40,7 @@ export default function BYOAIStatusWidget() {
         
         if (response.ok) {
           const data = await response.json();
-          setUserProvider(data.data?.preferences);
+          setUserProvider(data.preferences);
           
           // Check provider status
           const statusResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/status`, {

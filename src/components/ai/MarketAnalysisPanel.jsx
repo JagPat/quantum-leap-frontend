@@ -89,6 +89,7 @@ export default function MarketAnalysisPanel() {
         return;
       }
 
+      console.log(`📡 [MarketAnalysisPanel] Generating ${analysisType} analysis...`);
       const symbolList = formData.symbols.split(',').map(s => s.trim().toUpperCase());
       
       const request = {
@@ -112,14 +113,54 @@ export default function MarketAnalysisPanel() {
           throw new Error('Invalid analysis type');
       }
 
+      console.log(`📡 [MarketAnalysisPanel] ${analysisType} analysis response:`, result);
+
+      // Handle no_key status (user not connected to AI)
+      if (result?.status === 'no_key') {
+        console.log(`🔑 [MarketAnalysisPanel] No AI key configured - showing dummy data`);
+        setAnalyses(prev => ({ ...prev, [analysisType]: result }));
+        toast({
+          title: "Sample Analysis",
+          description: result.message || "Connect your AI provider to get personalized market analysis",
+          variant: "default",
+        });
+        return;
+      }
+
+      // Handle not_implemented status
+      if (result?.status === 'not_implemented') {
+        console.log(`🚧 [MarketAnalysisPanel] ${analysisType} analysis not yet implemented`);
+        toast({
+          title: "Feature Coming Soon",
+          description: result.message || `${ANALYSIS_TYPES.find(t => t.value === analysisType)?.label} is planned but not yet implemented`,
+          variant: "default",
+        });
+        return;
+      }
+
+      // Handle unauthorized status
+      if (result?.status === 'unauthorized') {
+        console.log(`🔐 [MarketAnalysisPanel] Unauthorized for ${analysisType} analysis`);
+        toast({
+          title: "Authentication Required",
+          description: result.message || "Please connect to your broker to access market analysis",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setAnalyses(prev => ({ ...prev, [analysisType]: result }));
       
+      const isDummy = result?.analysis?.is_dummy;
       toast({
-        title: "Analysis Complete",
-        description: `${ANALYSIS_TYPES.find(t => t.value === analysisType)?.label} generated successfully!`,
+        title: isDummy ? "Sample Analysis Generated" : "Analysis Complete",
+        description: isDummy 
+          ? "This is example analysis (connect AI for personalized insights)"
+          : `${ANALYSIS_TYPES.find(t => t.value === analysisType)?.label} generated successfully!`,
       });
 
     } catch (err) {
+      console.error(`❌ [MarketAnalysisPanel] Failed to generate ${analysisType} analysis:`, err);
       toast({
         title: "Analysis Failed",
         description: err.message || "Failed to generate analysis",
@@ -182,6 +223,23 @@ export default function MarketAnalysisPanel() {
 
         {analysis ? (
           <div className="space-y-4">
+            {/* Dummy Data Notice */}
+            {analysis.analysis?.is_dummy && (
+              <Alert className="border-blue-200 bg-blue-50">
+                <AlertTriangle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  <strong>Sample Data:</strong> This is example analysis to show what you'll get when you connect your AI provider. 
+                  <Button 
+                    variant="link" 
+                    className="p-0 h-auto text-blue-600 hover:text-blue-800 ml-2"
+                    onClick={() => window.location.href = '/ai?tab=settings'}
+                  >
+                    Configure AI →
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+            
             {/* Key Metrics */}
             {analysis.key_metrics && (
               <Card className="border-blue-200">

@@ -124,29 +124,104 @@ export default function AISettingsForm() {
   const loadCurrentSettings = async () => {
     setLoading(true);
     try {
-      const response = await railwayAPI.request('/api/ai/preferences');
-      if (response.status === 'success' && response.data?.preferences) {
-        setCurrentSettings(response.data.preferences);
-        setPreferences(prev => ({
-          ...prev,
-          preferred_ai_provider: response.data.preferences.preferred_ai_provider || 'auto'
-        }));
-      } else if (response.status === 'unauthorized') {
-        console.warn('User not authenticated for AI preferences');
-        // Set default settings for unauthenticated users
+      console.log('🔧 [AISettingsForm] Loading current AI settings...');
+      
+      // Get stored broker config for API calls
+      const storedConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
+      const activeConfig = storedConfigs.find(config => 
+        config.is_connected && 
+        config.user_data?.user_id
+      );
+
+      if (!activeConfig) {
+        console.warn('🔧 [AISettingsForm] No active broker config found');
+        toast({
+          title: "Authentication Required",
+          description: "Please connect to your broker first to configure AI settings.",
+          variant: "destructive",
+        });
         setCurrentSettings({
           preferred_ai_provider: 'auto',
           has_openai_key: false,
           has_claude_key: false,
-          has_gemini_key: false
+          has_gemini_key: false,
+          openai_key_preview: '',
+          claude_key_preview: '',
+          gemini_key_preview: ''
+        });
+        setLoading(false);
+        return;
+      }
+
+      const userId = activeConfig.user_data.user_id;
+      console.log('🔧 [AISettingsForm] Loading settings for user:', userId);
+
+      const response = await railwayAPI.request('/api/ai/preferences', {
+        method: 'GET',
+        headers: {
+          'X-User-ID': userId,
+          'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
+        }
+      });
+
+      console.log('🔧 [AISettingsForm] AI preferences response:', response);
+
+      if (response.status === 'success' && response.preferences) {
+        const prefs = response.preferences;
+        setCurrentSettings({
+          preferred_ai_provider: prefs.preferred_ai_provider || 'auto',
+          has_openai_key: !!prefs.has_openai_key,
+          has_claude_key: !!prefs.has_claude_key,
+          has_gemini_key: !!prefs.has_gemini_key,
+          openai_key_preview: prefs.openai_key_preview || '',
+          claude_key_preview: prefs.claude_key_preview || '',
+          gemini_key_preview: prefs.gemini_key_preview || ''
+        });
+        
+        setPreferences(prev => ({
+          ...prev,
+          preferred_ai_provider: prefs.preferred_ai_provider || 'auto'
+        }));
+        
+        console.log('✅ [AISettingsForm] Settings loaded successfully');
+      } else if (response.status === 'no_key') {
+        console.log('⚠️ [AISettingsForm] No AI keys configured yet');
+        setCurrentSettings({
+          preferred_ai_provider: 'auto',
+          has_openai_key: false,
+          has_claude_key: false,
+          has_gemini_key: false,
+          openai_key_preview: '',
+          claude_key_preview: '',
+          gemini_key_preview: ''
+        });
+      } else {
+        console.warn('🔧 [AISettingsForm] Unexpected response status:', response.status);
+        setCurrentSettings({
+          preferred_ai_provider: 'auto',
+          has_openai_key: false,
+          has_claude_key: false,
+          has_gemini_key: false,
+          openai_key_preview: '',
+          claude_key_preview: '',
+          gemini_key_preview: ''
         });
       }
     } catch (error) {
-      console.error('Failed to load AI settings:', error);
+      console.error('❌ [AISettingsForm] Failed to load AI settings:', error);
       toast({
         title: "Error",
-        description: "Failed to load current AI settings. Please connect to your broker first.",
+        description: "Failed to load current AI settings. Please check your connection.",
         variant: "destructive",
+      });
+      setCurrentSettings({
+        preferred_ai_provider: 'auto',
+        has_openai_key: false,
+        has_claude_key: false,
+        has_gemini_key: false,
+        openai_key_preview: '',
+        claude_key_preview: '',
+        gemini_key_preview: ''
       });
     }
     setLoading(false);
@@ -241,6 +316,21 @@ export default function AISettingsForm() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      console.log('💾 [AISettingsForm] Saving AI preferences...');
+      
+      // Get stored broker config for API calls
+      const storedConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
+      const activeConfig = storedConfigs.find(config => 
+        config.is_connected && 
+        config.user_data?.user_id
+      );
+
+      if (!activeConfig) {
+        throw new Error('No active broker connection found');
+      }
+
+      const userId = activeConfig.user_data.user_id;
+
       // Validate keys if option is enabled and there are new keys
       if (validateBeforeSaving) {
         const keysToValidate = [];
@@ -264,19 +354,39 @@ export default function AISettingsForm() {
         }
       }
 
-      // Save preferences
+      // Save preferences - only include keys that are actually provided
       const requestBody = {
         preferred_ai_provider: preferences.preferred_ai_provider,
-        openai_api_key: preferences.openai_api_key || null,
-        claude_api_key: preferences.claude_api_key || null,
-        gemini_api_key: preferences.gemini_api_key || null
+        openai_api_key: preferences.openai_api_key?.trim() || null,
+        claude_api_key: preferences.claude_api_key?.trim() || null,
+        gemini_api_key: preferences.gemini_api_key?.trim() || null
       };
+
+      // Check if at least one key is provided
+      const hasAnyKey = requestBody.openai_api_key || requestBody.claude_api_key || requestBody.gemini_api_key;
+      if (!hasAnyKey) {
+        toast({
+          title: "No API Key",
+          description: "Please provide at least one API key to save preferences.",
+          variant: "destructive",
+        });
+        setSaving(false);
+        return;
+      }
+
+      console.log('💾 [AISettingsForm] Saving preferences for user:', userId);
 
       const response = await railwayAPI.request('/api/ai/preferences', {
         method: 'POST',
-        body: JSON.stringify(requestBody),
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'X-User-ID': userId,
+          'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
       });
+
+      console.log('💾 [AISettingsForm] Save response:', response);
 
       if (response.status === 'success') {
         toast({
@@ -285,10 +395,11 @@ export default function AISettingsForm() {
         });
         await loadCurrentSettings(); // Refresh current settings
       } else {
+        console.error('💾 [AISettingsForm] Save failed with status:', response.status, 'message:', response.message);
         throw new Error(response.message || 'Failed to save settings');
       }
     } catch (error) {
-      console.error('Failed to save AI settings:', error);
+      console.error('❌ [AISettingsForm] Failed to save AI settings:', error);
       toast({
         title: "Error",
         description: "Failed to save AI settings. Please try again.",
@@ -309,9 +420,9 @@ export default function AISettingsForm() {
         method: 'POST',
         body: JSON.stringify({
           preferred_ai_provider: 'auto',
-          openai_api_key: null,
-          claude_api_key: null,
-          gemini_api_key: null
+          openai_api_key: "",
+          claude_api_key: "",
+          gemini_api_key: ""
         }),
         headers: { 'Content-Type': 'application/json' }
       });

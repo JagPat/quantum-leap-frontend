@@ -88,6 +88,20 @@ export default function FeedbackPanel() {
       const result = await recordTradeOutcome(payload);
       setSubmittedFeedback(result);
       
+      // Handle dummy data response
+      if (result?.status === 'no_key') {
+        toast({
+          title: "Sample Feedback",
+          description: result.message || "Connect your AI provider to get personalized learning insights",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Feedback Submitted",
+          description: "Trade outcome recorded and AI learning insights generated",
+        });
+      }
+      
       // Fetch learning insights for this strategy
       await fetchLearningInsights(feedbackForm.strategy_id);
       
@@ -102,11 +116,6 @@ export default function FeedbackPanel() {
         exit_reason: '',
         notes: ''
       });
-      
-      toast({
-        title: "Feedback Submitted",
-        description: "Trade outcome recorded and AI learning insights generated",
-      });
 
     } catch (err) {
       toast({
@@ -120,6 +129,12 @@ export default function FeedbackPanel() {
   const fetchLearningInsights = async (strategyId) => {
     try {
       const insights = await getLearningInsights(strategyId);
+      
+      // Handle dummy data response
+      if (insights?.status === 'no_key') {
+        console.log('🔑 [FeedbackPanel] No AI key configured - showing dummy insights');
+      }
+      
       setLearningInsights(prev => [insights, ...prev.filter(i => i.strategy_id !== strategyId)]);
     } catch (err) {
       console.error('Failed to fetch learning insights:', err);

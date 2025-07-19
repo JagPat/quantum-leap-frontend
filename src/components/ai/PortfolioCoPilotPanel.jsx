@@ -62,10 +62,19 @@ export default function PortfolioCoPilotPanel({ portfolioData, onRefresh }) {
       const result = await analyzePortfolioData(portfolioData);
       setLastAnalysis(new Date());
       
-      toast({
-        title: "Analysis Complete",
-        description: "Portfolio analysis and recommendations updated",
-      });
+      // Handle dummy data response
+      if (result?.status === 'no_key') {
+        toast({
+          title: "Sample Analysis",
+          description: result.message || "Connect your AI provider to get personalized portfolio analysis",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Analysis Complete",
+          description: "Portfolio analysis and recommendations updated",
+        });
+      }
 
     } catch (err) {
       toast({
@@ -114,20 +123,31 @@ export default function PortfolioCoPilotPanel({ portfolioData, onRefresh }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <Card>
-        <CardHeader>
+      <Card className="border-slate-700/50 bg-slate-800/50 backdrop-blur-sm shadow-lg border-0 rounded-xl">
+        <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              AI Portfolio Co-Pilot
-            </CardTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg border border-blue-500/30">
+                <Shield className="h-5 w-5 text-blue-400" />
+              </div>
+              <div>
+                <CardTitle className="text-xl font-bold text-white">AI Portfolio Co-Pilot</CardTitle>
+                <p className="text-sm text-slate-400">Intelligent portfolio analysis and recommendations</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
               {lastAnalysis && (
-                <span className="text-sm text-gray-500">
-                  Last analyzed: {lastAnalysis.toLocaleTimeString()}
-                </span>
+                <div className="text-right">
+                  <span className="text-xs text-slate-500 block">Last analyzed</span>
+                  <span className="text-sm font-medium text-slate-300">{lastAnalysis.toLocaleTimeString()}</span>
+                </div>
               )}
-              <Button onClick={handleAnalyze} disabled={loading} size="sm">
+              <Button 
+                onClick={handleAnalyze} 
+                disabled={loading} 
+                size="sm"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-md"
+              >
                 <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 {loading ? 'Analyzing...' : 'Analyze Portfolio'}
               </Button>
@@ -413,9 +433,31 @@ export default function PortfolioCoPilotPanel({ portfolioData, onRefresh }) {
             <CardTitle className="flex items-center gap-2">
               <Target className="h-5 w-5" />
               AI Rebalancing Recommendations
+              {recommendations.rebalancing_suggestions.some(rec => rec.is_dummy) && (
+                <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-100">
+                  Sample
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Dummy Data Notice */}
+            {recommendations.rebalancing_suggestions.some(rec => rec.is_dummy) && (
+              <Alert className="border-blue-200 bg-blue-100 mb-4">
+                <AlertTriangle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  <strong>Sample Data:</strong> These are example recommendations to show what you'll get when you connect your AI provider. 
+                  <Button 
+                    variant="link" 
+                    className="p-0 h-auto text-blue-600 hover:text-blue-800 ml-2"
+                    onClick={() => window.location.href = '/ai?tab=settings'}
+                  >
+                    Configure AI →
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div className="space-y-4">
               {recommendations.rebalancing_suggestions.map((suggestion, index) => (
                 <div key={index} className="bg-white p-4 rounded-lg border">
@@ -515,23 +557,73 @@ export default function PortfolioCoPilotPanel({ portfolioData, onRefresh }) {
 
       {/* No Analysis State */}
       {!analysis && !loading && (
-        <Card className="border-dashed">
+        <Card className="border-slate-700/50 bg-slate-800/50 backdrop-blur-sm shadow-lg border-0 rounded-xl">
           <CardContent className="pt-6">
-            <div className="text-center py-8">
-              <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-600 mb-2">
-                Portfolio Analysis Not Available
+            <div className="text-center py-12">
+              <div className="p-4 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center border border-blue-500/30">
+                <Shield className="h-10 w-10 text-blue-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-3">
+                Ready for AI Analysis
               </h3>
-              <p className="text-gray-500 mb-4">
+              <p className="text-slate-400 mb-6 max-w-md mx-auto">
                 {portfolioData?.holdings 
-                  ? 'Click "Analyze Portfolio" to get AI-powered insights and recommendations'
-                  : 'Connect your broker account to analyze your portfolio'
+                  ? 'Connect your AI provider to get intelligent insights, risk analysis, and trading recommendations'
+                  : 'Connect your broker account to unlock AI-powered portfolio analysis'
                 }
               </p>
-              {portfolioData?.holdings && (
-                <Button onClick={handleAnalyze}>
-                  <Shield className="mr-2 h-4 w-4" />
-                  Analyze Portfolio
+              
+              {portfolioData?.holdings ? (
+                <div className="space-y-4">
+                  <Button 
+                    onClick={handleAnalyze}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-md px-8 py-3"
+                  >
+                    <Shield className="mr-2 h-5 w-5" />
+                    Analyze Portfolio
+                  </Button>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 text-left">
+                    <div className="text-center p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                      <TrendingUp className="h-6 w-6 text-blue-400 mx-auto mb-2" />
+                      <h4 className="font-medium text-white mb-1">Performance Analysis</h4>
+                      <p className="text-sm text-slate-400">Risk-adjusted returns and performance metrics</p>
+                    </div>
+                    <div className="text-center p-4 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                      <PieChart className="h-6 w-6 text-purple-400 mx-auto mb-2" />
+                      <h4 className="font-medium text-white mb-1">Diversification</h4>
+                      <p className="text-sm text-slate-400">Sector allocation and concentration analysis</p>
+                    </div>
+                    <div className="text-center p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                      <Target className="h-6 w-6 text-green-400 mx-auto mb-2" />
+                      <h4 className="font-medium text-white mb-1">Trading Signals</h4>
+                      <p className="text-sm text-slate-400">AI-powered buy/sell recommendations</p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-6 p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                    <p className="text-sm text-slate-400 text-center">
+                      <strong>Setup Required:</strong> Add your OpenAI, Claude, or Gemini API key in AI Settings to enable personalized analysis
+                    </p>
+                    <div className="mt-3 text-center">
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        className="border-blue-500/30 text-blue-300 hover:bg-blue-500/20"
+                        onClick={() => window.location.href = '/ai?tab=settings'}
+                      >
+                        Configure AI
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Button 
+                  variant="outline"
+                  className="border-slate-600/50 text-slate-300 hover:bg-slate-700/50"
+                  onClick={() => window.location.href = '/settings'}
+                >
+                  Connect Broker Account
                 </Button>
               )}
             </div>

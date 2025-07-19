@@ -306,6 +306,36 @@ export default function BrokerSetup({
         console.log("✅ Verified user_id:", result.user_data.user_id);
         console.log("✅ Access token length:", result.access_token?.length);
         
+        // Create persistent session on backend
+        try {
+          console.log("🔐 [Component] Creating persistent session...");
+          const sessionData = {
+            access_token: result.access_token,
+            api_key: apiKey,
+            user_data: result.user_data,
+            broker_name: config.broker_name || 'zerodha',
+            created_at: new Date().toISOString()
+          };
+          
+          const sessionResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/broker/session/create`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-User-ID': result.user_data.user_id,
+              'Authorization': `token ${apiKey}:${result.access_token}`
+            },
+            body: JSON.stringify(sessionData)
+          });
+          
+          if (sessionResponse.ok) {
+            console.log("✅ [Component] Persistent session created successfully");
+          } else {
+            console.warn("⚠️ [Component] Failed to create persistent session, but continuing...");
+          }
+        } catch (sessionError) {
+          console.warn("⚠️ [Component] Session creation failed, but continuing:", sessionError);
+        }
+        
         // Save the correct data structure
         const configToSave = {
           ...config,

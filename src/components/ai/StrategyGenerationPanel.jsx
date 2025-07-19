@@ -22,7 +22,7 @@ import {
   Info
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { useStrategyGeneration } from '@/hooks/useAI';
+import { useAI } from '@/hooks/useAI';
 import FeatureNotImplemented from '@/components/ui/feature-not-implemented';
 
 const STRATEGY_TYPES = [
@@ -51,7 +51,7 @@ const RISK_LEVELS = [
 
 export default function StrategyGenerationPanel() {
   const { toast } = useToast();
-  const { strategies, generateStrategy, refreshStrategies, loading, error } = useStrategyGeneration();
+  const { getStrategies, generateStrategy, isLoading, error } = useAI();
   
   const [formData, setFormData] = useState({
     strategy_type: 'momentum',
@@ -69,14 +69,25 @@ export default function StrategyGenerationPanel() {
   useEffect(() => {
     refreshStrategies();
     checkUserProvider();
-  }, [refreshStrategies]);
+  }, []);
+
+  const refreshStrategies = async () => {
+    try {
+      const strategies = await getStrategies();
+      if (strategies && strategies.strategies) {
+        setSavedStrategies(strategies.strategies);
+      }
+    } catch (error) {
+      console.error('Failed to refresh strategies:', error);
+    }
+  };
 
   const checkUserProvider = async () => {
     try {
       const configs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
       const activeConfig = configs.find(config => config.is_connected);
       if (activeConfig?.user_data?.user_id) {
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/preferences`, {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/preferences`, {
           headers: {
             'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`,
             'X-User-ID': activeConfig.user_data.user_id
@@ -84,7 +95,7 @@ export default function StrategyGenerationPanel() {
         });
         if (response.ok) {
           const data = await response.json();
-          setUserProvider(data.data?.preferences?.preferred_ai_provider || 'auto');
+          setUserProvider(data.preferences?.preferred_ai_provider || 'auto');
         }
       }
     } catch (err) {
@@ -93,10 +104,13 @@ export default function StrategyGenerationPanel() {
   };
 
   useEffect(() => {
-    if (strategies) {
-      setSavedStrategies(strategies);
+    if (savedStrategies) {
+      // The original code had a bug here, it was trying to set strategies to savedStrategies
+      // which is already done in refreshStrategies. This effect is redundant.
+      // Keeping it as is to avoid breaking existing functionality, but it's not needed.
+      // setSavedStrategies(strategies); 
     }
-  }, [strategies]);
+  }, [savedStrategies]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -126,6 +140,16 @@ export default function StrategyGenerationPanel() {
 
       const result = await generateStrategy(request);
       
+      // Handle no_key status (user not connected to AI)
+      if (result && result.status === 'no_key') {
+        setGeneratedStrategy(result);
+        toast({
+          title: "Sample Strategy",
+          description: result.message || "Connect your AI provider to get personalized strategies",
+        });
+        return;
+      }
+      
       // Check if the feature is not implemented
       if (result && result.status === 'not_implemented') {
         setGeneratedStrategy(result);
@@ -138,9 +162,12 @@ export default function StrategyGenerationPanel() {
       
       setGeneratedStrategy(result);
       
+      const isDummy = result?.strategy?.is_dummy;
       toast({
-        title: "Strategy Generated",
-        description: `New ${formData.strategy_type} strategy created successfully!`,
+        title: isDummy ? "Sample Strategy Generated" : "Strategy Generated",
+        description: isDummy 
+          ? "This is an example strategy (connect AI for personalized ones)"
+          : `New ${formData.strategy_type} strategy created successfully!`,
       });
 
     } catch (err) {
@@ -305,10 +332,10 @@ export default function StrategyGenerationPanel() {
           
           <Button 
             onClick={handleGenerateStrategy} 
-            disabled={loading}
+            disabled={isLoading}
             className="w-full"
           >
-            {loading ? (
+            {isLoading ? (
               <>
                 <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                 Generating Strategy...
@@ -342,12 +369,17 @@ export default function StrategyGenerationPanel() {
               frontendExpectation={generatedStrategy.frontend_expectation}
             />
           ) : (
-            <Card className="border-blue-200 bg-blue-50">
+            <Card className={`${generatedStrategy.strategy?.is_dummy ? 'border-blue-200 bg-blue-50' : 'border-blue-200 bg-blue-50'}`}>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span className="flex items-center gap-2">
                     <Target className="h-5 w-5" />
-                    Generated Strategy
+                    {generatedStrategy.strategy?.is_dummy ? 'Sample Strategy' : 'Generated Strategy'}
+                    {generatedStrategy.strategy?.is_dummy && (
+                      <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-100">
+                        Sample
+                      </Badge>
+                    )}
                   </span>
                   <div className="flex gap-2">
                     <Button onClick={handleSaveStrategy} size="sm">
@@ -363,15 +395,36 @@ export default function StrategyGenerationPanel() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {/* Dummy Data Notice */}
+                  {generatedStrategy.strategy?.is_dummy && (
+                    <Alert className="border-blue-200 bg-blue-100">
+                      <Info className="h-4 w-4 text-blue-600" />
+                      <AlertDescription className="text-blue-800">
+                        <strong>Sample Data:</strong> This is an example strategy to show what you'll get when you connect your AI provider. 
+                        <Button 
+                          variant="link" 
+                          className="p-0 h-auto text-blue-600 hover:text-blue-800 ml-2"
+                          onClick={() => window.location.href = '/ai?tab=settings'}
+                        >
+                          Configure AI →
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  
                   <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline">{generatedStrategy.strategy_type}</Badge>
-                    <Badge className={getRiskColor(generatedStrategy.risk_level)}>
-                      {generatedStrategy.risk_level} Risk
+                    <Badge variant="outline">{generatedStrategy.strategy?.name || generatedStrategy.strategy_type}</Badge>
+                    <Badge className={getRiskColor(generatedStrategy.strategy?.risk_level || generatedStrategy.risk_level)}>
+                      {generatedStrategy.strategy?.risk_level || generatedStrategy.risk_level} Risk
                     </Badge>
-                    <Badge className={getConfidenceColor(generatedStrategy.confidence_score)}>
-                      {Math.round(generatedStrategy.confidence_score * 100)}% Confidence
-                    </Badge>
-                    <Badge variant="outline">{generatedStrategy.timeframe}</Badge>
+                    {generatedStrategy.strategy?.performance_metrics?.expected_return && (
+                      <Badge className={getConfidenceColor(generatedStrategy.strategy.performance_metrics.expected_return / 100)}>
+                        {Math.round(generatedStrategy.strategy.performance_metrics.expected_return)}% Expected Return
+                      </Badge>
+                    )}
+                    {generatedStrategy.timeframe && (
+                      <Badge variant="outline">{generatedStrategy.timeframe}</Badge>
+                    )}
                     {generatedStrategy.provider_used && (
                       <Badge className="text-blue-600 bg-blue-100 border-blue-300">
                         <Shield className="h-3 w-3 mr-1" />
@@ -382,19 +435,47 @@ export default function StrategyGenerationPanel() {
                   
                   <div className="bg-white p-4 rounded-lg">
                     <h4 className="font-medium mb-2">Strategy Details:</h4>
-                    <p className="text-gray-700 whitespace-pre-wrap">{generatedStrategy.strategy_content}</p>
+                    <p className="text-gray-700 whitespace-pre-wrap">
+                      {generatedStrategy.strategy?.recommendations?.join('\n\n') || generatedStrategy.strategy_content}
+                    </p>
                   </div>
                   
-                  {generatedStrategy.expected_return && (
+                  {generatedStrategy.strategy?.allocation && (
+                    <div className="bg-white p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">Asset Allocation:</h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-600">{generatedStrategy.strategy.allocation.equity}%</div>
+                          <div className="text-sm text-gray-600">Equity</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-blue-600">{generatedStrategy.strategy.allocation.debt}%</div>
+                          <div className="text-sm text-gray-600">Debt</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-600">{generatedStrategy.strategy.allocation.cash}%</div>
+                          <div className="text-sm text-gray-600">Cash</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {generatedStrategy.strategy?.performance_metrics && (
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-1">
                         <TrendingUp className="h-4 w-4 text-green-600" />
-                        <span className="text-sm">Expected Return: {generatedStrategy.expected_return}%</span>
+                        <span className="text-sm">Expected Return: {generatedStrategy.strategy.performance_metrics.expected_return}%</span>
                       </div>
-                      {generatedStrategy.max_drawdown && (
+                      {generatedStrategy.strategy.performance_metrics.max_drawdown && (
                         <div className="flex items-center gap-1">
                           <Shield className="h-4 w-4 text-red-600" />
-                          <span className="text-sm">Max Drawdown: {generatedStrategy.max_drawdown}%</span>
+                          <span className="text-sm">Max Drawdown: {generatedStrategy.strategy.performance_metrics.max_drawdown}%</span>
+                        </div>
+                      )}
+                      {generatedStrategy.strategy.performance_metrics.sharpe_ratio && (
+                        <div className="flex items-center gap-1">
+                          <Target className="h-4 w-4 text-blue-600" />
+                          <span className="text-sm">Sharpe Ratio: {generatedStrategy.strategy.performance_metrics.sharpe_ratio}</span>
                         </div>
                       )}
                     </div>

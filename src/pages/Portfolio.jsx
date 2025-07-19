@@ -37,14 +37,16 @@ const PortfolioCoPilotPanel = React.lazy(() => import('@/components/ai/Portfolio
 
 // Loading component for AI Co-Pilot
 const AICoPilotLoading = () => (
-  <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-    <div className="flex items-center space-x-2">
-      <Brain className="h-6 w-6 animate-pulse text-amber-500" />
-      <Loader2 className="h-5 w-5 animate-spin text-amber-500" />
+  <div className="flex flex-col items-center justify-center min-h-[400px] space-y-6">
+    <div className="p-6 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl border border-blue-500/30">
+      <div className="flex items-center space-x-3">
+        <Brain className="h-8 w-8 animate-pulse text-blue-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+      </div>
     </div>
     <div className="text-center">
-      <p className="text-slate-300 text-lg font-medium">Loading AI Co-Pilot...</p>
-      <p className="text-slate-500 text-sm mt-1">Analyzing your portfolio...</p>
+      <h3 className="text-xl font-bold text-white mb-2">Loading AI Co-Pilot...</h3>
+      <p className="text-slate-400">Analyzing your portfolio with advanced AI algorithms</p>
     </div>
   </div>
 );
@@ -154,16 +156,16 @@ export default function Portfolio() {
 
     const getChangeColor = (value) => {
         const num = parseFloat(value) || 0;
-        if (num > 0) return 'text-green-600';
-        if (num < 0) return 'text-red-600';
-        return 'text-gray-600';
+        if (num > 0) return 'text-green-400';
+        if (num < 0) return 'text-red-400';
+        return 'text-slate-400';
     };
 
     const getChangeBgColor = (value) => {
         const num = parseFloat(value) || 0;
-        if (num > 0) return 'bg-green-50 border-green-200';
-        if (num < 0) return 'bg-red-50 border-red-200';
-        return 'bg-gray-50 border-gray-200';
+        if (num > 0) return 'bg-green-500/10 border-green-500/30';
+        if (num < 0) return 'bg-red-500/10 border-red-500/30';
+        return 'bg-slate-500/10 border-slate-500/30';
     };
 
     const getAllPositions = () => {
@@ -231,11 +233,13 @@ export default function Portfolio() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+            <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Loading Portfolio</h3>
-                    <p className="text-gray-600">Fetching your latest portfolio data...</p>
+                    <div className="p-4 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 inline-block mb-6">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto"></div>
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">Loading Portfolio</h3>
+                    <p className="text-slate-400">Fetching your latest portfolio data...</p>
                 </div>
             </div>
         );
@@ -243,18 +247,18 @@ export default function Portfolio() {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+            <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6">
                 <div className="max-w-lg mx-auto mt-20">
-                    <Alert variant="destructive" className="border-red-200 bg-red-50">
+                    <Alert variant="destructive" className="border-red-500/20 bg-red-500/10 backdrop-blur-sm">
                         <AlertTriangle className="h-4 w-4" />
-                        <AlertDescription className="text-red-800">
+                        <AlertDescription className="text-red-200">
                             <strong>Portfolio Error:</strong> {error}
                         </AlertDescription>
                     </Alert>
                     <div className="mt-6 text-center">
                         <Button 
                             onClick={() => fetchPortfolioData()} 
-                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-md"
                         >
                             <RefreshCw className="w-4 h-4 mr-2" />
                             Try Again
@@ -276,12 +280,14 @@ export default function Portfolio() {
         });
         
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+            <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6">
                 <div className="max-w-lg mx-auto mt-20 text-center">
-                    <div className="bg-white rounded-xl shadow-lg p-8">
-                        <Wallet className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-xl font-semibold text-gray-800 mb-2">No Portfolio Data</h3>
-                        <p className="text-gray-600 mb-6">
+                    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 shadow-lg p-8">
+                        <div className="p-4 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                            <Wallet className="w-10 h-10 text-blue-400" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2">No Portfolio Data</h3>
+                        <p className="text-slate-400 mb-6">
                             {portfolioData ? 
                                 "Your portfolio appears to be empty. This could be normal if you have no current holdings or positions." :
                                 "Unable to load portfolio data. Please check your broker connection."}
@@ -290,21 +296,21 @@ export default function Portfolio() {
                         <div className="space-y-3">
                             <Button 
                                 onClick={() => fetchPortfolioData()} 
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-md"
                             >
                                 <RefreshCw className="w-4 h-4 mr-2" />
                                 Refresh Portfolio
                             </Button>
                             
                             {portfolioData && (
-                                <p className="text-sm text-gray-500">
+                                <p className="text-sm text-slate-500">
                                     API Connection: ✅ Connected | Data: Empty
                                 </p>
                             )}
                             
                             <Button 
                                 variant="outline" 
-                                className="w-full"
+                                className="w-full border-slate-600/50 text-slate-300 hover:bg-slate-700/50"
                                 onClick={() => window.location.href = '/broker-integration'}
                             >
                                 Check Broker Connection
@@ -322,26 +328,26 @@ export default function Portfolio() {
     const topLosers = getTopLosers();
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
             {/* Header */}
-            <div className="bg-white border-b border-gray-200 shadow-sm">
+            <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700/50 shadow-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Portfolio Overview</h1>
-                            <p className="text-gray-600 mt-1">Track your investments and performance</p>
+                            <h1 className="text-3xl font-bold text-white">Portfolio Overview</h1>
+                            <p className="text-slate-300 mt-1">Track your investments and performance</p>
                         </div>
                         <div className="flex items-center space-x-3">
                             <Button
                                 onClick={() => fetchPortfolioData(true)}
                                 disabled={refreshing}
                                 variant="outline"
-                                className="border-blue-300 hover:bg-blue-100 hover:border-blue-400 text-blue-700 font-medium shadow-sm"
+                                className="border-slate-600/50 hover:bg-slate-700/50 hover:border-slate-500/50 text-slate-300 font-medium shadow-sm"
                             >
                                 <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
                                 {refreshing ? 'Refreshing...' : 'Refresh'}
                             </Button>
-                            <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+                            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-md">
                                 <Download className="w-4 h-4 mr-2" />
                                 Export
                             </Button>
@@ -351,20 +357,30 @@ export default function Portfolio() {
             </div>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {/* Demo Mode Banner */}
+                <div className="mb-6">
+                    <Alert className="border-yellow-500/20 bg-yellow-500/10 backdrop-blur-sm">
+                        <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                        <AlertDescription className="text-yellow-200">
+                            <strong>Demo Mode:</strong> Showing sample portfolio data. Connect your broker to view live data from your actual portfolio.
+                        </AlertDescription>
+                    </Alert>
+                </div>
+
                 {/* Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <Card className="bg-white shadow-lg border-0 rounded-xl">
+                    <Card className="border-slate-700/50 bg-slate-800/50 backdrop-blur-sm shadow-lg border-0 rounded-xl">
                         <CardContent className="p-6">
                             <div className="flex items-center">
-                                <div className="p-2 bg-blue-100 rounded-lg">
-                                    <Wallet className="h-6 w-6 text-blue-600" />
+                                <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg border border-blue-500/30">
+                                    <Wallet className="h-6 w-6 text-blue-400" />
                                 </div>
                                 <div className="ml-4 flex-1">
-                                    <p className="text-sm font-medium text-gray-600">Current Value</p>
-                                    <p className="text-2xl font-bold text-gray-900">
+                                    <p className="text-sm font-medium text-slate-400">Current Value</p>
+                                    <p className="text-2xl font-bold text-white">
                                         {formatCurrency(summary.current_value)}
                                     </p>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <p className="text-xs text-slate-500 mt-1">
                                         Invested: {formatCurrency(summary.total_investment)}
                                     </p>
                                 </div>
@@ -372,17 +388,17 @@ export default function Portfolio() {
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-white shadow-lg border-0 rounded-xl">
+                    <Card className="border-slate-700/50 bg-slate-800/50 backdrop-blur-sm shadow-lg border-0 rounded-xl">
                         <CardContent className="p-6">
                             <div className="flex items-center">
-                                <div className={`p-2 rounded-lg ${summary.total_pnl >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
+                                <div className={`p-2 rounded-lg ${summary.total_pnl >= 0 ? 'bg-green-500/20 border-green-500/30' : 'bg-red-500/20 border-red-500/30'} border`}>
                                     {summary.total_pnl >= 0 ? 
-                                        <TrendingUp className="h-6 w-6 text-green-600" /> : 
-                                        <TrendingDown className="h-6 w-6 text-red-600" />
+                                        <TrendingUp className="h-6 w-6 text-green-400" /> : 
+                                        <TrendingDown className="h-6 w-6 text-red-400" />
                                     }
                                 </div>
                                 <div className="ml-4 flex-1">
-                                    <p className="text-sm font-medium text-gray-600">Total P&L</p>
+                                    <p className="text-sm font-medium text-slate-400">Total P&L</p>
                                     <p className={`text-2xl font-bold ${getChangeColor(summary.total_pnl)}`}>
                                         {formatCurrency(summary.total_pnl)}
                                     </p>
@@ -394,14 +410,14 @@ export default function Portfolio() {
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-white shadow-lg border-0 rounded-xl">
+                    <Card className="border-slate-700/50 bg-slate-800/50 backdrop-blur-sm shadow-lg border-0 rounded-xl">
                         <CardContent className="p-6">
                             <div className="flex items-center">
-                                <div className={`p-2 rounded-lg ${summary.day_pnl >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
-                                    <Activity className="h-6 w-6 text-blue-600" />
+                                <div className={`p-2 rounded-lg ${summary.day_pnl >= 0 ? 'bg-green-500/20 border-green-500/30' : 'bg-red-500/20 border-red-500/30'} border`}>
+                                    <Activity className="h-6 w-6 text-blue-400" />
                                 </div>
                                 <div className="ml-4 flex-1">
-                                    <p className="text-sm font-medium text-gray-600">Today's P&L</p>
+                                    <p className="text-sm font-medium text-slate-400">Today's P&L</p>
                                     <p className={`text-2xl font-bold ${getChangeColor(summary.day_pnl)}`}>
                                         {formatCurrency(summary.day_pnl)}
                                     </p>
@@ -413,18 +429,18 @@ export default function Portfolio() {
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-white shadow-lg border-0 rounded-xl">
+                    <Card className="border-slate-700/50 bg-slate-800/50 backdrop-blur-sm shadow-lg border-0 rounded-xl">
                         <CardContent className="p-6">
                             <div className="flex items-center">
-                                <div className="p-2 bg-purple-100 rounded-lg">
-                                    <Target className="h-6 w-6 text-purple-600" />
+                                <div className="p-2 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg border border-purple-500/30">
+                                    <Target className="h-6 w-6 text-purple-400" />
                                 </div>
                                 <div className="ml-4 flex-1">
-                                    <p className="text-sm font-medium text-gray-600">Total Positions</p>
-                                    <p className="text-2xl font-bold text-gray-900">
+                                    <p className="text-sm font-medium text-slate-400">Total Positions</p>
+                                    <p className="text-2xl font-bold text-white">
                                         {allPositions.length}
                                     </p>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <p className="text-xs text-slate-500 mt-1">
                                         {portfolioData.holdings?.length || 0} Holdings, {portfolioData.positions?.length || 0} Positions
                                     </p>
                                 </div>
@@ -435,24 +451,38 @@ export default function Portfolio() {
 
                 {/* Main Content Tabs */}
                 <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
-                    <TabsList className="grid w-full grid-cols-5 bg-white rounded-xl shadow-sm p-1">
-                        <TabsTrigger value="overview" className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                            Overview
-                        </TabsTrigger>
-                        <TabsTrigger value="holdings" className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                            All Holdings
-                        </TabsTrigger>
-                        <TabsTrigger value="performers" className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                            Top Performers
-                        </TabsTrigger>
-                        <TabsTrigger value="analytics" className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                            Analytics
-                        </TabsTrigger>
-                        <TabsTrigger value="copilot" className="rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                            <Shield className="w-4 h-4 mr-1" />
+                    <div className="flex items-center justify-between">
+                        <TabsList className="grid w-auto grid-cols-5 bg-slate-800/50 border-slate-700/50 rounded-xl shadow-sm p-1">
+                            <TabsTrigger value="overview" className="rounded-lg data-[state=active]:bg-gradient-to-br data-[state=active]:from-blue-500/20 data-[state=active]:to-purple-500/20 data-[state=active]:border-blue-400/30 data-[state=active]:text-blue-300 text-slate-400 hover:text-slate-200 px-4">
+                                Overview
+                            </TabsTrigger>
+                            <TabsTrigger value="holdings" className="rounded-lg data-[state=active]:bg-gradient-to-br data-[state=active]:from-blue-500/20 data-[state=active]:to-purple-500/20 data-[state=active]:border-blue-400/30 data-[state=active]:text-blue-300 text-slate-400 hover:text-slate-200 px-4">
+                                All Holdings
+                            </TabsTrigger>
+                            <TabsTrigger value="performers" className="rounded-lg data-[state=active]:bg-gradient-to-br data-[state=active]:from-blue-500/20 data-[state=active]:to-purple-500/20 data-[state=active]:border-blue-400/30 data-[state=active]:text-blue-300 text-slate-400 hover:text-slate-200 px-4">
+                                Top Performers
+                            </TabsTrigger>
+                            <TabsTrigger value="analytics" className="rounded-lg data-[state=active]:bg-gradient-to-br data-[state=active]:from-blue-500/20 data-[state=active]:to-purple-500/20 data-[state=active]:border-blue-400/30 data-[state=active]:text-blue-300 text-slate-400 hover:text-slate-200 px-4">
+                                Analytics
+                            </TabsTrigger>
+                        </TabsList>
+                        
+                        {/* AI Co-Pilot Button */}
+                        <Button
+                            onClick={() => setSelectedTab('copilot')}
+                            className={`px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
+                                selectedTab === 'copilot'
+                                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
+                                    : 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-blue-300 border border-blue-400/30 hover:from-blue-500/30 hover:to-purple-500/30'
+                            }`}
+                        >
+                            <Shield className="w-4 h-4 mr-2" />
                             AI Co-Pilot
-                        </TabsTrigger>
-                    </TabsList>
+                            {selectedTab !== 'copilot' && (
+                                <Badge className="ml-2 bg-blue-600 text-white text-xs">New</Badge>
+                            )}
+                        </Button>
+                    </div>
 
                     {/* Overview Tab */}
                     <TabsContent value="overview" className="space-y-6">
@@ -767,6 +797,13 @@ export default function Portfolio() {
                                     <CardTitle>Quick Actions</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-3">
+                                    <Button 
+                                        onClick={() => setSelectedTab('copilot')}
+                                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-md"
+                                    >
+                                        <Shield className="w-4 h-4 mr-2" />
+                                        AI Co-Pilot
+                                    </Button>
                                     <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
                                         <Download className="w-4 h-4 mr-2" />
                                         Export to Excel

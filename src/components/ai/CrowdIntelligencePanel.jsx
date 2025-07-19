@@ -32,9 +32,20 @@ export default function CrowdIntelligencePanel() {
 
   const handleRefresh = async () => {
     try {
-      await refreshInsights();
+      console.log('📡 [CrowdIntelligencePanel] Refreshing insights...');
+      const result = await refreshInsights();
       setLastRefresh(new Date());
+      
+      // Handle dummy data response
+      if (result?.status === 'no_key') {
+        toast({
+          title: "Sample Data",
+          description: result.message || "Connect your AI provider to get real-time crowd intelligence",
+          variant: "default",
+        });
+      }
     } catch (err) {
+      console.error('❌ [CrowdIntelligencePanel] Failed to refresh insights:', err);
       toast({
         title: "Failed to Load Insights",
         description: err.message || "Could not fetch crowd intelligence data",
@@ -108,11 +119,11 @@ export default function CrowdIntelligencePanel() {
       )}
 
       {/* Trending Strategies */}
-      {trendingData?.trending_strategies && (
+      {trendingData?.trending_strategies ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-                              <Flame className="h-5 w-5" />
+              <Flame className="h-5 w-5" />
               Trending Strategies
             </CardTitle>
           </CardHeader>
@@ -193,7 +204,7 @@ export default function CrowdIntelligencePanel() {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       {/* Community Insights */}
       {crowdData?.insights && (
@@ -205,6 +216,23 @@ export default function CrowdIntelligencePanel() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Dummy Data Notice */}
+            {crowdData.insights.some(insight => insight.is_dummy) && (
+              <Alert className="border-blue-200 bg-blue-50 mb-4">
+                <AlertTriangle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  <strong>Sample Data:</strong> These are example insights to show what you'll get when you connect your AI provider. 
+                  <Button 
+                    variant="link" 
+                    className="p-0 h-auto text-blue-600 hover:text-blue-800 ml-2"
+                    onClick={() => window.location.href = '/ai?tab=settings'}
+                  >
+                    Configure AI →
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div className="space-y-6">
               {/* Overall Market Sentiment */}
               {crowdData.insights.market_sentiment && (
@@ -366,15 +394,29 @@ export default function CrowdIntelligencePanel() {
             <div className="text-center py-8">
               <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-600 mb-2">
-                No Crowd Intelligence Available
+                Crowd Intelligence
               </h3>
               <p className="text-gray-500 mb-4">
-                Community insights will appear here when enough trading data is available
+                Connect your AI provider to get community insights and trending strategies based on collective trading wisdom.
               </p>
-              <Button onClick={handleRefresh}>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Check for Updates
-              </Button>
+              <div className="space-y-2 text-sm text-gray-400">
+                <p>👥 <strong>Community Insights:</strong> Market sentiment and trending strategies</p>
+                <p>📊 <strong>Risk Patterns:</strong> Collective risk assessment and warnings</p>
+                <p>🎯 <strong>Popular Symbols:</strong> Most traded stocks and performance</p>
+                <p>🔑 <strong>Setup:</strong> Add your OpenAI, Claude, or Gemini API key in AI Settings</p>
+              </div>
+              <div className="mt-4 space-x-2">
+                <Button onClick={handleRefresh} variant="outline" disabled={loading}>
+                  <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  Check for Updates
+                </Button>
+                <Button 
+                  onClick={() => window.location.href = '/ai?tab=settings'} 
+                  variant="default"
+                >
+                  Configure AI
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

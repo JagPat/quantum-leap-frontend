@@ -37,7 +37,7 @@ const CONFIDENCE_FILTERS = [
 
 export default function TradingSignalsPanel() {
   const { toast } = useToast();
-  const { getSignals, loading, error } = useAI();
+  const { getSignals, isLoading, error } = useAI();
   
   const [signals, setSignals] = useState([]);
   const [filteredSignals, setFilteredSignals] = useState([]);
@@ -64,11 +64,73 @@ export default function TradingSignalsPanel() {
 
   const fetchSignals = async (symbolList = []) => {
     try {
+      console.log('📡 [TradingSignalsPanel] Fetching signals...');
       const data = await getSignals(symbolList);
-      setSignals(data?.signals || []);
-      setLastRefresh(new Date());
+      console.log('📡 [TradingSignalsPanel] Signals response:', data);
+      
+      // Handle no_key status (user not connected to AI)
+      if (data?.status === 'no_key') {
+        console.log('🔑 [TradingSignalsPanel] No AI key configured - showing dummy data');
+        setSignals(data?.signals || []);
+        setLastRefresh(new Date());
+        toast({
+          title: "Sample Data",
+          description: data.message || "Connect your AI provider to get real-time signals",
+          variant: "default",
+        });
+        return;
+      }
+      
+      // Handle not_implemented status
+      if (data?.status === 'not_implemented') {
+        console.log('🚧 [TradingSignalsPanel] Signals feature not yet implemented');
+        setSignals([]);
+        setLastRefresh(new Date());
+        toast({
+          title: "Feature Coming Soon",
+          description: data.message || "AI trading signals are planned but not yet implemented",
+          variant: "default",
+        });
+        return;
+      }
+      
+      // Handle unauthorized status
+      if (data?.status === 'unauthorized') {
+        console.log('🔐 [TradingSignalsPanel] Unauthorized for signals');
+        setSignals([]);
+        setLastRefresh(new Date());
+        toast({
+          title: "Authentication Required",
+          description: data.message || "Please connect to your broker to access trading signals",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Handle successful response
+      if (data?.status === 'success' || data?.signals) {
+        setSignals(data?.signals || []);
+        setLastRefresh(new Date());
+        
+        if (data?.signals?.length > 0) {
+          const isDummy = data.signals.some(signal => signal.is_dummy);
+          toast({
+            title: isDummy ? "Sample Data Loaded" : "Signals Loaded",
+            description: isDummy 
+              ? `${data.signals.length} sample signals (connect AI for live data)`
+              : `Found ${data.signals.length} trading signals`,
+          });
+        }
+      } else {
+        // Handle empty or unexpected response
+        setSignals([]);
+        setLastRefresh(new Date());
+        console.log('📡 [TradingSignalsPanel] No signals data received');
+      }
     } catch (err) {
-      console.error('Failed to fetch signals:', err);
+      console.error('❌ [TradingSignalsPanel] Failed to fetch signals:', err);
+      setSignals([]);
+      setLastRefresh(new Date());
       toast({
         title: "Failed to Load Signals",
         description: err.message || "Could not fetch trading signals",
@@ -197,8 +259,8 @@ export default function TradingSignalsPanel() {
                   Last updated: {lastRefresh.toLocaleTimeString()}
                 </span>
               )}
-              <Button onClick={handleRefresh} disabled={loading} size="sm">
-                <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <Button onClick={handleRefresh} disabled={isLoading} size="sm">
+                <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
             </div>
@@ -265,8 +327,25 @@ export default function TradingSignalsPanel() {
       {/* Signals List */}
       {filteredSignals.length > 0 ? (
         <div className="space-y-4">
+          {/* Dummy Data Notice */}
+          {filteredSignals.some(signal => signal.is_dummy) && (
+            <Alert className="border-blue-200 bg-blue-50">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                <strong>Sample Data:</strong> These are example signals to show what you'll get when you connect your AI provider. 
+                <Button 
+                  variant="link" 
+                  className="p-0 h-auto text-blue-600 hover:text-blue-800 ml-2"
+                  onClick={() => window.location.href = '/ai?tab=settings'}
+                >
+                  Configure AI →
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+          
           {filteredSignals.map((signal, index) => (
-            <Card key={signal.id || index} className="hover:shadow-md transition-shadow">
+            <Card key={signal.id || index} className={`hover:shadow-md transition-shadow ${signal.is_dummy ? 'border-blue-200 bg-blue-50/30' : ''}`}>
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -278,9 +357,14 @@ export default function TradingSignalsPanel() {
                         <Badge className={getSignalColor(signal.signal_type)}>
                           {getSignalIcon(signal.signal_type)}
                           <span className="ml-1 capitalize">
-                            {signal.signal_type?.replace('_', ' ')}
+                            {signal.signal_type?.replace('_', ' ') || signal.signal}
                           </span>
                         </Badge>
+                        {signal.is_dummy && (
+                          <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-100">
+                            Sample
+                          </Badge>
+                        )}
                       </div>
                       
                       {signal.confidence && (
@@ -295,7 +379,7 @@ export default function TradingSignalsPanel() {
                     </div>
                     
                     <p className="text-gray-700 mb-3">
-                      {signal.rationale || signal.description || 'No description available'}
+                      {signal.rationale || signal.reasoning || signal.description || 'No description available'}
                     </p>
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -306,10 +390,10 @@ export default function TradingSignalsPanel() {
                         </div>
                       )}
                       
-                      {signal.target_price && (
+                      {signal.price_target && (
                         <div>
                           <span className="text-gray-600">Target:</span>
-                          <div className="font-medium text-green-600">₹{signal.target_price}</div>
+                          <div className="font-medium text-green-600">₹{signal.price_target}</div>
                         </div>
                       )}
                       
@@ -364,21 +448,35 @@ export default function TradingSignalsPanel() {
             <div className="text-center py-8">
               <Target className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-600 mb-2">
-                {loading ? 'Loading Signals...' : 'No Trading Signals'}
+                {isLoading ? 'Loading Signals...' : 'AI Trading Signals'}
               </h3>
               <p className="text-gray-500 mb-4">
-                {loading 
+                {isLoading 
                   ? 'AI is analyzing market conditions...'
                   : filters.symbols.trim()
                     ? 'No signals found for the specified filters'
-                    : 'AI trading signals will appear here when available'
+                    : 'Connect your AI provider to get intelligent trading signals based on market analysis.'
                 }
               </p>
-              {!loading && (
-                <Button onClick={handleRefresh}>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Refresh Signals
-                </Button>
+              <div className="space-y-2 text-sm text-gray-400">
+                <p>🎯 <strong>What you'll get:</strong> Buy/sell recommendations with confidence levels</p>
+                <p>📊 <strong>Analysis:</strong> Technical indicators, sentiment, and risk assessment</p>
+                <p>⚡ <strong>Real-time:</strong> Live market monitoring and signal updates</p>
+                <p>🔑 <strong>Setup:</strong> Add your OpenAI, Claude, or Gemini API key in AI Settings</p>
+              </div>
+              {!isLoading && (
+                <div className="mt-4 space-x-2">
+                  <Button onClick={handleRefresh} variant="outline">
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Check for Updates
+                  </Button>
+                  <Button 
+                    onClick={() => window.location.href = '/ai?tab=settings'} 
+                    variant="default"
+                  >
+                    Configure AI
+                  </Button>
+                </div>
               )}
             </div>
           </CardContent>

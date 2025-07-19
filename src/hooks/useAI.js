@@ -1,19 +1,181 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { railwayAPI } from '@/api/railwayAPI';
 
-// Custom hook for AI operations
+/**
+ * AI Engine Hook
+ * Manages AI status, preferences, and operations with comprehensive error handling
+ */
 export const useAI = () => {
-  const [loading, setLoading] = useState(false);
+  const [aiStatus, setAiStatus] = useState(null);
+  const [aiPreferences, setAiPreferences] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [threadId, setThreadId] = useState(null);
   const abortControllerRef = useRef(null);
+  const loadingRef = useRef(false);
 
-  // Generic request handler with abort support
+  // Load AI preferences and status on mount
+  useEffect(() => {
+    loadAIStatus();
+  }, []);
+
+  const loadAIStatus = useCallback(async () => {
+    if (loadingRef.current) {
+      console.log('🧠 [useAI] Already loading, skipping...');
+      return;
+    }
+    
+    loadingRef.current = true;
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      console.log('🧠 [useAI] Loading AI status and preferences...');
+      
+      // Get stored broker config for API calls
+      const storedConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
+      const activeConfig = storedConfigs.find(config => 
+        config.is_connected && 
+        config.user_data?.user_id
+      );
+
+      if (!activeConfig) {
+        console.warn('🧠 [useAI] No active broker config found');
+        setAiStatus({ 
+          status: 'unauthenticated', 
+          message: 'No broker connection found',
+          overall_status: 'offline'
+        });
+        setAiPreferences(null);
+        return;
+      }
+
+      const userId = activeConfig.user_data.user_id;
+      console.log('🧠 [useAI] Loading AI data for user:', userId);
+
+      // Load AI preferences first
+      const preferencesResponse = await railwayAPI.request('/ai/preferences', {
+        method: 'GET',
+        headers: {
+          'X-User-ID': userId,
+          'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
+        }
+      });
+
+      console.log('🧠 [useAI] AI preferences response:', preferencesResponse);
+
+      // Transform preferences to match frontend expectations
+      const transformedPreferences = {
+        preferred_ai_provider: preferencesResponse.preferences?.preferred_ai_provider || 'auto',
+        has_openai_key: !!preferencesResponse.preferences?.openai_api_key,
+        has_claude_key: !!preferencesResponse.preferences?.claude_api_key,
+        has_gemini_key: !!preferencesResponse.preferences?.gemini_api_key,
+        openai_key_preview: preferencesResponse.preferences?.openai_key_preview || '',
+        claude_key_preview: preferencesResponse.preferences?.claude_key_preview || '',
+        gemini_key_preview: preferencesResponse.preferences?.gemini_key_preview || ''
+      };
+
+      setAiPreferences(transformedPreferences);
+
+      // Determine AI status based on preferences
+      const hasAnyKey = transformedPreferences.has_openai_key || 
+                       transformedPreferences.has_claude_key || 
+                       transformedPreferences.has_gemini_key;
+
+      if (hasAnyKey) {
+        // Load detailed AI status
+        const [statusResponse, healthResponse] = await Promise.all([
+          railwayAPI.request('/api/ai/status', {
+            method: 'GET',
+            headers: {
+              'X-User-ID': userId,
+              'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
+            }
+          }).catch(() => ({ status: 'configured', message: 'AI configured' })),
+          
+          railwayAPI.request('/api/ai/health', {
+            method: 'GET',
+            headers: {
+              'X-User-ID': userId,
+              'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
+            }
+          }).catch(() => ({ 
+            providers: { 
+              openai: 'available', 
+              claude: 'available', 
+              gemini: 'available' 
+            } 
+          }))
+        ]);
+
+        const combinedStatus = {
+          status: 'configured',
+          overall_status: 'online',
+          message: 'AI Engine is configured and ready',
+          provider_status: healthResponse.providers || {
+            openai: transformedPreferences.has_openai_key ? 'available' : 'unavailable',
+            claude: transformedPreferences.has_claude_key ? 'available' : 'unavailable',
+            gemini: transformedPreferences.has_gemini_key ? 'available' : 'unavailable'
+          },
+          statistics: {
+            total_providers: 3,
+            available_providers: Object.values(healthResponse.providers || {}).filter(s => s === 'configured' || s === 'available').length,
+            total_requests: 0,
+            success_rate: 100
+          },
+          alerts: [],
+          lastChecked: new Date().toISOString()
+        };
+
+        setAiStatus(combinedStatus);
+        console.log('✅ [useAI] AI status loaded successfully:', combinedStatus);
+      } else {
+        setAiStatus({
+          status: 'unconfigured',
+          overall_status: 'offline',
+          message: 'No AI API keys configured',
+          provider_status: {
+            openai: 'unavailable',
+            claude: 'unavailable',
+            gemini: 'unavailable'
+          },
+          statistics: {
+            total_providers: 0,
+            available_providers: 0,
+            total_requests: 0,
+            success_rate: 0
+          },
+          alerts: [{
+            severity: 'warning',
+            message: 'Please configure at least one AI provider in settings'
+          }],
+          lastChecked: new Date().toISOString()
+        });
+        console.log('⚠️ [useAI] No AI keys configured');
+      }
+
+    } catch (error) {
+      console.error('❌ [useAI] Failed to load AI status:', error);
+      setError(error.message);
+      setAiStatus({
+        status: 'error',
+        overall_status: 'offline',
+        message: 'Failed to load AI status',
+        error: error.message,
+        lastChecked: new Date().toISOString()
+      });
+    } finally {
+      setIsLoading(false);
+      loadingRef.current = false;
+    }
+  }, []);
+
+  // Enhanced request handler with comprehensive response handling
   const makeRequest = useCallback(async (endpoint, options = {}) => {
     try {
-      setLoading(true);
+      setIsLoading(true);
       setError(null);
-
+      
       // Cancel previous request if still pending
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -26,32 +188,61 @@ export const useAI = () => {
         signal: abortControllerRef.current.signal
       });
 
-      // Handle different response statuses
+      console.log(`🧠 [useAI] Response from ${endpoint}:`, response);
+
+      // Handle different response statuses comprehensively
       if (response.status === 'error') {
+        console.error(`❌ [useAI] Backend error for ${endpoint}:`, response.message);
         throw new Error(response.message || 'AI request failed');
       }
 
       // Handle not_implemented status gracefully
       if (response.status === 'not_implemented') {
-        console.log(`Feature not yet implemented: ${endpoint}`);
-        return {
-          status: 'not_implemented',
-          message: response.message,
+        console.log(`🚧 [useAI] Feature not yet implemented: ${endpoint}`);
+        return { 
+          status: 'not_implemented', 
+          message: response.message || 'This feature is planned but not yet implemented', 
           feature: response.feature,
-          planned_features: response.planned_features
+          planned_features: response.planned_features,
+          frontend_expectation: response.frontend_expectation,
+          data: null 
         };
       }
 
+      // Handle unauthorized status
+      if (response.status === 'unauthorized') {
+        console.log(`🔐 [useAI] Unauthorized for: ${endpoint}`);
+        return { 
+          status: 'unauthorized', 
+          message: response.message || 'Please connect to your broker to access this feature', 
+          data: null 
+        };
+      }
+
+      // Handle success status
+      if (response.status === 'success') {
+        console.log(`✅ [useAI] Success for ${endpoint}`);
+        return response.data || response;
+      }
+
+      // Handle healthy status (for health checks)
+      if (response.status === 'healthy') {
+        console.log(`✅ [useAI] Health check passed for ${endpoint}`);
+        return response;
+      }
+
+      // Return response as-is if no specific status handling needed
       return response.data || response;
     } catch (err) {
       if (err.name === 'AbortError') {
-        console.log('Request aborted');
+        console.log('🔄 [useAI] Request aborted');
         return null;
       }
+      console.error(`❌ [useAI] Error in ${endpoint}:`, err);
       setError(err.message);
       throw err;
     } finally {
-      setLoading(false);
+      setIsLoading(false);
       abortControllerRef.current = null;
     }
   }, []);
@@ -76,7 +267,7 @@ export const useAI = () => {
 
       return response;
     } catch (err) {
-      console.error('Error sending assistant message:', err);
+      console.error('❌ [useAI] Error sending assistant message:', err);
       throw err;
     }
   }, [makeRequest, threadId]);
@@ -92,7 +283,7 @@ export const useAI = () => {
       messages: [],
       message: 'Thread management not yet implemented'
     };
-  }, [makeRequest]);
+  }, []);
 
   const deleteThread = useCallback(async (threadId) => {
     // Thread management not implemented in current backend
@@ -100,7 +291,7 @@ export const useAI = () => {
       status: 'not_implemented',
       message: 'Thread management not yet implemented'
     };
-  }, [makeRequest]);
+  }, []);
 
   const getUserThreadId = useCallback(async () => {
     // Thread management not implemented in current backend
@@ -109,7 +300,7 @@ export const useAI = () => {
       thread_id: null,
       message: 'Thread management not yet implemented'
     };
-  }, [makeRequest]);
+  }, []);
 
   const clearUserThread = useCallback(async () => {
     // Thread management not implemented in current backend
@@ -118,7 +309,7 @@ export const useAI = () => {
       status: 'not_implemented',
       message: 'Thread management not yet implemented'
     };
-  }, [makeRequest]);
+  }, []);
 
   // Initialize thread ID on mount
   const initializeThread = useCallback(async () => {
@@ -161,7 +352,7 @@ export const useAI = () => {
 
   // Strategy Generation
   const generateStrategy = useCallback(async (request) => {
-    return await makeRequest('/api/ai/strategy/generate', {
+    return await makeRequest('/api/ai/strategy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request)
@@ -169,7 +360,7 @@ export const useAI = () => {
   }, [makeRequest]);
 
   const getStrategies = useCallback(async () => {
-    return await makeRequest('/api/ai/strategy/list');
+    return await makeRequest('/api/ai/strategy');
   }, [makeRequest]);
 
   const getStrategy = useCallback(async (strategyId) => {
@@ -243,42 +434,33 @@ export const useAI = () => {
     return await makeRequest('/api/ai/copilot/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ portfolio_data: portfolioData })
+      body: JSON.stringify(portfolioData)
     });
   }, [makeRequest]);
 
-  const getRebalanceRecommendations = useCallback(async (portfolioData) => {
-    return await makeRequest('/api/ai/copilot/recommendations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ portfolio_data: portfolioData })
-    });
+  const getPortfolioRecommendations = useCallback(async () => {
+    return await makeRequest('/api/ai/copilot/recommendations');
   }, [makeRequest]);
 
-  // System Health
-  const getAIStatus = useCallback(async () => {
-    return await makeRequest('/api/ai/status');
-  }, [makeRequest]);
-
-  const getAIHealth = useCallback(async () => {
-    return await makeRequest('/api/ai/health');
-  }, [makeRequest]);
-
-  // Cancel ongoing requests
-  const cancelRequest = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      setLoading(false);
-    }
-  }, []);
+  // Refresh AI status
+  const refreshAIStatus = useCallback(async () => {
+    await loadAIStatus();
+  }, [loadAIStatus]);
 
   return {
-    loading,
+    // State
+    aiStatus,
+    aiPreferences,
+    isLoading,
     error,
     threadId,
-    cancelRequest,
     
-    // OpenAI Assistants API
+    // Core functions
+    loadAIStatus,
+    refreshAIStatus,
+    makeRequest,
+    
+    // OpenAI Assistant
     sendAssistantMessage,
     getAssistantStatus,
     getThreadMessages,
@@ -293,24 +475,24 @@ export const useAI = () => {
     validateAPIKey,
     clearAIPreferences,
     
-    // Strategy
+    // Strategy Generation
     generateStrategy,
     getStrategies,
     getStrategy,
     
-    // Analysis
+    // Market Analysis
     generateMarketAnalysis,
     generateTechnicalAnalysis,
     generateSentimentAnalysis,
     
-    // Signals
+    // Trading Signals
     getSignals,
     
-    // Feedback
+    // Feedback System
     recordTradeOutcome,
     getLearningInsights,
     
-    // Analytics
+    // Analytics & Clustering
     getStrategyClustering,
     getStrategyAnalytics,
     
@@ -320,11 +502,7 @@ export const useAI = () => {
     
     // Portfolio Co-Pilot
     analyzePortfolio,
-    getRebalanceRecommendations,
-    
-    // System
-    getAIStatus,
-    getAIHealth
+    getPortfolioRecommendations
   };
 };
 
@@ -415,9 +593,28 @@ export const useOpenAIAssistant = () => {
   const loadAssistantStatus = useCallback(async () => {
     try {
       const status = await getAssistantStatus();
-      setAssistantStatus(status);
+      // Transform backend status to frontend format
+      const transformedStatus = {
+        is_available: status.status === 'configured' || status.status === 'healthy',
+        assistant_name: 'Quantum Trading AI',
+        model: 'GPT-4',
+        tools_count: 5,
+        status: status.status,
+        message: status.message,
+        configured_providers: status.configured_providers || []
+      };
+      setAssistantStatus(transformedStatus);
     } catch (err) {
       console.error('Failed to load assistant status:', err);
+      // Set default offline status
+      setAssistantStatus({
+        is_available: false,
+        assistant_name: 'Quantum Trading AI',
+        model: 'GPT-4',
+        tools_count: 5,
+        status: 'error',
+        message: 'Failed to load AI status'
+      });
     }
   }, [getAssistantStatus]);
 
@@ -484,32 +681,71 @@ export const usePortfolioCoPilot = () => {
 
 export const useCrowdIntelligence = () => {
   const { getCrowdInsights, getTrendingInsights, loading, error } = useAI();
-  const [crowdInsights, setCrowdInsights] = useState([]);
-  const [trendingInsights, setTrendingInsights] = useState([]);
+  const [crowdData, setCrowdData] = useState(null);
+  const [trendingData, setTrendingData] = useState(null);
 
   const loadCrowdInsights = useCallback(async () => {
     try {
+      console.log('📡 [useCrowdIntelligence] Loading crowd insights...');
       const result = await getCrowdInsights();
-      setCrowdInsights(result?.insights || []);
+      console.log('📡 [useCrowdIntelligence] Crowd insights response:', result);
+      
+      // Handle not_implemented status
+      if (result?.status === 'not_implemented') {
+        console.log('🚧 [useCrowdIntelligence] Crowd insights not yet implemented');
+        setCrowdData(null);
+        return;
+      }
+      
+      // Handle unauthorized status
+      if (result?.status === 'unauthorized') {
+        console.log('🔐 [useCrowdIntelligence] Unauthorized for crowd insights');
+        setCrowdData(null);
+        return;
+      }
+      
+      setCrowdData(result);
     } catch (err) {
-      console.error('Failed to load crowd insights:', err);
+      console.error('❌ [useCrowdIntelligence] Failed to load crowd insights:', err);
+      setCrowdData(null);
     }
   }, [getCrowdInsights]);
 
   const loadTrendingInsights = useCallback(async () => {
     try {
+      console.log('📡 [useCrowdIntelligence] Loading trending insights...');
       const result = await getTrendingInsights();
-      setTrendingInsights(result?.insights || []);
+      console.log('📡 [useCrowdIntelligence] Trending insights response:', result);
+      
+      // Handle not_implemented status
+      if (result?.status === 'not_implemented') {
+        console.log('🚧 [useCrowdIntelligence] Trending insights not yet implemented');
+        setTrendingData(null);
+        return;
+      }
+      
+      // Handle unauthorized status
+      if (result?.status === 'unauthorized') {
+        console.log('🔐 [useCrowdIntelligence] Unauthorized for trending insights');
+        setTrendingData(null);
+        return;
+      }
+      
+      setTrendingData(result);
     } catch (err) {
-      console.error('Failed to load trending insights:', err);
+      console.error('❌ [useCrowdIntelligence] Failed to load trending insights:', err);
+      setTrendingData(null);
     }
   }, [getTrendingInsights]);
 
+  const refreshInsights = useCallback(async () => {
+    await Promise.all([loadCrowdInsights(), loadTrendingInsights()]);
+  }, [loadCrowdInsights, loadTrendingInsights]);
+
   return {
-    crowdInsights,
-    trendingInsights,
-    loadCrowdInsights,
-    loadTrendingInsights,
+    crowdData,
+    trendingData,
+    refreshInsights,
     loading,
     error
   };

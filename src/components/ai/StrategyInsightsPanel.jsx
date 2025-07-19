@@ -51,12 +51,70 @@ export default function StrategyInsightsPanel() {
 
   const fetchClustering = async () => {
     try {
+      console.log('📡 [StrategyInsightsPanel] Fetching strategy clustering...');
       const data = await getStrategyClustering();
-      setClustering(data);
+      console.log('📡 [StrategyInsightsPanel] Clustering response:', data);
+      
+      // Handle no_key status (user not connected to AI)
+      if (data?.status === 'no_key') {
+        console.log('🔑 [StrategyInsightsPanel] No AI key configured - showing dummy data');
+        setClustering(data);
+        toast({
+          title: "Sample Insights",
+          description: data.message || "Connect your AI provider to get personalized strategy insights",
+          variant: "default",
+        });
+        return;
+      }
+
+      // Handle not_implemented status
+      if (data?.status === 'not_implemented') {
+        console.log('🚧 [StrategyInsightsPanel] Strategy clustering not yet implemented');
+        setClustering(null);
+        toast({
+          title: "Feature Coming Soon",
+          description: data.message || "Strategy clustering is planned but not yet implemented",
+          variant: "default",
+        });
+        return;
+      }
+      
+      // Handle unauthorized status
+      if (data?.status === 'unauthorized') {
+        console.log('🔐 [StrategyInsightsPanel] Unauthorized for clustering');
+        setClustering(null);
+        toast({
+          title: "Authentication Required",
+          description: data.message || "Please connect to your broker to access strategy insights",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Handle successful response
+      if (data?.status === 'success' || data?.clusters) {
+        setClustering(data);
+        
+        const isDummy = data?.clustering?.is_dummy;
+        if (data?.clusters && Object.keys(data.clusters).length > 0) {
+          toast({
+            title: isDummy ? "Sample Insights Loaded" : "Strategy Insights Loaded",
+            description: isDummy 
+              ? "This is example data (connect AI for personalized insights)"
+              : `Found ${Object.keys(data.clusters).length} strategy clusters`,
+          });
+        }
+      } else {
+        // Handle empty or unexpected response
+        setClustering(null);
+        console.log('📡 [StrategyInsightsPanel] No clustering data received');
+      }
     } catch (err) {
+      console.error('❌ [StrategyInsightsPanel] Failed to fetch clustering:', err);
+      setClustering(null);
       toast({
-        title: "Failed to Load Strategy Insights",
-        description: err.message || "Could not fetch strategy clustering data",
+        title: "Failed to Load Insights",
+        description: err.message || "Could not fetch strategy clustering",
         variant: "destructive",
       });
     }
@@ -109,6 +167,23 @@ export default function StrategyInsightsPanel() {
 
   const renderClusteringTab = () => (
     <div className="space-y-6">
+      {/* Dummy Data Notice */}
+      {clustering?.clustering?.is_dummy && (
+        <Alert className="border-blue-200 bg-blue-50">
+          <AlertTriangle className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <strong>Sample Data:</strong> These are example strategy insights to show what you'll get when you connect your AI provider. 
+            <Button 
+              variant="link" 
+              className="p-0 h-auto text-blue-600 hover:text-blue-800 ml-2"
+              onClick={() => window.location.href = '/ai?tab=settings'}
+            >
+              Configure AI →
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      
       {clustering?.clusters ? (
         <div className="space-y-6">
           {Object.entries(clustering.clusters).map(([tier, clusterData]) => {
@@ -249,15 +324,22 @@ export default function StrategyInsightsPanel() {
             <div className="text-center py-8">
               <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-600 mb-2">
-                No Strategy Clusters Available
+                Strategy Insights
               </h3>
               <p className="text-gray-500 mb-4">
-                Generate some trading strategies to see performance clustering and insights
+                Strategy clustering and analytics feature is coming soon! This will provide insights into strategy performance patterns and optimization opportunities.
               </p>
-              <Button onClick={fetchClustering} disabled={loading}>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Refresh Insights
+              <div className="space-y-2 text-sm text-gray-400">
+                <p>🚧 <strong>Coming Soon:</strong> Strategy performance clustering</p>
+                <p>📊 <strong>Features:</strong> Performance tiers, risk analysis, optimization recommendations</p>
+                <p>🎯 <strong>Benefits:</strong> Identify best-performing strategies and patterns</p>
+              </div>
+              <div className="mt-4">
+                <Button onClick={fetchClustering} variant="outline" disabled={loading}>
+                  <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  Check for Updates
               </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
