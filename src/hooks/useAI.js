@@ -311,6 +311,7 @@ export const useAI = () => {
     deleteThread,
     getUserThreadId,
     clearUserThread,
+    initializeThread,
     
     // AI Preferences
     getAIPreferences,
