@@ -5,16 +5,13 @@ const AIStatusContext = createContext();
 
 export const useAIStatus = () => {
   const context = useContext(AIStatusContext);
-  console.log('🔍 [useAIStatus] Context value:', context);
   if (!context) {
-    console.error('❌ [useAIStatus] Context is null - provider not found');
     throw new Error('useAIStatus must be used within an AIStatusProvider');
   }
   return context;
 };
 
 export const AIStatusProvider = ({ children }) => {
-  console.log('🔧 [AIStatusProvider] Rendering provider');
   const [aiStatus, setAiStatus] = useState({
     status: 'loading',
     overall_status: 'offline',
@@ -213,8 +210,6 @@ export const AIStatusProvider = ({ children }) => {
     loadAIStatus,
     refreshAIStatus: loadAIStatus
   };
-
-  console.log('🔧 [AIStatusProvider] Providing value:', value);
 
   return (
     <AIStatusContext.Provider value={value}>
