@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './Layout'
 import MyDashboard from './MyDashboard'
 import { Loader2, AlertCircle } from 'lucide-react'
@@ -57,8 +57,7 @@ const LazyWrapper = ({ children, fallbackText }) => (
 
 export default function Pages() {
   return (
-    <Router>
-      <Routes>
+    <Routes>
         <Route path="/" element={<Layout><MyDashboard /></Layout>} />
         
         <Route path="/portfolio" element={
@@ -165,6 +164,5 @@ export default function Pages() {
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </Router>
   )
 } 
