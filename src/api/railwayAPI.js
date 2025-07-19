@@ -7,6 +7,7 @@ const BACKEND_URL = 'https://web-production-de0bc.up.railway.app'; // Production
 class RailwayAPI {
   constructor() {
     this.baseURL = BACKEND_URL;
+    this.pendingRequests = new Map(); // For request deduplication
   }
 
   // Get authentication headers for Kite Connect API calls
@@ -34,6 +35,15 @@ class RailwayAPI {
 
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
+    
+    // Create a unique key for this request
+    const requestKey = `${options.method || 'GET'}:${endpoint}:${JSON.stringify(options.body || '')}`;
+    
+    // Check if there's already a pending request for this endpoint
+    if (this.pendingRequests.has(requestKey)) {
+      console.log(`🔄 [RailwayAPI] Request already pending for ${endpoint}, waiting for result...`);
+      return this.pendingRequests.get(requestKey);
+    }
     
     // Define which endpoints require authentication
     const requiresAuth = endpoint.includes('/api/portfolio/') || 
@@ -66,44 +76,60 @@ class RailwayAPI {
       },
     };
 
-    try {
-      console.log(`🚀 [RailwayAPI] ${config.method} ${url}`);
-      
-      const response = await fetch(url, config);
-      
-      if (!response.ok) {
-        if (response.status === 401) {
-          console.warn(`⚠️ [RailwayAPI] Unauthorized (401) for ${endpoint} - user needs to connect broker`);
-          return {
-            status: 'unauthorized',
-            message: 'Please connect to your broker to access this feature.',
-            data: null,
-            requiresAuth: true
-          };
-        }
-        
-        if (response.status === 404) {
-          console.warn(`⚠️ [RailwayAPI] Endpoint not found (404) for ${endpoint} - feature not yet implemented`);
-          return {
-            status: 'not_implemented',
-            message: 'This feature is planned but not yet implemented.',
-            data: null,
-            endpoint: endpoint
-          };
-        }
-        
-        const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-        throw new Error(errorData.detail || `HTTP ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      console.log(`✅ [RailwayAPI] Success:`, data);
-      return data;
-    } catch (error) {
-      console.error(`❌ [RailwayAPI] Error:`, error);
-      throw error;
+    // Add AbortController signal if provided
+    if (options.signal) {
+      config.signal = options.signal;
     }
+
+    // Create the request promise
+    const requestPromise = (async () => {
+      try {
+        console.log(`🚀 [RailwayAPI] ${config.method} ${url}`);
+        
+        const response = await fetch(url, config);
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            console.warn(`⚠️ [RailwayAPI] Unauthorized (401) for ${endpoint} - user needs to connect broker`);
+            return {
+              status: 'unauthorized',
+              message: 'Please connect to your broker to access this feature.',
+              data: null,
+              requiresAuth: true
+            };
+          }
+          
+          if (response.status === 404) {
+            console.warn(`⚠️ [RailwayAPI] Endpoint not found (404) for ${endpoint} - feature not yet implemented`);
+            return {
+              status: 'not_implemented',
+              message: 'This feature is planned but not yet implemented.',
+              data: null,
+              endpoint: endpoint
+            };
+          }
+          
+          const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+          throw new Error(errorData.detail || `HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        console.log(`✅ [RailwayAPI] Success:`, data);
+        return data;
+      } catch (error) {
+        console.error(`❌ [RailwayAPI] Error:`, error);
+        throw error;
+      } finally {
+        // Remove the request from pending requests
+        this.pendingRequests.delete(requestKey);
+      }
+    })();
+
+    // Store the request promise
+    this.pendingRequests.set(requestKey, requestPromise);
+    
+    return requestPromise;
   }
 
   // ========================================

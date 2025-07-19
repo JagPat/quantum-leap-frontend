@@ -1,25 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { railwayAPI } from '@/api/railwayAPI';
+import { useAIStatus } from '@/contexts/AIStatusContext';
 
 /**
  * AI Engine Hook
  * Manages AI status, preferences, and operations with comprehensive error handling
  */
 export const useAI = () => {
-  const [aiStatus, setAiStatus] = useState(null);
-  const [aiPreferences, setAiPreferences] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+  // Use the global AI status context instead of local state
+  const { aiStatus, aiPreferences, isLoading, error, refreshAIStatus } = useAIStatus();
   const [threadId, setThreadId] = useState(null);
   const abortControllerRef = useRef(null);
   const loadingRef = useRef(false);
-
-  // Load AI preferences and status on mount
-  useEffect(() => {
-    loadAIStatus();
-  }, []);
-
-  const loadAIStatus = useCallback(async () => {
     if (loadingRef.current) {
       console.log('🧠 [useAI] Already loading, skipping...');
       return;
