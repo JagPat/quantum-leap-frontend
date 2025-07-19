@@ -3,8 +3,8 @@ import { railwayAPI } from '@/api/railwayAPI';
 import { useAIStatus } from '@/contexts/AIStatusContext';
 
 /**
- * AI Engine Hook
- * Manages AI status, preferences, and operations with comprehensive error handling
+ * Main AI hook that provides access to AI functionality
+ * Uses global AI status context to prevent duplicate requests
  */
 export const useAI = () => {
   // Use the global AI status context instead of local state
@@ -12,162 +12,10 @@ export const useAI = () => {
   const [threadId, setThreadId] = useState(null);
   const abortControllerRef = useRef(null);
   const loadingRef = useRef(false);
-    if (loadingRef.current) {
-      console.log('🧠 [useAI] Already loading, skipping...');
-      return;
-    }
-    
-    loadingRef.current = true;
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      console.log('🧠 [useAI] Loading AI status and preferences...');
-      
-      // Get stored broker config for API calls
-      const storedConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-      const activeConfig = storedConfigs.find(config => 
-        config.is_connected && 
-        config.user_data?.user_id
-      );
-
-      if (!activeConfig) {
-        console.warn('🧠 [useAI] No active broker config found');
-        setAiStatus({ 
-          status: 'unauthenticated', 
-          message: 'No broker connection found',
-          overall_status: 'offline'
-        });
-        setAiPreferences(null);
-        return;
-      }
-
-      const userId = activeConfig.user_data.user_id;
-      console.log('🧠 [useAI] Loading AI data for user:', userId);
-
-      // Load AI preferences first
-      const preferencesResponse = await railwayAPI.request('/api/ai/preferences', {
-        method: 'GET',
-        headers: {
-          'X-User-ID': userId,
-          'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
-        }
-      });
-
-      console.log('🧠 [useAI] AI preferences response:', preferencesResponse);
-
-      // Transform preferences to match frontend expectations
-      const transformedPreferences = {
-        preferred_ai_provider: preferencesResponse.preferences?.preferred_ai_provider || 'auto',
-        has_openai_key: !!preferencesResponse.preferences?.has_openai_key,
-        has_claude_key: !!preferencesResponse.preferences?.has_claude_key,
-        has_gemini_key: !!preferencesResponse.preferences?.has_gemini_key,
-        openai_key_preview: preferencesResponse.preferences?.openai_key_preview || '',
-        claude_key_preview: preferencesResponse.preferences?.claude_key_preview || '',
-        gemini_key_preview: preferencesResponse.preferences?.gemini_key_preview || ''
-      };
-
-      setAiPreferences(transformedPreferences);
-
-      // Determine AI status based on preferences
-      const hasAnyKey = transformedPreferences.has_openai_key || 
-                       transformedPreferences.has_claude_key || 
-                       transformedPreferences.has_gemini_key;
-
-      if (hasAnyKey) {
-        // Load detailed AI status
-        const [statusResponse, healthResponse] = await Promise.all([
-          railwayAPI.request('/api/ai/status', {
-            method: 'GET',
-            headers: {
-              'X-User-ID': userId,
-              'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
-            }
-          }).catch(() => ({ status: 'configured', message: 'AI configured' })),
-          
-          railwayAPI.request('/api/ai/health', {
-            method: 'GET',
-            headers: {
-              'X-User-ID': userId,
-              'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
-            }
-          }).catch(() => ({ 
-            providers: { 
-              openai: 'available', 
-              claude: 'available', 
-              gemini: 'available' 
-            } 
-          }))
-        ]);
-
-        const combinedStatus = {
-          status: 'configured',
-          overall_status: 'online',
-          message: 'AI Engine is configured and ready',
-          provider_status: healthResponse.providers || {
-            openai: transformedPreferences.has_openai_key ? 'available' : 'unavailable',
-            claude: transformedPreferences.has_claude_key ? 'available' : 'unavailable',
-            gemini: transformedPreferences.has_gemini_key ? 'available' : 'unavailable'
-          },
-          statistics: {
-            total_providers: 3,
-            available_providers: Object.values(healthResponse.providers || {}).filter(s => s === 'configured' || s === 'available').length,
-            total_requests: 0,
-            success_rate: 100
-          },
-          alerts: [],
-          lastChecked: new Date().toISOString()
-        };
-
-        setAiStatus(combinedStatus);
-        console.log('✅ [useAI] AI status loaded successfully:', combinedStatus);
-      } else {
-        setAiStatus({
-          status: 'unconfigured',
-          overall_status: 'offline',
-          message: 'No AI API keys configured',
-          provider_status: {
-            openai: 'unavailable',
-            claude: 'unavailable',
-            gemini: 'unavailable'
-          },
-          statistics: {
-            total_providers: 0,
-            available_providers: 0,
-            total_requests: 0,
-            success_rate: 0
-          },
-          alerts: [{
-            severity: 'warning',
-            message: 'Please configure at least one AI provider in settings'
-          }],
-          lastChecked: new Date().toISOString()
-        });
-        console.log('⚠️ [useAI] No AI keys configured');
-      }
-
-    } catch (error) {
-      console.error('❌ [useAI] Failed to load AI status:', error);
-      setError(error.message);
-      setAiStatus({
-        status: 'error',
-        overall_status: 'offline',
-        message: 'Failed to load AI status',
-        error: error.message,
-        lastChecked: new Date().toISOString()
-      });
-    } finally {
-      setIsLoading(false);
-      loadingRef.current = false;
-    }
-  }, []);
 
   // Enhanced request handler with comprehensive response handling
   const makeRequest = useCallback(async (endpoint, options = {}) => {
     try {
-      setIsLoading(true);
-      setError(null);
-      
       // Cancel previous request if still pending
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -231,10 +79,8 @@ export const useAI = () => {
         return null;
       }
       console.error(`❌ [useAI] Error in ${endpoint}:`, err);
-      setError(err.message);
       throw err;
     } finally {
-      setIsLoading(false);
       abortControllerRef.current = null;
     }
   }, []);
@@ -359,74 +205,39 @@ export const useAI = () => {
     return await makeRequest(`/api/ai/strategy/${strategyId}`);
   }, [makeRequest]);
 
-  // Market Analysis
-  const generateMarketAnalysis = useCallback(async (request) => {
-    return await makeRequest('/api/ai/analysis/market', {
-      method: 'POST',
+  const updateStrategy = useCallback(async (strategyId, updates) => {
+    return await makeRequest(`/api/ai/strategy/${strategyId}`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request)
+      body: JSON.stringify(updates)
     });
   }, [makeRequest]);
 
-  const generateTechnicalAnalysis = useCallback(async (request) => {
-    return await makeRequest('/api/ai/analysis/technical', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request)
-    });
-  }, [makeRequest]);
-
-  const generateSentimentAnalysis = useCallback(async (request) => {
-    return await makeRequest('/api/ai/analysis/sentiment', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request)
+  const deleteStrategy = useCallback(async (strategyId) => {
+    return await makeRequest(`/api/ai/strategy/${strategyId}`, {
+      method: 'DELETE'
     });
   }, [makeRequest]);
 
   // Trading Signals
-  const getSignals = useCallback(async (symbols = []) => {
-    const params = symbols.length > 0 ? `?symbols=${symbols.join(',')}` : '';
-    return await makeRequest(`/api/ai/signals${params}`);
+  const getSignals = useCallback(async () => {
+    return await makeRequest('/api/ai/signals');
   }, [makeRequest]);
 
-  // Feedback System
-  const recordTradeOutcome = useCallback(async (request) => {
-    return await makeRequest('/api/ai/feedback/outcome', {
+  const generateSignal = useCallback(async (request) => {
+    return await makeRequest('/api/ai/signals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request)
     });
   }, [makeRequest]);
 
-  const getLearningInsights = useCallback(async (strategyId) => {
-    return await makeRequest(`/api/ai/feedback/learning/${strategyId}`);
-  }, [makeRequest]);
-
-  // Analytics & Clustering
-  const getStrategyClustering = useCallback(async () => {
-    return await makeRequest('/api/ai/clustering/strategies');
-  }, [makeRequest]);
-
-  const getStrategyAnalytics = useCallback(async (strategyId) => {
-    return await makeRequest(`/api/ai/analytics/strategy/${strategyId}`);
-  }, [makeRequest]);
-
-  // Crowd Intelligence
-  const getCrowdInsights = useCallback(async () => {
-    return await makeRequest('/api/ai/insights/crowd');
-  }, [makeRequest]);
-
-  const getTrendingInsights = useCallback(async () => {
-    return await makeRequest('/api/ai/insights/trending');
-  }, [makeRequest]);
-
-  // Portfolio Co-Pilot
-  const analyzePortfolio = useCallback(async (portfolioData) => {
+  // Portfolio Analysis
+  const analyzePortfolio = useCallback(async (request) => {
     return await makeRequest('/api/ai/copilot/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(portfolioData)
+      body: JSON.stringify(request)
     });
   }, [makeRequest]);
 
@@ -434,34 +245,74 @@ export const useAI = () => {
     return await makeRequest('/api/ai/copilot/recommendations');
   }, [makeRequest]);
 
-  // Refresh AI status
-  const refreshAIStatus = useCallback(async () => {
-    await loadAIStatus();
-  }, [loadAIStatus]);
+  // Market Analysis
+  const analyzeMarket = useCallback(async (request) => {
+    return await makeRequest('/api/ai/analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request)
+    });
+  }, [makeRequest]);
+
+  const getMarketInsights = useCallback(async () => {
+    return await makeRequest('/api/ai/insights/trending');
+  }, [makeRequest]);
+
+  // Crowd Intelligence
+  const getCrowdInsights = useCallback(async () => {
+    return await makeRequest('/api/ai/insights/crowd');
+  }, [makeRequest]);
+
+  // Strategy Analytics
+  const getStrategyAnalytics = useCallback(async (strategyId) => {
+    return await makeRequest(`/api/ai/analytics/strategy/${strategyId}`);
+  }, [makeRequest]);
+
+  const getStrategyClustering = useCallback(async () => {
+    return await makeRequest('/api/ai/clustering/strategies');
+  }, [makeRequest]);
+
+  // Performance Analytics
+  const getPerformanceAnalytics = useCallback(async () => {
+    return await makeRequest('/api/ai/analytics/performance');
+  }, [makeRequest]);
+
+  // Feedback and Learning
+  const recordTradeOutcome = useCallback(async (feedback) => {
+    return await makeRequest('/api/ai/feedback/outcome', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(feedback)
+    });
+  }, [makeRequest]);
+
+  const getLearningInsights = useCallback(async () => {
+    return await makeRequest('/api/ai/feedback/insights');
+  }, [makeRequest]);
+
+  // Initialize thread on mount
+  useEffect(() => {
+    initializeThread();
+  }, [initializeThread]);
 
   return {
-    // State
+    // Status and preferences from global context
     aiStatus,
     aiPreferences,
     isLoading,
     error,
-    threadId,
-    
-    // Core functions
-    loadAIStatus,
     refreshAIStatus,
-    makeRequest,
     
-    // OpenAI Assistant
+    // Thread management
+    threadId,
     sendAssistantMessage,
     getAssistantStatus,
     getThreadMessages,
     deleteThread,
     getUserThreadId,
     clearUserThread,
-    initializeThread,
     
-    // Preferences
+    // AI Preferences
     getAIPreferences,
     updateAIPreferences,
     validateAPIKey,
@@ -471,30 +322,34 @@ export const useAI = () => {
     generateStrategy,
     getStrategies,
     getStrategy,
-    
-    // Market Analysis
-    generateMarketAnalysis,
-    generateTechnicalAnalysis,
-    generateSentimentAnalysis,
+    updateStrategy,
+    deleteStrategy,
     
     // Trading Signals
     getSignals,
+    generateSignal,
     
-    // Feedback System
-    recordTradeOutcome,
-    getLearningInsights,
+    // Portfolio Analysis
+    analyzePortfolio,
+    getPortfolioRecommendations,
     
-    // Analytics & Clustering
-    getStrategyClustering,
-    getStrategyAnalytics,
+    // Market Analysis
+    analyzeMarket,
+    getMarketInsights,
     
     // Crowd Intelligence
     getCrowdInsights,
-    getTrendingInsights,
     
-    // Portfolio Co-Pilot
-    analyzePortfolio,
-    getPortfolioRecommendations
+    // Strategy Analytics
+    getStrategyAnalytics,
+    getStrategyClustering,
+    
+    // Performance Analytics
+    getPerformanceAnalytics,
+    
+    // Feedback and Learning
+    recordTradeOutcome,
+    getLearningInsights
   };
 };
 
