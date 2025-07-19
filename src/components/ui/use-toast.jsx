@@ -1,5 +1,5 @@
 // Simplified toast implementation to prevent memory leaks
-import { useState, useCallback } from "react";
+import { useState, useEffect } from "react";
 
 const TOAST_LIMIT = 3;
 const TOAST_REMOVE_DELAY = 3000;
@@ -103,7 +103,7 @@ function toast({ ...props }) {
 function useToast() {
   const [state, setState] = useState(memoryState);
 
-  useState(() => {
+  useEffect(() => {
     listeners.push(setState);
     return () => {
       const index = listeners.indexOf(setState);
@@ -111,7 +111,7 @@ function useToast() {
         listeners.splice(index, 1);
       }
     };
-  });
+  }, []);
 
   return {
     ...state,
