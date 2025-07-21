@@ -54,9 +54,7 @@ const TIMEFRAMES = [
 export default function MarketAnalysisPanel() {
   const { toast } = useToast();
   const { 
-    generateMarketAnalysis, 
-    generateTechnicalAnalysis, 
-    generateSentimentAnalysis, 
+    analyzeMarket, 
     loading, 
     error 
   } = useAI();
@@ -99,19 +97,11 @@ export default function MarketAnalysisPanel() {
       };
 
       let result;
-      switch (analysisType) {
-        case 'market':
-          result = await generateMarketAnalysis(request);
-          break;
-        case 'technical':
-          result = await generateTechnicalAnalysis(request);
-          break;
-        case 'sentiment':
-          result = await generateSentimentAnalysis(request);
-          break;
-        default:
-          throw new Error('Invalid analysis type');
-      }
+      // Use the unified analyzeMarket function for all analysis types
+      result = await analyzeMarket({
+        ...request,
+        analysis_type: analysisType
+      });
 
       console.log(`📡 [MarketAnalysisPanel] ${analysisType} analysis response:`, result);
 

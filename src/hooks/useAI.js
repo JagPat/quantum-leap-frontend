@@ -528,7 +528,7 @@ export const usePortfolioCoPilot = () => {
 };
 
 export const useCrowdIntelligence = () => {
-  const { getCrowdInsights, getTrendingInsights, loading, error } = useAI();
+  const { getCrowdInsights, getMarketInsights, loading, error } = useAI();
   const [crowdData, setCrowdData] = useState(null);
   const [trendingData, setTrendingData] = useState(null);
 
@@ -562,7 +562,7 @@ export const useCrowdIntelligence = () => {
   const loadTrendingInsights = useCallback(async () => {
     try {
       console.log('📡 [useCrowdIntelligence] Loading trending insights...');
-      const result = await getTrendingInsights();
+      const result = await getMarketInsights();
       console.log('📡 [useCrowdIntelligence] Trending insights response:', result);
       
       // Handle not_implemented status

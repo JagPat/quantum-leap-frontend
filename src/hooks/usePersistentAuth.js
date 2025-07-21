@@ -86,13 +86,24 @@ export const usePersistentAuth = () => {
     try {
       console.log('🔍 [usePersistentAuth] Validating session with backend...');
       
-      const response = await railwayAPI.request('/broker/status', {
-        method: 'GET',
-        headers: {
-          'X-User-ID': config.user_data.user_id,
-          'Authorization': `token ${config.api_key}:${config.access_token}`
-        }
-      });
+      // Use the railwayAPI.request method which handles authentication properly
+      const response = await railwayAPI.request('/broker/status');
+
+      // Handle different response statuses
+      if (response.status === 'unauthorized') {
+        console.log('🔐 [usePersistentAuth] Session is unauthorized - no valid broker connection');
+        return false;
+      }
+      
+      if (response.status === 'not_implemented') {
+        console.log('🚧 [usePersistentAuth] Broker status endpoint not yet implemented');
+        return false;
+      }
+      
+      if (response.status === 'error') {
+        console.log('❌ [usePersistentAuth] Backend error during validation');
+        return false;
+      }
 
       const isValid = response.status === 'success' && response.data?.is_connected;
       console.log('🔍 [usePersistentAuth] Backend validation result:', isValid);
