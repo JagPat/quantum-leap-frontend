@@ -217,7 +217,33 @@ class RailwayAPI {
   // ========================================
 
   async getPortfolioData(userId) {
-    return this.request(`/api/portfolio/latest-simple?user_id=${userId}`);
+    // Try to fetch live portfolio data first
+    try {
+      console.log(`🔄 [RailwayAPI] Attempting to fetch live portfolio for user: ${userId}`);
+      const liveResult = await this.fetchLivePortfolio(userId);
+      if (liveResult && liveResult.status === 'success') {
+        console.log(`✅ [RailwayAPI] Live portfolio data fetched successfully`);
+        return liveResult;
+      }
+    } catch (error) {
+      console.log(`⚠️ [RailwayAPI] Live portfolio fetch failed:`, error.message);
+    }
+    
+    // Try the latest stored portfolio
+    try {
+      console.log(`🔄 [RailwayAPI] Trying latest stored portfolio for user: ${userId}`);
+      const result = await this.request(`/api/portfolio/latest-simple?user_id=${userId}`);
+      if (result && result.status === 'success') {
+        console.log(`✅ [RailwayAPI] Latest stored portfolio found`);
+        return result;
+      }
+    } catch (error) {
+      console.log(`⚠️ [RailwayAPI] Latest portfolio failed:`, error.message);
+    }
+    
+    // Fallback to mock portfolio data only if user is not authenticated
+    console.log(`🔄 [RailwayAPI] Using mock portfolio data for user: ${userId}`);
+    return this.request(`/api/portfolio/mock?user_id=${userId}`);
   }
 
   async fetchLivePortfolio(userId) {

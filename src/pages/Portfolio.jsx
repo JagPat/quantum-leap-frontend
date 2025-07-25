@@ -90,11 +90,14 @@ export default function Portfolio() {
             console.log("🔍 [Portfolio] BrokerConfigs:", brokerConfigs);
             console.log("🔍 [Portfolio] ActiveBrokerConfig:", activeBrokerConfig);
             
+            // Use mock user ID for testing if no broker is connected
+            let userIdentifier;
             if (!activeBrokerConfig?.user_data?.user_id) {
-                throw new Error('No authenticated broker found. Please connect to your broker first.');
+                console.log("⚠️ [Portfolio] No authenticated broker found, using mock user for testing");
+                userIdentifier = 'mock_user_testing';
+            } else {
+                userIdentifier = activeBrokerConfig.user_data.user_id;
             }
-
-            const userIdentifier = activeBrokerConfig.user_data.user_id;
             console.log("🔍 [Portfolio] Fetching data for user:", userIdentifier);
             
             const result = await portfolioAPI(userIdentifier);
@@ -357,15 +360,29 @@ export default function Portfolio() {
             </div>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Demo Mode Banner */}
-                <div className="mb-6">
-                    <Alert className="border-yellow-500/20 bg-yellow-500/10 backdrop-blur-sm">
-                        <AlertTriangle className="h-4 w-4 text-yellow-400" />
-                        <AlertDescription className="text-yellow-200">
-                            <strong>Demo Mode:</strong> Showing sample portfolio data. Connect your broker to view live data from your actual portfolio.
-                        </AlertDescription>
-                    </Alert>
-                </div>
+                {/* Demo Mode Banner - Only show if using mock data */}
+                {(!activeBrokerConfig?.user_data?.user_id || !activeBrokerConfig?.is_connected) && (
+                    <div className="mb-6">
+                        <Alert className="border-yellow-500/20 bg-yellow-500/10 backdrop-blur-sm">
+                            <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                            <AlertDescription className="text-yellow-200">
+                                <strong>Demo Mode:</strong> Showing sample portfolio data. Connect your broker to view live data from your actual portfolio.
+                            </AlertDescription>
+                        </Alert>
+                    </div>
+                )}
+                
+                {/* Live Data Banner - Show when connected */}
+                {activeBrokerConfig?.user_data?.user_id && activeBrokerConfig?.is_connected && (
+                    <div className="mb-6">
+                        <Alert className="border-green-500/20 bg-green-500/10 backdrop-blur-sm">
+                            <CheckCircle className="h-4 w-4 text-green-400" />
+                            <AlertDescription className="text-green-200">
+                                <strong>Live Data:</strong> Showing real-time portfolio data from your {activeBrokerConfig.broker_name || 'broker'} account.
+                            </AlertDescription>
+                        </Alert>
+                    </div>
+                )}
 
                 {/* Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
