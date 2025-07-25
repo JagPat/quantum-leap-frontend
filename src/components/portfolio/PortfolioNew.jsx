@@ -414,9 +414,22 @@ export default function PortfolioNew() {
         });
         
         // Use backend-calculated values if available, otherwise calculate from positions
-        const backendTotalValue = portfolioData.total_value;
-        const backendTotalPnl = portfolioData.total_pnl;
-        const backendDayPnl = portfolioData.day_pnl;
+        // Check both root level and summary object for backend values
+        const backendTotalValue = portfolioData.total_value || portfolioData.summary?.total_value;
+        const backendTotalPnl = portfolioData.total_pnl || portfolioData.summary?.total_pnl;
+        const backendDayPnl = portfolioData.day_pnl || portfolioData.summary?.day_pnl;
+        
+        console.log("🔍 [PortfolioNew] Backend values extracted:", {
+            backendTotalValue,
+            backendTotalPnl,
+            backendDayPnl,
+            rootLevel: {
+                total_value: portfolioData.total_value,
+                total_pnl: portfolioData.total_pnl,
+                day_pnl: portfolioData.day_pnl
+            },
+            summaryLevel: portfolioData.summary
+        });
         
         console.log("🔢 [PortfolioNew] Backend summary values:", {
             total_value: backendTotalValue,
