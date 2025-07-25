@@ -437,29 +437,40 @@ export default function PortfolioNew() {
             day_pnl: backendDayPnl
         });
         
-        // Calculate totals from actual data as fallback
-        const totalCurrentValue = allPositions.reduce((sum, pos) => sum + (pos.current_value || 0), 0);
-        const totalInvestment = allPositions.reduce((sum, pos) => {
-            const avgPrice = pos.average_price || 0;
-            const quantity = pos.quantity || 0;
+        // PRINCIPLE: Use broker-calculated values FIRST, calculate only as last resort
+        // Backend aggregates broker data, so use it directly
+        let finalCurrentValue = backendTotalValue;
+        let finalTotalPnl = backendTotalPnl;
+        let finalDayPnl = backendDayPnl;
+        let totalInvestment = 0;
+        
+        // Only calculate if backend values are missing (should rarely happen)
+        if (finalCurrentValue === undefined || finalTotalPnl === undefined || finalDayPnl === undefined) {
+            console.warn("⚠️ [PortfolioNew] Backend values missing, falling back to local calculation");
+            
+            // Fallback calculations (only when backend fails)
+            const totalCurrentValue = allPositions.reduce((sum, pos) => sum + (pos.current_value || 0), 0);
+            const totalPnl = allPositions.reduce((sum, pos) => sum + (pos.pnl || 0), 0);
+            const dayPnl = allPositions.reduce((sum, pos) => {
+                if (pos.source === 'holdings') {
+                    return sum + (pos.day_change || 0); // Use broker day_change
+                } else if (pos.source === 'positions') {
+                    return sum + (pos.m2m || 0); // Use broker m2m
+                }
+                return sum + (pos.day_change || 0);
+            }, 0);
+            
+            finalCurrentValue = finalCurrentValue ?? totalCurrentValue;
+            finalTotalPnl = finalTotalPnl ?? totalPnl;
+            finalDayPnl = finalDayPnl ?? dayPnl;
+        }
+        
+        // Calculate investment total (only for percentage calculations)
+        totalInvestment = allPositions.reduce((sum, pos) => {
+            const avgPrice = pos.average_price || 0; // Broker-provided
+            const quantity = pos.quantity || 0; // Broker-provided
             return sum + (avgPrice * quantity);
         }, 0);
-        const totalPnl = allPositions.reduce((sum, pos) => sum + (pos.pnl || 0), 0);
-        
-        // Calculate day P&L - use different fields for holdings vs positions
-        const dayPnl = allPositions.reduce((sum, pos) => {
-            if (pos.source === 'holdings') {
-                return sum + (pos.day_change || 0);
-            } else if (pos.source === 'positions') {
-                return sum + (pos.m2m || 0); // Mark-to-market for positions
-            }
-            return sum + (pos.day_change || 0); // fallback
-        }, 0);
-        
-        // Use backend values if available, otherwise use calculated values
-        const finalCurrentValue = backendTotalValue !== undefined ? backendTotalValue : totalCurrentValue;
-        const finalTotalPnl = backendTotalPnl !== undefined ? backendTotalPnl : totalPnl;
-        const finalDayPnl = backendDayPnl !== undefined ? backendDayPnl : dayPnl;
         
         // Calculate percentages
         const totalPnlPercentage = totalInvestment > 0 ? (finalTotalPnl / totalInvestment) * 100 : 0;
