@@ -431,6 +431,12 @@ export default function PortfolioNew() {
             summaryLevel: portfolioData.summary
         });
         
+        console.log("🔍 [PortfolioNew] Sample holdings data:", {
+            firstHolding: portfolioData.holdings?.[0],
+            holdingsCount: portfolioData.holdings?.length,
+            sampleFields: portfolioData.holdings?.[0] ? Object.keys(portfolioData.holdings[0]) : []
+        });
+        
         console.log("🔢 [PortfolioNew] Backend summary values:", {
             total_value: backendTotalValue,
             total_pnl: backendTotalPnl,

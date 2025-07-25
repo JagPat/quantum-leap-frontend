@@ -221,12 +221,20 @@ class RailwayAPI {
     try {
       console.log(`🔄 [RailwayAPI] Attempting to fetch live portfolio for user: ${userId}`);
       const liveResult = await this.fetchLivePortfolio(userId);
+      console.log(`🔍 [RailwayAPI] Live portfolio result:`, liveResult);
       if (liveResult && liveResult.status === 'success') {
         console.log(`✅ [RailwayAPI] Live portfolio data fetched successfully`);
+        console.log(`📊 [RailwayAPI] Live data summary:`, {
+          total_value: liveResult.data?.total_value,
+          holdings_count: liveResult.data?.holdings?.length
+        });
         return liveResult;
+      } else {
+        console.log(`⚠️ [RailwayAPI] Live portfolio status not success:`, liveResult?.status, liveResult?.message);
       }
     } catch (error) {
       console.log(`⚠️ [RailwayAPI] Live portfolio fetch failed:`, error.message);
+      console.log(`⚠️ [RailwayAPI] Live portfolio error details:`, error);
     }
     
     // Try the latest stored portfolio
