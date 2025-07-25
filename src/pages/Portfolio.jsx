@@ -61,6 +61,7 @@ export default function Portfolio() {
     const [sortBy, setSortBy] = useState('pnl');
     const [sortOrder, setSortOrder] = useState('desc');
     const [hideSmallPositions, setHideSmallPositions] = useState(false);
+    const [activeBrokerConfig, setActiveBrokerConfig] = useState(null);
 
     useEffect(() => {
         fetchPortfolioData();
@@ -85,18 +86,21 @@ export default function Portfolio() {
         try {
             // Get authenticated broker user_id
             const brokerConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-            const activeBrokerConfig = brokerConfigs.find(config => config.is_connected && config.access_token);
+            const currentActiveBrokerConfig = brokerConfigs.find(config => config.is_connected && config.access_token);
+            
+            // Update state with current broker config
+            setActiveBrokerConfig(currentActiveBrokerConfig);
             
             console.log("🔍 [Portfolio] BrokerConfigs:", brokerConfigs);
-            console.log("🔍 [Portfolio] ActiveBrokerConfig:", activeBrokerConfig);
+            console.log("🔍 [Portfolio] ActiveBrokerConfig:", currentActiveBrokerConfig);
             
             // Use mock user ID for testing if no broker is connected
             let userIdentifier;
-            if (!activeBrokerConfig?.user_data?.user_id) {
+            if (!currentActiveBrokerConfig?.user_data?.user_id) {
                 console.log("⚠️ [Portfolio] No authenticated broker found, using mock user for testing");
                 userIdentifier = 'mock_user_testing';
             } else {
-                userIdentifier = activeBrokerConfig.user_data.user_id;
+                userIdentifier = currentActiveBrokerConfig.user_data.user_id;
             }
             console.log("🔍 [Portfolio] Fetching data for user:", userIdentifier);
             
