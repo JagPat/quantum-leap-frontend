@@ -329,16 +329,47 @@ export default function PortfolioNew() {
         return 'bg-gray-50 border-gray-200';
     };
 
+    // Calculate individual position P&L percentage using broker data
+    const calculatePositionPnlPercentage = (position) => {
+        if (!position) return 0;
+        
+        const avgPrice = position.average_price || 0;
+        const quantity = Math.abs(position.quantity || 0);
+        const investment = avgPrice * quantity;
+        
+        if (investment <= 0) return 0;
+        
+        // Use broker-calculated P&L directly
+        let pnl = 0;
+        if (position.source === 'holdings') {
+            pnl = position.pnl || 0; // Broker-calculated P&L for holdings
+        } else if (position.source === 'positions') {
+            pnl = position.unrealised || position.pnl || 0; // Broker-calculated unrealised P&L for positions
+        } else {
+            pnl = position.pnl || 0; // Fallback to pnl field
+        }
+        
+        return (pnl / investment) * 100;
+    };
+
+    // Enhance positions with calculated percentage
+    const enhancePositionWithPercentage = (position) => {
+        return {
+            ...position,
+            pnl_percentage: calculatePositionPnlPercentage(position)
+        };
+    };
+
     const getAllPositions = () => {
         if (!portfolioData) return [];
         
         const holdings = portfolioData.holdings || [];
         const positions = portfolioData.positions || [];
         
-        // Combine and mark source
+        // Combine, mark source, and enhance with calculated percentages
         const allPositions = [
-            ...holdings.map(h => ({ ...h, source: 'holdings' })),
-            ...positions.map(p => ({ ...p, source: 'positions' }))
+            ...holdings.map(h => enhancePositionWithPercentage({ ...h, source: 'holdings' })),
+            ...positions.map(p => enhancePositionWithPercentage({ ...p, source: 'positions' }))
         ];
 
         // Filter and sort
@@ -405,16 +436,18 @@ export default function PortfolioNew() {
                 source: p.source,
                 current_value: p.current_value,
                 pnl: p.pnl,
+                unrealised: p.unrealised,
                 day_change: p.day_change,
                 m2m: p.m2m,
                 avg_price: p.average_price,
+                last_price: p.last_price,
                 quantity: p.quantity,
                 allFields: Object.keys(p)
             }))
         });
         
-        // Use backend-calculated values if available, otherwise calculate from positions
-        // Check both root level and summary object for backend values
+        // BROKER DATA FIRST PRINCIPLE: Use backend-calculated values directly
+        // Backend aggregates broker data, so use it directly without recalculation
         const backendTotalValue = portfolioData.total_value || portfolioData.summary?.total_value;
         const backendTotalPnl = portfolioData.total_pnl || portfolioData.summary?.total_pnl;
         const backendDayPnl = portfolioData.day_pnl || portfolioData.summary?.day_pnl;
@@ -431,20 +464,7 @@ export default function PortfolioNew() {
             summaryLevel: portfolioData.summary
         });
         
-        console.log("🔍 [PortfolioNew] Sample holdings data:", {
-            firstHolding: portfolioData.holdings?.[0],
-            holdingsCount: portfolioData.holdings?.length,
-            sampleFields: portfolioData.holdings?.[0] ? Object.keys(portfolioData.holdings[0]) : []
-        });
-        
-        console.log("🔢 [PortfolioNew] Backend summary values:", {
-            total_value: backendTotalValue,
-            total_pnl: backendTotalPnl,
-            day_pnl: backendDayPnl
-        });
-        
         // PRINCIPLE: Use broker-calculated values FIRST, calculate only as last resort
-        // Backend aggregates broker data, so use it directly
         let finalCurrentValue = backendTotalValue;
         let finalTotalPnl = backendTotalPnl;
         let finalDayPnl = backendDayPnl;
@@ -454,16 +474,32 @@ export default function PortfolioNew() {
         if (finalCurrentValue === undefined || finalTotalPnl === undefined || finalDayPnl === undefined) {
             console.warn("⚠️ [PortfolioNew] Backend values missing, falling back to local calculation");
             
-            // Fallback calculations (only when backend fails)
-            const totalCurrentValue = allPositions.reduce((sum, pos) => sum + (pos.current_value || 0), 0);
-            const totalPnl = allPositions.reduce((sum, pos) => sum + (pos.pnl || 0), 0);
+            // Fallback calculations using broker-provided values
+            const totalCurrentValue = allPositions.reduce((sum, pos) => {
+                // Use broker-calculated current_value if available, otherwise calculate
+                return sum + (pos.current_value || (pos.quantity * pos.last_price) || 0);
+            }, 0);
+            
+            const totalPnl = allPositions.reduce((sum, pos) => {
+                if (pos.source === 'holdings') {
+                    // For holdings, use broker-calculated pnl directly
+                    return sum + (pos.pnl || 0);
+                } else if (pos.source === 'positions') {
+                    // For positions, use broker-calculated unrealised P&L
+                    return sum + (pos.unrealised || pos.pnl || 0);
+                }
+                return sum + (pos.pnl || 0);
+            }, 0);
+            
             const dayPnl = allPositions.reduce((sum, pos) => {
                 if (pos.source === 'holdings') {
-                    return sum + (pos.day_change || 0); // Use broker day_change
+                    // For holdings, use broker day_change
+                    return sum + (pos.day_change || 0);
                 } else if (pos.source === 'positions') {
-                    return sum + (pos.m2m || 0); // Use broker m2m
+                    // For positions, use broker m2m (mark-to-market)
+                    return sum + (pos.m2m || 0);
                 }
-                return sum + (pos.day_change || 0);
+                return sum + (pos.day_change || pos.m2m || 0);
             }, 0);
             
             finalCurrentValue = finalCurrentValue ?? totalCurrentValue;
@@ -471,24 +507,24 @@ export default function PortfolioNew() {
             finalDayPnl = finalDayPnl ?? dayPnl;
         }
         
-        // Calculate investment total (only for percentage calculations)
+        // Calculate total investment using broker-provided average prices
         totalInvestment = allPositions.reduce((sum, pos) => {
-            const avgPrice = pos.average_price || 0; // Broker-provided
-            const quantity = pos.quantity || 0; // Broker-provided
+            const avgPrice = pos.average_price || 0; // Broker-provided average price
+            const quantity = Math.abs(pos.quantity || 0); // Broker-provided quantity
             return sum + (avgPrice * quantity);
         }, 0);
         
-        // Calculate percentages
+        // Calculate percentages with proper validation
         const totalPnlPercentage = totalInvestment > 0 ? (finalTotalPnl / totalInvestment) * 100 : 0;
-        const dayPnlPercentage = finalCurrentValue > 0 ? (finalDayPnl / finalCurrentValue) * 100 : 0;
+        const dayPnlPercentage = totalInvestment > 0 ? (finalDayPnl / totalInvestment) * 100 : 0;
         
         const calculatedSummary = {
-            current_value: finalCurrentValue,
-            total_investment: totalInvestment,
-            total_pnl: finalTotalPnl,
-            total_pnl_percentage: totalPnlPercentage,
-            day_pnl: finalDayPnl,
-            day_pnl_percentage: dayPnlPercentage,
+            current_value: finalCurrentValue || 0,
+            total_investment: totalInvestment || 0,
+            total_pnl: finalTotalPnl || 0,
+            total_pnl_percentage: totalPnlPercentage || 0,
+            day_pnl: finalDayPnl || 0,
+            day_pnl_percentage: dayPnlPercentage || 0,
             holdings_count: portfolioData.holdings?.length || 0,
             positions_count: portfolioData.positions?.length || 0
         };
