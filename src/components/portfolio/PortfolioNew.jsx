@@ -349,7 +349,18 @@ export default function PortfolioNew() {
             pnl = position.pnl || 0; // Fallback to pnl field
         }
         
-        return (pnl / investment) * 100;
+        const percentage = (pnl / investment) * 100;
+        
+        // Debug log for verification
+        console.log(`📈 [${position.tradingsymbol}] P&L Calculation:`, {
+            avgPrice,
+            quantity,
+            investment,
+            pnl,
+            percentage: percentage.toFixed(2) + '%'
+        });
+        
+        return percentage;
     };
 
     // Enhance positions with calculated percentage
@@ -535,6 +546,47 @@ export default function PortfolioNew() {
             holdings_count: portfolioData.holdings?.length || 0,
             positions_count: portfolioData.positions?.length || 0
         };
+        
+        // DEBUGGING: Manual verification of calculations
+        console.log("🧮 [PortfolioNew] Manual Calculation Verification:");
+        console.log("Backend API Values:", {
+            total_value: portfolioData.total_value,
+            total_pnl: portfolioData.total_pnl,
+            day_pnl: portfolioData.day_pnl
+        });
+        
+        // Manual calculation for verification
+        const manualTotalInvestment = allPositions.reduce((sum, pos) => {
+            const investment = (pos.average_price || 0) * Math.abs(pos.quantity || 0);
+            return sum + investment;
+        }, 0);
+        
+        const manualTotalPnl = allPositions.reduce((sum, pos) => sum + (pos.pnl || 0), 0);
+        const manualCurrentValue = allPositions.reduce((sum, pos) => sum + (pos.current_value || 0), 0);
+        
+        console.log("Manual Calculations:", {
+            manualTotalInvestment,
+            manualTotalPnl,
+            manualCurrentValue,
+            manualTotalPnlPercentage: manualTotalInvestment > 0 ? (manualTotalPnl / manualTotalInvestment) * 100 : 0,
+            shouldMatch: {
+                currentValue: portfolioData.total_value,
+                totalPnl: portfolioData.total_pnl
+            }
+        });
+        
+        // Sample stock verification
+        const sampleStock = allPositions[0];
+        if (sampleStock) {
+            const stockInvestment = (sampleStock.average_price || 0) * Math.abs(sampleStock.quantity || 0);
+            const stockPnlPercentage = stockInvestment > 0 ? ((sampleStock.pnl || 0) / stockInvestment) * 100 : 0;
+            console.log(`Sample Stock (${sampleStock.tradingsymbol}) Verification:`, {
+                investment: stockInvestment,
+                pnl: sampleStock.pnl,
+                pnlPercentage: stockPnlPercentage,
+                currentValue: sampleStock.current_value
+            });
+        }
         
         console.log("📊 [PortfolioNew] Final calculated summary:", calculatedSummary);
         
