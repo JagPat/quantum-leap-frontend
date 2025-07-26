@@ -448,9 +448,9 @@ export default function PortfolioNew() {
         
         // BROKER DATA FIRST PRINCIPLE: Use backend-calculated values directly
         // Backend aggregates broker data, so use it directly without recalculation
-        const backendTotalValue = portfolioData.total_value || portfolioData.summary?.total_value;
-        const backendTotalPnl = portfolioData.total_pnl || portfolioData.summary?.total_pnl;
-        const backendDayPnl = portfolioData.day_pnl || portfolioData.summary?.day_pnl;
+        const backendTotalValue = portfolioData.total_value || portfolioData.summary?.total_value || 0;
+        const backendTotalPnl = portfolioData.total_pnl || portfolioData.summary?.total_pnl || 0;
+        const backendDayPnl = portfolioData.day_pnl || portfolioData.summary?.day_pnl || 0;
         
         console.log("🔍 [PortfolioNew] Backend values extracted:", {
             backendTotalValue,
@@ -461,7 +461,12 @@ export default function PortfolioNew() {
                 total_pnl: portfolioData.total_pnl,
                 day_pnl: portfolioData.day_pnl
             },
-            summaryLevel: portfolioData.summary
+            summaryLevel: portfolioData.summary,
+            finalValues: {
+                finalCurrentValue: backendTotalValue,
+                finalTotalPnl: backendTotalPnl,
+                finalDayPnl: backendDayPnl
+            }
         });
         
         // PRINCIPLE: Use broker-calculated values FIRST, calculate only as last resort
@@ -471,7 +476,9 @@ export default function PortfolioNew() {
         let totalInvestment = 0;
         
         // Only calculate if backend values are missing (should rarely happen)
-        if (finalCurrentValue === undefined || finalTotalPnl === undefined || finalDayPnl === undefined) {
+        if (finalCurrentValue === undefined || finalCurrentValue === null || 
+            finalTotalPnl === undefined || finalTotalPnl === null ||
+            finalDayPnl === undefined || finalDayPnl === null) {
             console.warn("⚠️ [PortfolioNew] Backend values missing, falling back to local calculation");
             
             // Fallback calculations using broker-provided values
