@@ -11,6 +11,10 @@ on:
     paths:
       - 'frontend/**'
 
+concurrency:
+  group: "deploy-${{ github.ref }}"
+  cancel-in-progress: true
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -42,13 +46,20 @@ jobs:
       run: npm test -- --coverage --watchAll=false
       continue-on-error: true
       
+    - name: Install Railway CLI
+      if: github.ref == 'refs/heads/main'
+      run: |
+        curl -fsSL https://railway.app/install.sh | sh
+        echo "$HOME/.railway/bin" >> $GITHUB_PATH
+        
     - name: Deploy to Railway
       if: github.ref == 'refs/heads/main'
-      uses: railway-app/railway-deploy@v1
-      with:
-        railway-token: ${{ secrets.RAILWAY_TOKEN }}
-        service: frontend
-        dockerfile: frontend/Dockerfile
+      env:
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      working-directory: ./frontend
+      run: |
+        railway login --token $RAILWAY_TOKEN
+        railway up --detach
         
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
