@@ -56,9 +56,11 @@ jobs:
       if: github.ref == 'refs/heads/main'
       env:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
       working-directory: ./frontend
       run: |
         railway login --token $RAILWAY_TOKEN
+        railway link $RAILWAY_PROJECT_ID
         railway up --detach
         
     - name: Upload build artifacts
