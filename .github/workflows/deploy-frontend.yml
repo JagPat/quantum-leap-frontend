@@ -37,7 +37,7 @@ jobs:
     - name: Build frontend
       working-directory: ./frontend
       env:
-        VITE_API_BASE_URL: https://web-production-de0bc.up.railway.app
+        VITE_API_BASE_URL: https://quantumtrade-backend-production-925c.up.railway.app
         NODE_ENV: production
       run: npm run build
       
