@@ -11,6 +11,7 @@ import {
 } from '../types/portfolio';
 import { PortfolioValidator, PortfolioValidationError } from '../utils/portfolioValidation';
 import { portfolioCache, cacheKeys } from '../utils/portfolioCache';
+import { brokerAPI } from './brokerAPI';
 
 /**
  * Portfolio Service
@@ -19,16 +20,44 @@ import { portfolioCache, cacheKeys } from '../utils/portfolioCache';
 export class PortfolioService {
   private baseURL: string;
   private defaultHeaders: Record<string, string>;
+  private useLiveData: boolean;
 
   constructor() {
     this.baseURL = process.env.REACT_APP_API_BASE_URL || 'https://web-production-de0bc.up.railway.app';
     this.defaultHeaders = {
       'Content-Type': 'application/json',
     };
+    this.useLiveData = true; // Enable live data by default
+  }
+
+  /**
+   * Check if user has active broker connection
+   */
+  private async checkBrokerConnection(userId: string): Promise<boolean> {
+    try {
+      const status = await brokerAPI.checkConnectionStatus(null, userId);
+      return status.isConnected && status.connectionStatus.state === 'connected';
+    } catch (error) {
+      console.warn('Failed to check broker connection:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get portfolio data source (live broker data or mock data)
+   */
+  private async getDataSource(userId: string): Promise<'live' | 'mock'> {
+    if (!this.useLiveData) {
+      return 'mock';
+    }
+
+    const hasConnection = await this.checkBrokerConnection(userId);
+    return hasConnection ? 'live' : 'mock';
   }
 
   /**
    * Get latest portfolio data (cached)
+   * Uses live broker data if connected, otherwise falls back to mock data
    * Endpoint: GET /api/portfolio/latest-simple
    */
   async getLatestPortfolio(userId: string): Promise<PortfolioData> {
@@ -36,7 +65,8 @@ export class PortfolioService {
       throw new PortfolioValidationError('Invalid user ID');
     }
 
-    const cacheKey = cacheKeys.portfolio(userId);
+    const dataSource = await this.getDataSource(userId);
+    const cacheKey = cacheKeys.portfolio(userId) + `_${dataSource}`;
     
     // Check cache first
     const cached = portfolioCache.get<PortfolioData>(cacheKey);
@@ -45,15 +75,24 @@ export class PortfolioService {
     }
 
     try {
-      const response = await this.makeRequest<PortfolioData>(
-        `/api/portfolio/latest-simple?user_id=${userId}`,
-        { method: 'GET' }
-      );
+      let response: PortfolioData;
+      
+      if (dataSource === 'live') {
+        // Use live broker data
+        response = await this.fetchLiveBrokerData(userId);
+      } else {
+        // Use mock data
+        response = await this.makeRequest<PortfolioData>(
+          `/api/portfolio/latest-simple?user_id=${userId}`,
+          { method: 'GET' }
+        );
+      }
 
       const validatedData = PortfolioValidator.validatePortfolioData(response);
       
-      // Cache the validated data
-      portfolioCache.set(cacheKey, validatedData);
+      // Cache the validated data (shorter cache for live data)
+      const cacheTime = dataSource === 'live' ? 30000 : 300000; // 30s for live, 5min for mock
+      portfolioCache.set(cacheKey, validatedData, cacheTime);
       
       return validatedData;
     } catch (error) {
@@ -63,6 +102,7 @@ export class PortfolioService {
 
   /**
    * Fetch live portfolio data (real-time)
+   * Always tries to use live broker data if connected
    * Endpoint: GET /api/portfolio/fetch-live
    */
   async fetchLivePortfolio(userId: string): Promise<PortfolioData> {
@@ -71,21 +111,102 @@ export class PortfolioService {
     }
 
     try {
-      const response = await this.makeRequest<PortfolioData>(
-        `/api/portfolio/fetch-live?user_id=${userId}`,
-        { method: 'GET' }
-      );
+      const dataSource = await this.getDataSource(userId);
+      let response: PortfolioData;
+      
+      if (dataSource === 'live') {
+        // Use live broker data
+        response = await this.fetchLiveBrokerData(userId);
+      } else {
+        // Fallback to mock live data
+        response = await this.makeRequest<PortfolioData>(
+          `/api/portfolio/fetch-live?user_id=${userId}`,
+          { method: 'GET' }
+        );
+      }
 
       const validatedData = PortfolioValidator.validatePortfolioData(response);
       
       // Update cache with fresh data
-      const cacheKey = cacheKeys.portfolio(userId);
+      const cacheKey = cacheKeys.portfolio(userId) + `_${dataSource}`;
       portfolioCache.set(cacheKey, validatedData, 30000); // 30 seconds for live data
       
       return validatedData;
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch live portfolio');
     }
+  }
+
+  /**
+   * Fetch live data from broker API
+   */
+  private async fetchLiveBrokerData(userId: string): Promise<PortfolioData> {
+    try {
+      // Get broker configurations
+      const configs = await brokerAPI.getBrokerConfigs(userId);
+      const activeConfig = configs.find(config => config.isConnected);
+      
+      if (!activeConfig) {
+        throw new Error('No active broker connection found');
+      }
+
+      // Fetch live data from broker-integrated endpoints
+      const [holdings, positions, margins] = await Promise.all([
+        this.makeRequest<any>(`/api/broker/holdings?config_id=${activeConfig.id}`, { method: 'GET' }),
+        this.makeRequest<any>(`/api/broker/positions?config_id=${activeConfig.id}`, { method: 'GET' }),
+        this.makeRequest<any>(`/api/broker/margins?config_id=${activeConfig.id}`, { method: 'GET' })
+      ]);
+
+      // Transform broker data to portfolio format
+      return this.transformBrokerDataToPortfolio(holdings, positions, margins);
+    } catch (error) {
+      console.warn('Failed to fetch live broker data, falling back to mock:', error);
+      // Fallback to mock data if broker data fails
+      return this.makeRequest<PortfolioData>(
+        `/api/portfolio/fetch-live?user_id=${userId}`,
+        { method: 'GET' }
+      );
+    }
+  }
+
+  /**
+   * Transform broker API data to portfolio format
+   */
+  private transformBrokerDataToPortfolio(holdings: any, positions: any, margins: any): PortfolioData {
+    // Calculate total value from holdings
+    const totalValue = holdings.reduce((sum: number, holding: any) => {
+      return sum + (holding.quantity * holding.lastPrice);
+    }, 0);
+
+    // Calculate day change from positions
+    const dayChange = positions.net?.reduce((sum: number, position: any) => {
+      return sum + (position.pnl || 0);
+    }, 0) || 0;
+
+    const dayChangePercent = totalValue > 0 ? (dayChange / (totalValue - dayChange)) * 100 : 0;
+
+    // Transform holdings to portfolio format
+    const portfolioHoldings = holdings.map((holding: any) => ({
+      symbol: holding.tradingsymbol,
+      quantity: holding.quantity,
+      price: holding.lastPrice,
+      value: holding.quantity * holding.lastPrice,
+      change: holding.dayChange || 0,
+      changePercent: holding.dayChangePercentage || 0,
+      exchange: holding.exchange,
+      product: holding.product
+    }));
+
+    return {
+      totalValue,
+      dayChange,
+      dayChangePercent,
+      positions: portfolioHoldings,
+      cash: margins?.equity?.available?.cash || 0,
+      lastUpdated: new Date().toISOString(),
+      isLive: true,
+      dataSource: 'broker'
+    };
   }
 
   /**
@@ -432,19 +553,54 @@ export class PortfolioService {
   }
 
   /**
+   * Enable or disable live data usage
+   */
+  setLiveDataEnabled(enabled: boolean): void {
+    this.useLiveData = enabled;
+    // Clear cache when switching data sources
+    portfolioCache.clear();
+  }
+
+  /**
+   * Check if live data is enabled
+   */
+  isLiveDataEnabled(): boolean {
+    return this.useLiveData;
+  }
+
+  /**
+   * Get current data source for user
+   */
+  async getCurrentDataSource(userId: string): Promise<'live' | 'mock'> {
+    return this.getDataSource(userId);
+  }
+
+  /**
+   * Force refresh of portfolio data (clears cache)
+   */
+  async refreshPortfolioData(userId: string): Promise<void> {
+    // Clear all cache entries for this user
+    this.clearUserCache(userId);
+  }
+
+  /**
    * Health check for portfolio service
    */
-  async healthCheck(): Promise<{ status: string; timestamp: string }> {
+  async healthCheck(): Promise<{ status: string; timestamp: string; dataSource?: string }> {
     try {
       const response = await fetch(`${this.baseURL}/health`);
+      const brokerHealth = await brokerAPI.healthCheck();
+      
       return {
-        status: response.ok ? 'healthy' : 'unhealthy',
+        status: response.ok && brokerHealth ? 'healthy' : 'unhealthy',
         timestamp: new Date().toISOString(),
+        dataSource: this.useLiveData ? 'live_enabled' : 'mock_only'
       };
     } catch (error) {
       return {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
+        dataSource: 'unknown'
       };
     }
   }

@@ -6,127 +6,404 @@ import { config } from '../config/deployment.js';
 class BrokerAPIService {
     constructor() {
         this.baseURL = config.urls.backend;
-        this.endpoints = config.api.auth;
+        this.endpoints = {
+            ...config.api.auth,
+            // OAuth endpoints
+            setupOAuth: `${this.baseURL}/api/modules/auth/broker/setup-oauth`,
+            callback: `${this.baseURL}/api/modules/auth/broker/callback`,
+            refreshToken: `${this.baseURL}/api/modules/auth/broker/refresh-token`,
+            disconnect: `${this.baseURL}/api/modules/auth/broker/disconnect`,
+            status: `${this.baseURL}/api/modules/auth/broker/status`,
+            configs: `${this.baseURL}/api/modules/auth/broker/configs`,
+            reconnect: `${this.baseURL}/api/modules/auth/broker/reconnect`,
+            health: `${this.baseURL}/api/modules/auth/broker/health`
+        };
+        
+        // OAuth flow management
+        this.currentOAuthFlow = null;
+        this.oauthWindow = null;
+        this.oauthCheckInterval = null;
     }
 
     // Setup OAuth credentials and get OAuth URL
-    async setupOAuth(apiKey, apiSecret) {
-        const params = new URLSearchParams({
-            api_key: apiKey,
-            api_secret: apiSecret,
-            frontend_url: config.urls.frontend // Tell backend where to redirect
-        });
+    async setupOAuth(apiKey, apiSecret, userId) {
+        try {
+            const response = await fetch(this.endpoints.setupOAuth, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    api_key: apiKey,
+                    api_secret: apiSecret,
+                    user_id: userId,
+                    frontend_url: config.urls.frontend
+                })
+            });
 
-        const response = await fetch(`${this.endpoints.testOAuth}?${params}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || result.message || 'OAuth setup failed');
             }
-        });
 
-        if (!response.ok) {
-            throw new Error(`Backend setup failed: ${response.status}`);
+            // Store OAuth flow data
+            this.currentOAuthFlow = {
+                configId: result.data.config_id,
+                state: result.data.state,
+                oauthUrl: result.data.oauth_url,
+                redirectUri: result.data.redirect_uri
+            };
+
+            return result.data;
+        } catch (error) {
+            console.error('OAuth setup error:', error);
+            throw error;
         }
-
-        const result = await response.json();
-        
-        if (result.status !== 'success') {
-            throw new Error(result.message || 'OAuth setup failed');
-        }
-
-        return result;
     }
 
-    // Generate session from request token
-    async generateSession(requestToken, apiKey, apiSecret) {
-        const response = await fetch(this.endpoints.generateSession, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                request_token: requestToken,
-                api_key: apiKey,
-                api_secret: apiSecret
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Session generation failed: ${response.status}`);
-        }
-
-        const result = await response.json();
-        
-        if (result.status !== 'success') {
-            throw new Error(result.message || 'Session generation failed');
-        }
-
-        return result;
-    }
-
-    // Get session data by user ID
-    async getSession(userId) {
-        const response = await fetch(`${this.endpoints.getSession}?user_id=${userId}`);
-        
-        if (!response.ok) {
-            throw new Error(`Failed to fetch session: ${response.status}`);
-        }
-
-        const result = await response.json();
-        
-        if (result.status !== 'success') {
-            throw new Error(result.message || 'Failed to fetch session');
-        }
-
-        return result;
-    }
-
-    // Check broker connection status
-    async checkStatus(userId) {
-        const response = await fetch(`${this.endpoints.checkStatus}?user_id=${userId}`);
-        
-        if (!response.ok) {
-            throw new Error(`Status check failed: ${response.status}`);
-        }
-
-        const result = await response.json();
-        
-        if (result.status !== 'success') {
-            throw new Error(result.message || 'Status check failed');
-        }
-
-        return result;
-    }
-
-    // Invalidate session
-    async invalidateSession(userId) {
-        const response = await fetch(`${this.endpoints.invalidateSession}?user_id=${userId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
+    // Handle OAuth callback
+    async handleOAuthCallback(requestToken, state) {
+        try {
+            if (!this.currentOAuthFlow) {
+                throw new Error('No active OAuth flow found');
             }
-        });
 
-        if (!response.ok) {
-            throw new Error(`Session invalidation failed: ${response.status}`);
+            const response = await fetch(this.endpoints.callback, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    request_token: requestToken,
+                    state: state,
+                    config_id: this.currentOAuthFlow.configId
+                })
+            });
+
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || result.message || 'OAuth callback failed');
+            }
+
+            // Clear OAuth flow
+            this.currentOAuthFlow = null;
+
+            return result.data;
+        } catch (error) {
+            console.error('OAuth callback error:', error);
+            this.currentOAuthFlow = null;
+            throw error;
         }
+    }
 
-        const result = await response.json();
-        
-        if (result.status !== 'success') {
-            throw new Error(result.message || 'Session invalidation failed');
+    // Get broker configurations
+    async getBrokerConfigs(userId) {
+        try {
+            const response = await fetch(`${this.endpoints.configs}?user_id=${userId}`);
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to fetch broker configurations');
+            }
+
+            return result.data;
+        } catch (error) {
+            console.error('Get broker configs error:', error);
+            throw error;
         }
+    }
 
-        return result;
+    // Create or update broker configuration
+    async createBrokerConfig(userId, apiKey, apiSecret, brokerName = 'zerodha') {
+        try {
+            const response = await fetch(this.endpoints.configs, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: userId,
+                    api_key: apiKey,
+                    api_secret: apiSecret,
+                    broker_name: brokerName
+                })
+            });
+
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to create broker configuration');
+            }
+
+            return result.data;
+        } catch (error) {
+            console.error('Create broker config error:', error);
+            throw error;
+        }
+    }
+
+    // Check connection status
+    async checkConnectionStatus(configId = null, userId = null) {
+        try {
+            const params = new URLSearchParams();
+            if (configId) params.append('config_id', configId);
+            if (userId) params.append('user_id', userId);
+
+            const response = await fetch(`${this.endpoints.status}?${params}`);
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Status check failed');
+            }
+
+            return result.data;
+        } catch (error) {
+            console.error('Status check error:', error);
+            throw error;
+        }
+    }
+
+    // Refresh OAuth tokens
+    async refreshTokens(configId) {
+        try {
+            const response = await fetch(this.endpoints.refreshToken, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    config_id: configId
+                })
+            });
+
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || result.message || 'Token refresh failed');
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Token refresh error:', error);
+            throw error;
+        }
+    }
+
+    // Disconnect broker
+    async disconnectBroker(configId) {
+        try {
+            const response = await fetch(this.endpoints.disconnect, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    config_id: configId
+                })
+            });
+
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || result.message || 'Disconnect failed');
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Disconnect error:', error);
+            throw error;
+        }
+    }
+
+    // Reconnect broker
+    async reconnectBroker(configId) {
+        try {
+            const response = await fetch(this.endpoints.reconnect, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    config_id: configId
+                })
+            });
+
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || result.message || 'Reconnect failed');
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Reconnect error:', error);
+            throw error;
+        }
+    }
+
+    // Delete broker configuration
+    async deleteBrokerConfig(configId, userId) {
+        try {
+            const response = await fetch(`${this.endpoints.configs}/${configId}?user_id=${userId}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Delete failed');
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Delete config error:', error);
+            throw error;
+        }
+    }
+
+    // OAuth flow management
+    async initiateOAuthFlow(oauthUrl, onSuccess, onError, onCancel) {
+        try {
+            // Close any existing OAuth window
+            this.closeOAuthWindow();
+
+            // Open OAuth window
+            const windowFeatures = 'width=600,height=700,scrollbars=yes,resizable=yes,status=yes,location=yes';
+            this.oauthWindow = window.open(oauthUrl, 'oauth_window', windowFeatures);
+
+            if (!this.oauthWindow) {
+                throw new Error('Failed to open OAuth window. Please allow popups for this site.');
+            }
+
+            // Monitor OAuth window
+            this.monitorOAuthWindow(onSuccess, onError, onCancel);
+
+        } catch (error) {
+            console.error('OAuth flow initiation error:', error);
+            if (onError) onError(error);
+        }
+    }
+
+    monitorOAuthWindow(onSuccess, onError, onCancel) {
+        // Check if window is closed every second
+        this.oauthCheckInterval = setInterval(() => {
+            if (this.oauthWindow && this.oauthWindow.closed) {
+                this.cleanupOAuthFlow();
+                if (onCancel) onCancel();
+                return;
+            }
+
+            // Try to access window URL (will fail due to CORS until redirect)
+            try {
+                if (this.oauthWindow && this.oauthWindow.location.href.includes(config.urls.frontend)) {
+                    // OAuth completed, extract parameters
+                    const url = new URL(this.oauthWindow.location.href);
+                    const requestToken = url.searchParams.get('request_token');
+                    const state = url.searchParams.get('state');
+                    const status = url.searchParams.get('status');
+
+                    this.closeOAuthWindow();
+
+                    if (status === 'success' && requestToken && state) {
+                        // Handle successful OAuth
+                        this.handleOAuthCallback(requestToken, state)
+                            .then(result => {
+                                if (onSuccess) onSuccess(result);
+                            })
+                            .catch(error => {
+                                if (onError) onError(error);
+                            });
+                    } else {
+                        const error = new Error(url.searchParams.get('error') || 'OAuth authorization failed');
+                        if (onError) onError(error);
+                    }
+                }
+            } catch (e) {
+                // Expected CORS error while OAuth is in progress
+            }
+        }, 1000);
+
+        // Timeout after 5 minutes
+        setTimeout(() => {
+            if (this.oauthWindow && !this.oauthWindow.closed) {
+                this.closeOAuthWindow();
+                if (onError) onError(new Error('OAuth flow timed out'));
+            }
+        }, 5 * 60 * 1000);
+    }
+
+    closeOAuthWindow() {
+        if (this.oauthWindow) {
+            this.oauthWindow.close();
+            this.oauthWindow = null;
+        }
+        this.cleanupOAuthFlow();
+    }
+
+    cleanupOAuthFlow() {
+        if (this.oauthCheckInterval) {
+            clearInterval(this.oauthCheckInterval);
+            this.oauthCheckInterval = null;
+        }
+    }
+
+    // Get current OAuth flow
+    getCurrentOAuthFlow() {
+        return this.currentOAuthFlow;
+    }
+
+    // Clear OAuth flow
+    clearOAuthFlow() {
+        this.currentOAuthFlow = null;
+        this.closeOAuthWindow();
+    }
+
+    // Auto-refresh tokens for active connections
+    async startAutoTokenRefresh(configs, onRefresh) {
+        // Check every 30 minutes
+        setInterval(async () => {
+            for (const config of configs) {
+                if (config.isConnected && config.tokenStatus?.status === 'expiring_soon') {
+                    try {
+                        console.log(`Auto-refreshing tokens for config ${config.id}`);
+                        await this.refreshTokens(config.id);
+                        if (onRefresh) onRefresh(config.id);
+                    } catch (error) {
+                        console.error(`Auto token refresh failed for config ${config.id}:`, error);
+                    }
+                }
+            }
+        }, 30 * 60 * 1000);
+    }
+
+    // Connection status polling
+    async startStatusPolling(configId, interval = 60000, onStatusUpdate) {
+        const pollStatus = async () => {
+            try {
+                const status = await this.checkConnectionStatus(configId);
+                if (onStatusUpdate) onStatusUpdate(status);
+            } catch (error) {
+                console.error('Status polling error:', error);
+            }
+        };
+
+        // Initial check
+        await pollStatus();
+
+        // Set up interval
+        return setInterval(pollStatus, interval);
     }
 
     // Health check
     async healthCheck() {
         try {
-            const response = await fetch(config.api.health);
-            return response.ok;
+            const response = await fetch(this.endpoints.health);
+            const result = await response.json();
+            return result.success;
         } catch (error) {
-            console.warn('Backend health check failed:', error);
+            console.warn('Broker API health check failed:', error);
             return false;
         }
     }
