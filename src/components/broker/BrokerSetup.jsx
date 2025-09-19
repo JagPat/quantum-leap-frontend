@@ -547,7 +547,10 @@ export default function BrokerSetup({
       }
       
       // Generate session via API service
-      const result = await brokerAPI.generateSession(cleanRequestToken, apiKey, apiSecret);
+      const result = await brokerAPI.generateSession(cleanRequestToken, apiKey, apiSecret, {
+        userId: config.user_id || config.userId || localStorage.getItem('temp_user_id'),
+        configId: config.id
+      });
       console.log("📡 Backend response:", result);
 
       if (result.status === 'success') {

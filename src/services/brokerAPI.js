@@ -11,6 +11,7 @@ class BrokerAPIService {
             // OAuth endpoints
             setupOAuth: `${this.baseURL}/api/modules/auth/broker/setup-oauth`,
             callback: `${this.baseURL}/api/modules/auth/broker/callback`,
+            generateSession: `${this.baseURL}/api/modules/auth/broker/generate-session`,
             refreshToken: `${this.baseURL}/api/modules/auth/broker/refresh-token`,
             disconnect: `${this.baseURL}/api/modules/auth/broker/disconnect`,
             status: `${this.baseURL}/api/modules/auth/broker/status`,
@@ -140,6 +141,49 @@ class BrokerAPIService {
             return result.data;
         } catch (error) {
             console.error('Create broker config error:', error);
+            throw error;
+        }
+    }
+
+    // Generate broker session by exchanging request token
+    async generateSession(requestToken, apiKey, apiSecret, options = {}) {
+        try {
+            const payload = {
+                request_token: requestToken,
+                api_key: apiKey,
+                api_secret: apiSecret
+            };
+
+            if (options.userId) {
+                payload.user_id = options.userId;
+            }
+
+            if (options.configId) {
+                payload.config_id = options.configId;
+            }
+
+            const response = await fetch(this.endpoints.generateSession, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json().catch(() => ({}));
+
+            if (!response.ok || result.success === false) {
+                throw new Error(result.error || result.message || 'Failed to generate broker session');
+            }
+
+            const data = result.data || {};
+
+            return {
+                status: 'success',
+                ...data
+            };
+        } catch (error) {
+            console.error('Generate session error:', error);
             throw error;
         }
     }
