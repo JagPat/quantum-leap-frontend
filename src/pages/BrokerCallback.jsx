@@ -8,36 +8,57 @@ export default function BrokerCallback() {
 
     useEffect(() => {
         console.log('🔄 BrokerCallback: Starting callback processing...');
+        console.log('🔍 BrokerCallback: Window opener available:', !!window.opener);
+        console.log('🔍 BrokerCallback: Window opener closed:', window.opener?.closed);
+        console.log('🔍 BrokerCallback: Current origin:', window.location.origin);
         
         const urlParams = new URLSearchParams(window.location.search);
         const requestTokenParam = urlParams.get('request_token');
         const statusParam = urlParams.get('status');
         const userIdParam = urlParams.get('user_id');
         const errorParam = urlParams.get('error');
-        const parentOrigin = urlParams.get('parent_origin') || getParentOrigin();
+        const stateParam = urlParams.get('state');
         
         console.log('🔍 BrokerCallback: URL params:', {
             status: statusParam,
             request_token: requestTokenParam,
             user_id: userIdParam,
             error: errorParam,
-            parent_origin: parentOrigin
+            state: stateParam
         });
-        
-        // Clean, simple message sender
+
+        // Enhanced parent window detection and communication
         const sendToParent = (messageData) => {
-            if (!window.opener || window.opener.closed) {
-                console.error('❌ BrokerCallback: Parent window not available');
+            console.log('🔍 BrokerCallback: Checking parent window availability...');
+            
+            // Check if window.opener exists and is not closed
+            if (!window.opener) {
+                console.error('❌ BrokerCallback: window.opener is null');
+                setStatus('error');
+                setMessage('Authentication successful but failed to communicate with parent window.\nPlease close this window and try again from the main application.');
                 return false;
             }
             
+            if (window.opener.closed) {
+                console.error('❌ BrokerCallback: Parent window is closed');
+                setStatus('error');
+                setMessage('Parent window was closed. Please try again from the main application.');
+                return false;
+            }
+            
+            // Get the correct target origin
+            const targetOrigin = getTargetOrigin();
+            console.log('🎯 BrokerCallback: Using target origin:', targetOrigin);
+            
             try {
-                console.log(`📤 BrokerCallback: Sending message to parent (${parentOrigin}):`, messageData);
-                window.opener.postMessage(messageData, parentOrigin);
+                console.log(`📤 BrokerCallback: Sending message to parent:`, messageData);
+                window.opener.postMessage(messageData, targetOrigin);
                 console.log('✅ BrokerCallback: Message sent successfully');
                 return true;
             } catch (error) {
                 console.error('❌ BrokerCallback: Failed to send message to parent:', error);
+                setStatus('error');
+                setMessage('Authentication successful but failed to communicate with parent window.\nError: ' + error.message);
                 return false;
             }
         };
@@ -63,23 +84,37 @@ export default function BrokerCallback() {
             localStorage.setItem('broker_status', 'Connected');
             localStorage.setItem('broker_request_token', requestToken);
             
-            const success = sendToParent({
+            // Prepare comprehensive message data
+            const messageData = {
                 type: 'BROKER_AUTH_SUCCESS',
                 status: 'success',
                 requestToken: requestToken,
-                backend_exchange: true // Mark as complete since we have the token
-            });
+                state: stateParam,
+                backend_exchange: true,
+                timestamp: new Date().toISOString(),
+                source: 'broker-callback'
+            };
             
-            if (success) {
-                setStatus('success');
-                setMessage('Authentication successful! Connection established.');
-                setTimeout(() => {
-                    window.close();
-                }, 2000);
-            } else {
-                setStatus('error');
-                setMessage('Authentication successful but failed to communicate with parent window.\nPlease close this window and try again from the main application.');
-            }
+            console.log('📤 BrokerCallback: Preparing to send success message:', messageData);
+            
+            // Add a small delay to ensure parent window is ready
+            setTimeout(() => {
+                const success = sendToParent(messageData);
+                
+                if (success) {
+                    setStatus('success');
+                    setMessage('Authentication successful! Connection established.\nThis window will close automatically.');
+                    
+                    // Close window after a short delay
+                    setTimeout(() => {
+                        console.log('🔄 BrokerCallback: Closing popup window');
+                        window.close();
+                    }, 3000);
+                } else {
+                    setStatus('error');
+                    setMessage('Authentication successful but failed to communicate with parent window.\nPlease close this window and try again from the main application.');
+                }
+            }, 500); // 500ms delay to ensure parent is ready
         }
 
         function handleSuccessCallback(userId, sendToParent) {
@@ -189,26 +224,43 @@ export default function BrokerCallback() {
         
     }, []);
 
-    // Simple parent origin detection
-    function getParentOrigin() {
+    // Enhanced parent origin detection
+    function getTargetOrigin() {
+        // Always use the production frontend origin for consistency
+        const productionOrigin = 'https://quantum-leap-frontend-production.up.railway.app';
+        
+        // Check if we're on the same origin as production
+        if (window.location.origin === productionOrigin) {
+            console.log('🎯 BrokerCallback: Using same origin for postMessage');
+            return productionOrigin;
+        }
+        
+        // For development, try to detect parent origin safely
         try {
             if (window.opener && !window.opener.closed) {
-                return window.opener.location.origin;
+                // Try to access parent origin (will fail if cross-origin)
+                const parentOrigin = window.opener.location.origin;
+                console.log('🎯 BrokerCallback: Detected parent origin:', parentOrigin);
+                return parentOrigin;
             }
         } catch (securityError) {
-            console.warn('⚠️ BrokerCallback: Cross-origin restriction, using referrer fallback');
+            console.warn('⚠️ BrokerCallback: Cross-origin restriction, using fallback');
         }
         
         // Fallback to referrer
         if (document.referrer) {
             try {
-                return new URL(document.referrer).origin;
+                const referrerOrigin = new URL(document.referrer).origin;
+                console.log('🎯 BrokerCallback: Using referrer origin:', referrerOrigin);
+                return referrerOrigin;
             } catch (e) {
                 console.warn('⚠️ BrokerCallback: Invalid referrer URL');
             }
         }
         
-        return window.location.origin;
+        // Final fallback - use wildcard for development
+        console.log('🎯 BrokerCallback: Using wildcard origin for development');
+        return '*';
     }
 
     const getStatusIcon = () => {

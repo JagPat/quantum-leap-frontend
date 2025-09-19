@@ -46,23 +46,31 @@ export default function BrokerSetup({
 
   useEffect(() => {
     const handleAuthMessage = (event) => {
-        // CRITICAL FIX: Dynamic port support for OAuth callback
+        console.log("📨 [BrokerSetup] Received message from origin:", event.origin);
+        console.log("📨 [BrokerSetup] Message data:", event.data);
+        
+        // Enhanced origin validation - be more permissive for development
         const allowedOrigins = [
-            window.location.origin, // Current port (5175, 5174, 5173, etc.)
+            window.location.origin, // Current origin
+            'https://quantum-leap-frontend-production.up.railway.app', // Production frontend
             'https://web-production-de0bc.up.railway.app', // Production backend
-            'http://localhost:5173', // Legacy support
-            'http://localhost:5174', // Common dev ports  
-            'http://localhost:5175', // Current dev port
-            'http://localhost:3000', // Alternative dev port
+            'http://localhost:5173', // Vite dev server
+            'http://localhost:5174', // Alternative Vite port
+            'http://localhost:5175', // Alternative Vite port
+            'http://localhost:3000', // React dev server
             'http://localhost:8080'  // Alternative dev port
         ];
         
-        if (!allowedOrigins.includes(event.origin)) {
-            console.log("🚫 Message from blocked origin:", event.origin);
+        // For development, also allow any localhost origin
+        const isLocalhost = event.origin.includes('localhost') || event.origin.includes('127.0.0.1');
+        const isAllowedOrigin = allowedOrigins.includes(event.origin) || isLocalhost;
+        
+        if (!isAllowedOrigin) {
+            console.log("🚫 [BrokerSetup] Message from blocked origin:", event.origin);
             return;
         }
         
-        console.log("✅ Received message from allowed origin:", event.origin, event.data);
+        console.log("✅ [BrokerSetup] Message from allowed origin:", event.origin);
         
         if (event.data?.type === 'BROKER_AUTH_SUCCESS') {
             // Handle successful OAuth completion
@@ -252,8 +260,9 @@ export default function BrokerSetup({
       const authUrl = setupResult.oauth_url;
       
       console.log("🚀 [BrokerSetup] Opening OAuth popup with URL:", authUrl);
+      console.log("🔍 [BrokerSetup] Current origin:", window.location.origin);
       
-      const popup = window.open(authUrl, 'brokerAuth', 'width=800,height=600');
+      const popup = window.open(authUrl, 'brokerAuth', 'width=800,height=600,scrollbars=yes,resizable=yes');
       if (!popup) {
         setError("Popup blocked. Please allow popups for this site.");
         toast({
@@ -262,11 +271,23 @@ export default function BrokerSetup({
             variant: "destructive",
         });
       } else {
+        console.log("✅ [BrokerSetup] Popup opened successfully");
         toast({
           title: "OAuth Started",
           description: "Complete the authentication in the popup window.",
           variant: "default",
         });
+        
+        // Monitor popup for debugging
+        const checkPopup = setInterval(() => {
+          if (popup.closed) {
+            console.log("🔄 [BrokerSetup] Popup was closed");
+            clearInterval(checkPopup);
+          }
+        }, 1000);
+        
+        // Clear interval after 5 minutes
+        setTimeout(() => clearInterval(checkPopup), 300000);
       }
     } catch (e) {
       console.error("❌ [BrokerSetup] Error in handleCredentialsSubmit:", e);
