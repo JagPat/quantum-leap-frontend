@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { createPageUrl } from '@/utils';
+import { config as deploymentConfig } from '@/config/deployment.js';
 import brokerAPI from '../../services/brokerAPI.js';
 
 export default function BrokerSetup({ 
@@ -43,6 +44,14 @@ export default function BrokerSetup({
 
   // Add a derived flag for true connection
   const isTrulyConnected = (existingConfig?.is_connected && liveStatus?.backendConnected);
+
+  const getBackendBaseUrl = () => {
+    const envUrl = typeof import.meta !== 'undefined' && import.meta.env?.VITE_BACKEND_URL;
+    const baseUrl = envUrl && envUrl.length > 0 
+      ? envUrl
+      : (deploymentConfig?.urls?.backend || 'https://web-production-de0bc.up.railway.app');
+    return baseUrl.replace(/\/$/, '');
+  };
 
   useEffect(() => {
     const handleAuthMessage = (event) => {
@@ -139,58 +148,241 @@ export default function BrokerSetup({
   }, [toast]);
 
   // NEW: Handle backend-exchanged authentication
-  const handleBackendAuthSuccess = async (userId) => {
+  const normalizeBackendConfig = (payload, context = {}) => {
+    if (!payload) return null;
+
+    const connectionStatus = payload.connectionStatus || payload.connection_status || null;
+    const connectionValidation = payload.connectionValidation || payload.connection_validation || null;
+    const tokenStatus = payload.tokenStatus || payload.token_status || null;
+    const backendUserId = context.backendUserId || null;
+
+    const resolvedUserId = context.resolvedUserId || 
+      payload.user_id ||
+      payload.userId ||
+      payload.broker_user_id ||
+      payload.brokerUserId ||
+      connectionValidation?.userId ||
+      tokenStatus?.userId ||
+      backendUserId ||
+      null;
+
+    const isConnected = typeof payload.is_connected === 'boolean' ? payload.is_connected
+      : typeof payload.isConnected === 'boolean' ? payload.isConnected
+      : connectionStatus?.state === 'connected';
+
+    const brokerName = payload.broker_name || payload.brokerName || 'zerodha';
+    const apiKey = payload.api_key || payload.apiKey || context.apiKey || config?.api_key || '';
+
+    const accessToken = payload.access_token || payload.accessToken || null;
+    const sessionId = payload.session_id || payload.sessionId || payload.id || Date.now().toString();
+
+    const userData = payload.user_data || payload.userData || (resolvedUserId ? {
+      user_id: resolvedUserId,
+      user_name: connectionValidation?.userName || null,
+      user_shortname: connectionValidation?.userShortname || null,
+    } : null);
+
+    return {
+      resolvedUserId,
+      brokerConfig: {
+        id: sessionId,
+        broker_name: brokerName,
+        api_key: apiKey,
+        is_connected: !!isConnected,
+        connection_status: connectionStatus?.state || (isConnected ? 'connected' : 'pending'),
+        connectionStatus,
+        access_token: accessToken,
+        request_token: payload.request_token || payload.requestToken || context.requestToken || null,
+        user_data: userData,
+        backend_connection: {
+          connectionStatus,
+          connectionValidation,
+          tokenStatus,
+          lastSync: payload.lastSync || payload.last_sync || null,
+          updatedAt: payload.updatedAt || payload.updated_at || null,
+        }
+      }
+    };
+  };
+
+  const attemptFetchBackendConfig = async (candidateId, backendUserId) => {
+    const backendBaseUrl = getBackendBaseUrl();
+    const candidateLabel = candidateId || 'unknown';
+
+    const endpoints = [
+      {
+        url: `${backendBaseUrl}/api/modules/auth/broker/status?user_id=${encodeURIComponent(candidateId)}`,
+        parser: async (payload) => {
+          if (payload?.success && payload.data) {
+            const normalized = normalizeBackendConfig({ ...payload.data, id: payload.data.configId }, { backendUserId, resolvedUserId: candidateId });
+            if (normalized?.brokerConfig?.is_connected) {
+              return normalized;
+            }
+          }
+          return null;
+        }
+      },
+      {
+        url: `${backendBaseUrl}/api/modules/auth/broker/configs?user_id=${encodeURIComponent(candidateId)}`,
+        parser: async (payload) => {
+          if (payload?.success && Array.isArray(payload.data)) {
+            const configMatch = payload.data.find((item) => {
+              const name = item.brokerName || item.broker_name;
+              const connected = typeof item.isConnected === 'boolean' ? item.isConnected : item.connectionStatus?.state === 'connected';
+              return (name || '').toLowerCase() === 'zerodha' && connected;
+            }) || payload.data[0];
+
+            if (configMatch) {
+              const normalized = normalizeBackendConfig(configMatch, { backendUserId, resolvedUserId: candidateId });
+              if (normalized?.brokerConfig) {
+                return normalized;
+              }
+            }
+          }
+          return null;
+        }
+      },
+      {
+        url: `${backendBaseUrl}/broker/session?user_id=${encodeURIComponent(candidateId)}`,
+        parser: async (payload) => {
+          if (!payload) return null;
+          const statusSuccess = payload.status === 'success' || payload.success === true;
+          const isConnected = payload.is_connected || payload.isConnected || payload.data?.is_connected;
+
+          if (statusSuccess && isConnected) {
+            const normalized = normalizeBackendConfig({
+              ...payload,
+              ...payload.data,
+            }, { backendUserId, resolvedUserId: candidateId });
+            if (normalized?.brokerConfig) {
+              return normalized;
+            }
+          }
+          return null;
+        }
+      }
+    ];
+
+    let lastError = null;
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`🌐 [BrokerSetup] (${candidateLabel}) Fetching backend config from:`, endpoint.url);
+        const response = await fetch(endpoint.url, {
+          headers: {
+            'X-User-ID': candidateId,
+          },
+          credentials: 'include',
+        });
+
+        let payload = null;
+        try {
+          payload = await response.json();
+        } catch (parseError) {
+          throw new Error(`Invalid JSON response (${response.status})`);
+        }
+
+        console.log(`📡 [BrokerSetup] (${candidateLabel}) Response from backend:`, payload);
+
+        if (!response.ok) {
+          throw new Error(payload?.message || payload?.error || `HTTP ${response.status}`);
+        }
+
+        const parsed = await endpoint.parser(payload);
+        if (parsed?.brokerConfig) {
+          return parsed;
+        }
+
+        lastError = new Error('Response received but connection not confirmed yet.');
+      } catch (error) {
+        console.error(`❌ [BrokerSetup] (${candidateLabel}) Fetch failed:`, error);
+        lastError = error;
+      }
+    }
+
+    throw lastError || new Error('No session data found');
+  };
+
+  const handleBackendAuthSuccess = async (backendUserId) => {
     setIsConnecting(true);
     setError('');
     
     try {
-      console.log("🔍 [BrokerSetup] Fetching session data for user:", userId);
-      
-      // Fetch session data from backend
-      const response = await fetch(`https://web-production-de0bc.up.railway.app/broker/session?user_id=${userId}`);
-      const sessionData = await response.json();
-      
-      console.log("📡 [BrokerSetup] Session data response:", sessionData);
-      
-      if (sessionData.status === 'success' && sessionData.is_connected) {
-        // Create broker config from session data
-        const brokerConfig = {
-          id: Date.now().toString(),
-          broker_name: 'zerodha',
-          api_key: sessionData.user_data.api_key,
-          user_data: sessionData.user_data,
-          access_token: sessionData.access_token,
-          is_connected: true,
-          connection_status: 'connected',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        
-        console.log("✅ [BrokerSetup] Created broker config:", brokerConfig);
-        
-        // Save to localStorage
-        const existingConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-        const updatedConfigs = existingConfigs.filter(c => c.broker_name !== 'zerodha');
-        updatedConfigs.push(brokerConfig);
-        localStorage.setItem('brokerConfigs', JSON.stringify(updatedConfigs));
-        
-        // Notify parent component
-        await onConfigSaved(brokerConfig);
-        
-        toast({
-          title: "Connection Successful",
-          description: `Connected to Zerodha as ${sessionData.user_data.user_name || sessionData.user_data.user_id}`,
-          variant: "success",
-        });
-        
-        setStep('connected');
-        
-        // Trigger connection complete callback
-        if (onConnectionComplete) {
-          onConnectionComplete(brokerConfig);
+      const candidateUserIds = Array.from(new Set([
+        localStorage.getItem('temp_user_id'),
+        backendUserId,
+        config?.user_data?.user_id,
+      ].filter(Boolean)));
+
+      if (candidateUserIds.length === 0) {
+        throw new Error('Unable to determine session identifier. Please restart the authentication flow.');
+      }
+
+      console.log('🔍 [BrokerSetup] Attempting to fetch session data. Candidates:', candidateUserIds);
+
+      let resolvedUserId = null;
+      let brokerConfigPayload = null;
+
+      for (const candidateId of candidateUserIds) {
+        try {
+          const result = await attemptFetchBackendConfig(candidateId, backendUserId);
+          if (result?.brokerConfig) {
+            brokerConfigPayload = result.brokerConfig;
+            resolvedUserId = result.resolvedUserId || candidateId;
+            break;
+          }
+        } catch (candidateError) {
+          console.error(`❌ [BrokerSetup] Session fetch failed for ${candidateId}:`, candidateError);
         }
-      } else {
-        throw new Error(sessionData.message || 'Failed to retrieve session data');
+      }
+
+      if (!brokerConfigPayload) {
+        throw new Error('Failed to retrieve session data');
+      }
+
+      if (resolvedUserId) {
+        localStorage.setItem('temp_user_id', resolvedUserId);
+      }
+
+      const connectedUserId = brokerConfigPayload.user_data?.user_id || resolvedUserId || backendUserId;
+
+      const normalizedBrokerConfig = {
+        ...config,
+        ...brokerConfigPayload,
+        id: brokerConfigPayload.id || Date.now().toString(),
+        broker_name: brokerConfigPayload.broker_name || 'zerodha',
+        api_key: brokerConfigPayload.api_key || config.api_key,
+        is_connected: true,
+        connection_status: 'connected',
+        user_id: connectedUserId,
+        broker_user_id: backendUserId || connectedUserId,
+        updated_at: new Date().toISOString()
+      };
+
+      console.log('✅ [BrokerSetup] Normalized broker config:', normalizedBrokerConfig);
+
+      setConfig(prev => ({
+        ...prev,
+        ...normalizedBrokerConfig,
+      }));
+
+      const existingConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
+      const updatedConfigs = existingConfigs.filter(c => c.broker_name !== 'zerodha');
+      updatedConfigs.push(normalizedBrokerConfig);
+      localStorage.setItem('brokerConfigs', JSON.stringify(updatedConfigs));
+
+      await onConfigSaved(normalizedBrokerConfig);
+
+      toast({
+        title: 'Connection Successful',
+        description: connectedUserId ? `Connected to Zerodha as ${connectedUserId}` : 'Broker connection completed successfully.',
+        variant: 'success',
+      });
+
+      setStep('connected');
+
+      if (onConnectionComplete) {
+        onConnectionComplete(normalizedBrokerConfig);
       }
     } catch (error) {
       console.error("❌ [BrokerSetup] Backend auth error:", error);
@@ -213,7 +405,7 @@ export default function BrokerSetup({
 
   const getBackendRedirectUrl = () => {
     // CRITICAL FIX: This should point to our Railway backend with correct auth prefix
-    return 'https://web-production-de0bc.up.railway.app/broker/callback';
+    return `${getBackendBaseUrl()}/broker/callback`;
   };
 
   const brokerInfo = {

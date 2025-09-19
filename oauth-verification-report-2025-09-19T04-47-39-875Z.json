@@ -1,0 +1,1748 @@
+{
+  "metadata": {
+    "timestamp": "2025-09-19T04:47:39.876Z",
+    "executionTime": 43494,
+    "version": "1.0.0",
+    "generator": "OAuth Deployment Verification System"
+  },
+  "summary": {
+    "overallScore": 87,
+    "totalTests": 84,
+    "totalPassed": 73,
+    "totalFailed": 24,
+    "successRate": 87,
+    "issueCount": {
+      "critical": 0,
+      "high": 4,
+      "medium": 9,
+      "low": 0
+    }
+  },
+  "verificationResults": {
+    "Database Schema Verification": false,
+    "OAuth Endpoint Verification": {
+      "success": false,
+      "results": {
+        "deployment": {
+          "healthy": true,
+          "info": {
+            "appVersion": "2.0.0",
+            "uptime": 371.216218216,
+            "timestamp": "2025-09-19T04:47:24.052Z",
+            "authModuleLoaded": true,
+            "deploymentTimestamp": "2025-09-19T04:47:24.360Z"
+          },
+          "checksPasssed": 3,
+          "totalChecks": 3
+        },
+        "fixes": {
+          "passed": 3,
+          "total": 3,
+          "allFixed": true
+        },
+        "userIdHandling": {
+          "passed": 0,
+          "total": 3,
+          "allPassed": false
+        },
+        "endpoints": {
+          "passed": 6,
+          "total": 9,
+          "allPassed": false
+        }
+      },
+      "metrics": {
+        "totalTests": 18,
+        "passedTests": 12,
+        "failedTests": 6,
+        "testResults": [
+          {
+            "name": "Application Health Check",
+            "path": "/health",
+            "method": "GET",
+            "expectedStatus": 200,
+            "actualStatus": 200,
+            "responseTime": 88.08712500000001,
+            "success": true,
+            "validationResult": {
+              "valid": true,
+              "message": "Application is ready"
+            },
+            "timestamp": "2025-09-19T04:47:04.226Z"
+          },
+          {
+            "name": "Auth Module Debug Endpoint",
+            "path": "/api/modules/auth/debug",
+            "method": "GET",
+            "expectedStatus": 200,
+            "actualStatus": 200,
+            "responseTime": 88.3623749999997,
+            "success": true,
+            "validationResult": {
+              "valid": true,
+              "message": "Auth module debug endpoint accessible"
+            },
+            "timestamp": "2025-09-19T04:47:04.315Z"
+          },
+          {
+            "name": "OAuth Health Check",
+            "path": "/api/modules/auth/broker/health",
+            "method": "GET",
+            "expectedStatus": 200,
+            "actualStatus": 200,
+            "responseTime": 625.3319999999994,
+            "success": true,
+            "validationResult": {
+              "valid": true,
+              "message": "OAuth health check passed"
+            },
+            "timestamp": "2025-09-19T04:47:04.940Z"
+          },
+          {
+            "name": "Valid OAuth Setup Request (Complete)",
+            "path": "/api/modules/auth/broker/setup-oauth",
+            "method": "POST",
+            "expectedStatus": 200,
+            "actualStatus": 500,
+            "responseTime": 152.55874999999833,
+            "success": false,
+            "validationResult": null,
+            "timestamp": "2025-09-19T04:47:05.093Z"
+          },
+          {
+            "name": "OAuth Setup Without user_id (Auto-generation Test)",
+            "path": "/api/modules/auth/broker/setup-oauth",
+            "method": "POST",
+            "expectedStatus": 200,
+            "actualStatus": 500,
+            "responseTime": 145.21604099999968,
+            "success": false,
+            "validationResult": null,
+            "timestamp": "2025-09-19T04:47:05.239Z"
+          },
+          {
+            "name": "Invalid OAuth Setup (Missing api_key)",
+            "path": "/api/modules/auth/broker/setup-oauth",
+            "method": "POST",
+            "expectedStatus": 400,
+            "actualStatus": 400,
+            "responseTime": 96.4027500000011,
+            "success": true,
+            "validationResult": {
+              "valid": true,
+              "message": "Proper validation error for missing api_key"
+            },
+            "timestamp": "2025-09-19T04:47:05.335Z"
+          },
+          {
+            "name": "Invalid OAuth Setup (Missing api_secret)",
+            "path": "/api/modules/auth/broker/setup-oauth",
+            "method": "POST",
+            "expectedStatus": 400,
+            "actualStatus": 400,
+            "responseTime": 121.31658299999981,
+            "success": true,
+            "validationResult": {
+              "valid": true,
+              "message": "Proper validation error for missing api_secret"
+            },
+            "timestamp": "2025-09-19T04:47:05.457Z"
+          },
+          {
+            "name": "Invalid OAuth Setup (Empty Payload)",
+            "path": "/api/modules/auth/broker/setup-oauth",
+            "method": "POST",
+            "expectedStatus": 400,
+            "actualStatus": 400,
+            "responseTime": 89.27220800000032,
+            "success": true,
+            "validationResult": {
+              "valid": true,
+              "message": "Proper error handling for empty payload"
+            },
+            "timestamp": "2025-09-19T04:47:05.547Z"
+          },
+          {
+            "name": "OAuth Status Check",
+            "path": "/api/modules/auth/broker/status?user_id=comprehensive_test_user",
+            "method": "GET",
+            "expectedStatus": 200,
+            "actualStatus": 500,
+            "responseTime": 95.67774999999892,
+            "success": false,
+            "validationResult": null,
+            "timestamp": "2025-09-19T04:47:05.643Z"
+          },
+          {
+            "name": "Application Health Check",
+            "path": "/health",
+            "method": "GET",
+            "expectedStatus": 200,
+            "actualStatus": 200,
+            "responseTime": 76.39266599999974,
+            "success": true,
+            "validationResult": {
+              "valid": true,
+              "message": "Application is ready"
+            },
+            "timestamp": "2025-09-19T04:47:25.858Z"
+          },
+          {
+            "name": "Auth Module Debug Endpoint",
+            "path": "/api/modules/auth/debug",
+            "method": "GET",
+            "expectedStatus": 200,
+            "actualStatus": 200,
+            "responseTime": 79.96029199999975,
+            "success": true,
+            "validationResult": {
+              "valid": true,
+              "message": "Auth module debug endpoint accessible"
+            },
+            "timestamp": "2025-09-19T04:47:25.938Z"
+          },
+          {
+            "name": "OAuth Health Check",
+            "path": "/api/modules/auth/broker/health",
+            "method": "GET",
+            "expectedStatus": 200,
+            "actualStatus": 200,
+            "responseTime": 515.4751670000005,
+            "success": true,
+            "validationResult": {
+              "valid": true,
+              "message": "OAuth health check passed"
+            },
+            "timestamp": "2025-09-19T04:47:26.454Z"
+          },
+          {
+            "name": "Valid OAuth Setup Request (Complete)",
+            "path": "/api/modules/auth/broker/setup-oauth",
+            "method": "POST",
+            "expectedStatus": 200,
+            "actualStatus": 500,
+            "responseTime": 128.57329200000095,
+            "success": false,
+            "validationResult": null,
+            "timestamp": "2025-09-19T04:47:26.583Z"
+          },
+          {
+            "name": "OAuth Setup Without user_id (Auto-generation Test)",
+            "path": "/api/modules/auth/broker/setup-oauth",
+            "method": "POST",
+            "expectedStatus": 200,
+            "actualStatus": 500,
+            "responseTime": 130.75183299999844,
+            "success": false,
+            "validationResult": null,
+            "timestamp": "2025-09-19T04:47:26.714Z"
+          },
+          {
+            "name": "Invalid OAuth Setup (Missing api_key)",
+            "path": "/api/modules/auth/broker/setup-oauth",
+            "method": "POST",
+            "expectedStatus": 400,
+            "actualStatus": 400,
+            "responseTime": 77.02504099999715,
+            "success": true,
+            "validationResult": {
+              "valid": true,
+              "message": "Proper validation error for missing api_key"
+            },
+            "timestamp": "2025-09-19T04:47:26.791Z"
+          },
+          {
+            "name": "Invalid OAuth Setup (Missing api_secret)",
+            "path": "/api/modules/auth/broker/setup-oauth",
+            "method": "POST",
+            "expectedStatus": 400,
+            "actualStatus": 400,
+            "responseTime": 74.29383299999972,
+            "success": true,
+            "validationResult": {
+              "valid": true,
+              "message": "Proper validation error for missing api_secret"
+            },
+            "timestamp": "2025-09-19T04:47:26.866Z"
+          },
+          {
+            "name": "Invalid OAuth Setup (Empty Payload)",
+            "path": "/api/modules/auth/broker/setup-oauth",
+            "method": "POST",
+            "expectedStatus": 400,
+            "actualStatus": 400,
+            "responseTime": 74.03904200000034,
+            "success": true,
+            "validationResult": {
+              "valid": true,
+              "message": "Proper error handling for empty payload"
+            },
+            "timestamp": "2025-09-19T04:47:26.940Z"
+          },
+          {
+            "name": "OAuth Status Check",
+            "path": "/api/modules/auth/broker/status?user_id=comprehensive_test_user",
+            "method": "GET",
+            "expectedStatus": 200,
+            "actualStatus": 500,
+            "responseTime": 76.58204100000148,
+            "success": false,
+            "validationResult": null,
+            "timestamp": "2025-09-19T04:47:27.017Z"
+          }
+        ],
+        "startTime": 17.135292,
+        "deploymentInfo": {
+          "appVersion": "2.0.0",
+          "uptime": 371.216218216,
+          "timestamp": "2025-09-19T04:47:24.052Z",
+          "authModuleLoaded": true,
+          "deploymentTimestamp": "2025-09-19T04:47:24.360Z"
+        }
+      }
+    },
+    "Production Health Monitoring": {
+      "healthy": true,
+      "results": {
+        "setupOAuth": {
+          "endpoint": "/api/modules/auth/broker/setup-oauth",
+          "passed": 3,
+          "total": 3,
+          "healthy": true,
+          "results": [
+            {
+              "name": "Endpoint Availability (404 Check)",
+              "success": true,
+              "details": {
+                "status": 400,
+                "available": true,
+                "responseTime": 74.06920799999716,
+                "timestamp": "2025-09-19T04:47:27.092Z"
+              },
+              "responseTime": 74.06920799999716
+            },
+            {
+              "name": "Valid Request Processing",
+              "success": "invalid input syntax for type uuid: \"health_check_user\"",
+              "details": {
+                "status": 500,
+                "validProcessing": "invalid input syntax for type uuid: \"health_check_user\"",
+                "response": {
+                  "success": false,
+                  "error": "Failed to setup OAuth",
+                  "message": "invalid input syntax for type uuid: \"health_check_user\""
+                },
+                "responseTime": 131.48862500000178,
+                "timestamp": "2025-09-19T04:47:27.224Z"
+              },
+              "responseTime": 131.48862500000178
+            },
+            {
+              "name": "Invalid Request Data Detection",
+              "success": true,
+              "details": {
+                "status": 400,
+                "properErrorHandling": true,
+                "errorMessage": "Invalid request data",
+                "responseTime": 72.8269169999985,
+                "timestamp": "2025-09-19T04:47:27.297Z"
+              },
+              "responseTime": 72.8269169999985
+            }
+          ]
+        },
+        "brokerHealth": {
+          "endpoint": "/api/modules/auth/broker/health",
+          "passed": 3,
+          "total": 3,
+          "healthy": true,
+          "results": [
+            {
+              "name": "Endpoint Availability",
+              "success": true,
+              "details": {
+                "status": 200,
+                "available": true,
+                "responseTime": 565.682708999997,
+                "timestamp": "2025-09-19T04:47:27.863Z"
+              },
+              "responseTime": 565.682708999997
+            },
+            {
+              "name": "Successful Health Status",
+              "success": true,
+              "details": {
+                "status": 200,
+                "successField": true,
+                "healthData": {
+                  "status": "healthy",
+                  "brokerService": "operational",
+                  "components": {
+                    "brokerConfigs": {
+                      "status": "healthy",
+                      "configCount": 0,
+                      "timestamp": "2025-09-19T04:47:28.363Z"
+                    },
+                    "tokenManager": {
+                      "status": "healthy",
+                      "tokenManager": "operational",
+                      "components": {
+                        "oauthTokens": {
+                          "status": "healthy",
+                          "totalTokens": 0,
+                          "expiredTokens": 0,
+                          "expiringSoon": 0,
+                          "timestamp": "2025-09-19T04:47:28.364Z"
+                        },
+                        "brokerConfigs": {
+                          "status": "healthy",
+                          "configCount": 0,
+                          "timestamp": "2025-09-19T04:47:28.366Z"
+                        },
+                        "kiteClient": {
+                          "status": "healthy",
+                          "kiteApiReachable": true,
+                          "statusCode": 429,
+                          "timestamp": "2025-09-19T04:47:28.399Z"
+                        }
+                      },
+                      "refreshJob": "running",
+                      "timestamp": "2025-09-19T04:47:28.399Z"
+                    },
+                    "kiteClient": {
+                      "status": "healthy",
+                      "kiteApiReachable": true,
+                      "statusCode": 429,
+                      "timestamp": "2025-09-19T04:47:28.423Z"
+                    }
+                  },
+                  "monitoring": "active",
+                  "timestamp": "2025-09-19T04:47:28.423Z"
+                },
+                "responseTime": 604.9340840000004,
+                "timestamp": "2025-09-19T04:47:28.468Z"
+              },
+              "responseTime": 604.9340840000004
+            },
+            {
+              "name": "Response Format Validation",
+              "success": true,
+              "details": {
+                "status": 200,
+                "validFormat": true,
+                "hasSuccessField": true,
+                "hasDataField": true,
+                "responseTime": 544.1032080000004,
+                "timestamp": "2025-09-19T04:47:29.012Z"
+              },
+              "responseTime": 544.1032080000004
+            }
+          ]
+        },
+        "statusFormats": {
+          "passed": 4,
+          "total": 4,
+          "healthy": true,
+          "results": [
+            {
+              "name": "Application Health Status",
+              "success": true,
+              "details": {
+                "endpoint": "/health",
+                "expectedStatus": 200,
+                "actualStatus": 200,
+                "statusCorrect": true,
+                "formatValid": true,
+                "responseTime": 73.98704099999668,
+                "timestamp": "2025-09-19T04:47:29.086Z"
+              },
+              "responseTime": 73.98704099999668
+            },
+            {
+              "name": "Auth Module Debug Status",
+              "success": true,
+              "details": {
+                "endpoint": "/api/modules/auth/debug",
+                "expectedStatus": 200,
+                "actualStatus": 200,
+                "statusCorrect": true,
+                "formatValid": true,
+                "responseTime": 76.53729200000089,
+                "timestamp": "2025-09-19T04:47:29.163Z"
+              },
+              "responseTime": 76.53729200000089
+            },
+            {
+              "name": "OAuth Health Status",
+              "success": true,
+              "details": {
+                "endpoint": "/api/modules/auth/broker/health",
+                "expectedStatus": 200,
+                "actualStatus": 200,
+                "statusCorrect": true,
+                "formatValid": true,
+                "responseTime": 558.3104999999996,
+                "timestamp": "2025-09-19T04:47:29.722Z"
+              },
+              "responseTime": 558.3104999999996
+            },
+            {
+              "name": "OAuth Setup Bad Request Status",
+              "success": true,
+              "details": {
+                "endpoint": "/api/modules/auth/broker/setup-oauth",
+                "expectedStatus": 400,
+                "actualStatus": 400,
+                "statusCorrect": true,
+                "formatValid": true,
+                "responseTime": 73.51966600000014,
+                "timestamp": "2025-09-19T04:47:29.795Z"
+              },
+              "responseTime": 73.51966600000014
+            }
+          ]
+        },
+        "errorAnalysis": {
+          "passed": 3,
+          "total": 3,
+          "healthy": true,
+          "results": [
+            {
+              "name": "Invalid Request Data Error Detection",
+              "success": true,
+              "details": {
+                "hasInvalidRequestDataError": true,
+                "status": 400,
+                "errorMessage": "Invalid request data",
+                "responseTime": 75.02795799999876
+              }
+            },
+            {
+              "name": "Missing Required Fields Error",
+              "success": true,
+              "details": {
+                "hasProperValidationError": true,
+                "status": 400,
+                "errorMessage": "Invalid request data",
+                "details": "\"api_key\" is required",
+                "responseTime": 78.16137500000332
+              }
+            },
+            {
+              "name": "Database Connection Error Handling",
+              "success": true,
+              "details": {
+                "hasProperDbErrorHandling": "invalid input syntax for type uuid: \"error_test_user\"",
+                "status": 500,
+                "errorMessage": "Failed to setup OAuth",
+                "responseTime": 127.11358299999847
+              }
+            }
+          ]
+        }
+      },
+      "metrics": {
+        "totalChecks": 13,
+        "successfulChecks": 13,
+        "failedChecks": 0,
+        "endpointStatus": {
+          "setupOAuth": true,
+          "brokerHealth": true,
+          "statusFormats": true,
+          "errorHandling": true
+        },
+        "responseTimeHistory": [
+          227.78982384615344,
+          213.4968653846148
+        ],
+        "errorHistory": [],
+        "startTime": 17.830625,
+        "lastCheckTime": "2025-09-19T04:47:27.018Z"
+      },
+      "summary": {
+        "totalTests": 13,
+        "totalPassed": 13,
+        "healthScore": 100,
+        "avgResponseTime": 213,
+        "executionTime": 33699
+      }
+    },
+    "End-to-End OAuth Verification": {
+      "success": false,
+      "results": {
+        "frontend": {
+          "phase": "Frontend Loading",
+          "passed": 0,
+          "total": 2,
+          "healthy": false,
+          "results": [
+            {
+              "name": "Frontend Accessibility",
+              "success": false,
+              "details": {
+                "status": 404,
+                "accessible": false,
+                "contentType": "application/json",
+                "responseTime": 714.4769579999993,
+                "timestamp": "2025-09-19T04:47:30.791Z"
+              },
+              "responseTime": 714.4769579999993
+            },
+            {
+              "name": "Broker Setup Interface Detection",
+              "success": false,
+              "details": {
+                "status": 404,
+                "hasSetupInterface": false,
+                "contentLength": 0,
+                "responseTime": 72.33974999999919,
+                "timestamp": "2025-09-19T04:47:30.864Z"
+              },
+              "responseTime": 72.33974999999919
+            }
+          ]
+        },
+        "oauth": {
+          "phase": "OAuth URL Generation",
+          "passed": 0,
+          "total": 2,
+          "healthy": false,
+          "results": [
+            {
+              "name": "Valid OAuth URL Generation",
+              "success": false,
+              "details": {
+                "status": 500,
+                "hasOAuthURL": false,
+                "responseTime": 153.32179200000246,
+                "timestamp": "2025-09-19T04:47:31.018Z"
+              },
+              "responseTime": 153.32179200000246
+            },
+            {
+              "name": "OAuth URL Structure Validation",
+              "success": false,
+              "details": {
+                "error": "No OAuth URL available from previous test",
+                "responseTime": 0
+              },
+              "responseTime": 0
+            }
+          ]
+        },
+        "state": {
+          "phase": "CSRF State Storage",
+          "passed": 0,
+          "total": 2,
+          "healthy": false,
+          "results": [
+            {
+              "name": "OAuth State Generation and Storage",
+              "success": false,
+              "details": {
+                "error": "No OAuth state or user ID available from previous test",
+                "responseTime": 0
+              },
+              "responseTime": 0
+            },
+            {
+              "name": "State Parameter Validation",
+              "success": false,
+              "details": {
+                "error": "No OAuth state available from previous test",
+                "responseTime": 0
+              },
+              "responseTime": 0
+            }
+          ]
+        },
+        "callback": {
+          "phase": "OAuth Callback Handling",
+          "passed": 0,
+          "total": 2,
+          "healthy": false,
+          "results": [
+            {
+              "name": "Callback Endpoint Availability",
+              "success": false,
+              "details": {
+                "status": 404,
+                "available": false,
+                "response": {
+                  "error": "Route not found",
+                  "path": "/api/modules/auth/broker/callback?request_token=test&state=test",
+                  "server": "modular",
+                  "port": "8080"
+                },
+                "responseTime": 75.54945800000132,
+                "timestamp": "2025-09-19T04:47:31.094Z"
+              },
+              "responseTime": 75.54945800000132
+            },
+            {
+              "name": "Connection Status Update Capability",
+              "success": false,
+              "details": {
+                "error": "No user ID available from previous test",
+                "responseTime": 0
+              },
+              "responseTime": 0
+            }
+          ]
+        }
+      },
+      "metrics": {
+        "totalTests": 8,
+        "passedTests": 0,
+        "failedTests": 8,
+        "testResults": [
+          {
+            "phase": "Frontend Loading",
+            "name": "Frontend Accessibility",
+            "success": false,
+            "details": {
+              "status": 404,
+              "accessible": false,
+              "contentType": "application/json",
+              "responseTime": 714.4769579999993,
+              "timestamp": "2025-09-19T04:47:30.791Z"
+            },
+            "responseTime": 714.4769579999993
+          },
+          {
+            "phase": "Frontend Loading",
+            "name": "Broker Setup Interface Detection",
+            "success": false,
+            "details": {
+              "status": 404,
+              "hasSetupInterface": false,
+              "contentLength": 0,
+              "responseTime": 72.33974999999919,
+              "timestamp": "2025-09-19T04:47:30.864Z"
+            },
+            "responseTime": 72.33974999999919
+          },
+          {
+            "phase": "OAuth URL Generation",
+            "name": "Valid OAuth URL Generation",
+            "success": false,
+            "details": {
+              "status": 500,
+              "hasOAuthURL": false,
+              "responseTime": 153.32179200000246,
+              "timestamp": "2025-09-19T04:47:31.018Z"
+            },
+            "responseTime": 153.32179200000246
+          },
+          {
+            "phase": "OAuth URL Generation",
+            "name": "OAuth URL Structure Validation",
+            "success": false,
+            "details": {
+              "error": "No OAuth URL available from previous test",
+              "responseTime": 0
+            },
+            "responseTime": 0
+          },
+          {
+            "phase": "CSRF State Storage",
+            "name": "OAuth State Generation and Storage",
+            "success": false,
+            "details": {
+              "error": "No OAuth state or user ID available from previous test",
+              "responseTime": 0
+            },
+            "responseTime": 0
+          },
+          {
+            "phase": "CSRF State Storage",
+            "name": "State Parameter Validation",
+            "success": false,
+            "details": {
+              "error": "No OAuth state available from previous test",
+              "responseTime": 0
+            },
+            "responseTime": 0
+          },
+          {
+            "phase": "OAuth Callback Handling",
+            "name": "Callback Endpoint Availability",
+            "success": false,
+            "details": {
+              "status": 404,
+              "available": false,
+              "response": {
+                "error": "Route not found",
+                "path": "/api/modules/auth/broker/callback?request_token=test&state=test",
+                "server": "modular",
+                "port": "8080"
+              },
+              "responseTime": 75.54945800000132,
+              "timestamp": "2025-09-19T04:47:31.094Z"
+            },
+            "responseTime": 75.54945800000132
+          },
+          {
+            "phase": "OAuth Callback Handling",
+            "name": "Connection Status Update Capability",
+            "success": false,
+            "details": {
+              "error": "No user ID available from previous test",
+              "responseTime": 0
+            },
+            "responseTime": 0
+          }
+        ],
+        "startTime": 18.329,
+        "oauthFlowData": null
+      },
+      "summary": {
+        "totalTests": 8,
+        "totalPassed": 0,
+        "successRate": 0,
+        "avgResponseTime": 127,
+        "executionTime": 34716,
+        "phasesPasssed": 0,
+        "totalPhases": 4
+      }
+    },
+    "Error Handling Verification": {
+      "success": false,
+      "results": {
+        "credentials": {
+          "phase": "Invalid Credential Handling",
+          "passed": 3,
+          "total": 4,
+          "healthy": false,
+          "results": [
+            {
+              "name": "Missing API Key Validation",
+              "success": true,
+              "details": {
+                "status": 400,
+                "hasValidationError": true,
+                "hasApiKeyError": true,
+                "isClearMessage": true,
+                "errorMessage": "Invalid request data",
+                "errorDetails": "\"api_key\" is required",
+                "responseTime": 72.94020799999998
+              },
+              "responseTime": 72.94020799999998
+            },
+            {
+              "name": "Missing API Secret Validation",
+              "success": false,
+              "details": {
+                "status": 400,
+                "hasValidationError": true,
+                "hasApiSecretError": false,
+                "isClearMessage": true,
+                "errorMessage": "Invalid request data",
+                "errorDetails": "\"api_key\" length must be at least 10 characters long",
+                "responseTime": 74.76224999999977
+              },
+              "responseTime": 74.76224999999977
+            },
+            {
+              "name": "Invalid Data Format Validation",
+              "success": true,
+              "details": {
+                "status": 400,
+                "hasValidationError": true,
+                "hasProperValidation": true,
+                "isClearMessage": true,
+                "errorMessage": "Invalid request data",
+                "errorDetails": "\"api_key\" is not allowed to be empty",
+                "responseTime": 79.91620800000237
+              },
+              "responseTime": 79.91620800000237
+            },
+            {
+              "name": "Malformed JSON Handling",
+              "success": "Internal server error",
+              "details": {
+                "status": 500,
+                "hasErrorHandling": true,
+                "hasProperErrorMessage": "Internal server error",
+                "errorMessage": "Internal server error",
+                "responseTime": 100
+              },
+              "responseTime": 100
+            }
+          ]
+        },
+        "database": {
+          "phase": "Database Connection Failure Handling",
+          "passed": 3,
+          "total": 3,
+          "healthy": true,
+          "results": [
+            {
+              "name": "Database Connection Error Response",
+              "success": true,
+              "details": {
+                "status": 500,
+                "hasProperErrorHandling": true,
+                "hasUserFriendlyMessage": true,
+                "doesNotExposeSensitiveInfo": true,
+                "errorMessage": "Failed to setup OAuth",
+                "message": "invalid input syntax for type uuid: \"db_test_user\"",
+                "responseTime": 172.249791000002
+              },
+              "responseTime": 172.249791000002
+            },
+            {
+              "name": "Database Health Check Error Handling",
+              "success": true,
+              "details": {
+                "status": 200,
+                "hasHealthResponse": true,
+                "hasDbStatusInfo": true,
+                "handlesDbErrors": false,
+                "dbErrorsDetected": false,
+                "responseTime": 571.4761670000007
+              },
+              "responseTime": 571.4761670000007
+            },
+            {
+              "name": "Status Check Database Error Handling",
+              "success": true,
+              "details": {
+                "status": 500,
+                "hasErrorResponse": true,
+                "hasProperErrorMessage": true,
+                "doesNotExposeSensitiveInfo": true,
+                "errorMessage": "Failed to check status",
+                "responseTime": 75.7905000000028
+              },
+              "responseTime": 75.7905000000028
+            }
+          ]
+        },
+        "oauth": {
+          "phase": "OAuth Authorization Failure Handling",
+          "passed": 2,
+          "total": 3,
+          "healthy": false,
+          "results": [
+            {
+              "name": "Invalid OAuth Credentials Handling",
+              "success": true,
+              "details": {
+                "status": 500,
+                "hasProperErrorHandling": true,
+                "hasUserFriendlyMessage": "Failed to setup OAuth",
+                "doesNotExposeSecrets": true,
+                "errorMessage": "Failed to setup OAuth",
+                "message": "invalid input syntax for type uuid: \"oauth_test_user\"",
+                "responseTime": 129.9807079999955
+              },
+              "responseTime": 129.9807079999955
+            },
+            {
+              "name": "OAuth State Validation Error Handling",
+              "success": true,
+              "details": {
+                "status": 404,
+                "hasErrorResponse": true,
+                "hasProperErrorMessage": true,
+                "errorMessage": "Route not found",
+                "responseTime": 74.6760409999988
+              },
+              "responseTime": 74.6760409999988
+            },
+            {
+              "name": "OAuth Flow Interruption Handling",
+              "success": false,
+              "details": {
+                "status": 500,
+                "hasProperResponse": false,
+                "hasUserFriendlyMessage": "Failed to check status",
+                "doesNotExposeInternalDetails": true,
+                "errorMessage": "Failed to check status",
+                "responseTime": 97.89420899999823
+              },
+              "responseTime": 97.89420899999823
+            }
+          ]
+        },
+        "network": {
+          "phase": "Network Issue and Timeout Handling",
+          "passed": 4,
+          "total": 4,
+          "healthy": true,
+          "results": [
+            {
+              "name": "Request Timeout Handling",
+              "success": true,
+              "details": {
+                "isTimeoutError": true,
+                "errorCode": "TIMEOUT",
+                "errorMessage": "Request timeout",
+                "responseTime": 101.91279200000281,
+                "message": "Timeout properly handled"
+              },
+              "responseTime": 101.91279200000281
+            },
+            {
+              "name": "Large Payload Handling",
+              "success": "Invalid request data",
+              "details": {
+                "status": 400,
+                "hasProperHandling": true,
+                "hasErrorMessage": "Invalid request data",
+                "errorMessage": "Invalid request data",
+                "payloadSize": 10087,
+                "responseTime": 377.7701670000024
+              },
+              "responseTime": 377.7701670000024
+            },
+            {
+              "name": "Concurrent Request Handling",
+              "success": true,
+              "details": {
+                "allSuccessful": true,
+                "concurrentRequests": 5,
+                "avgResponseTime": 2161,
+                "maxResponseTime": 2174,
+                "responseTimes": [
+                  2158,
+                  2128,
+                  2174,
+                  2174,
+                  2170
+                ],
+                "message": "Concurrent requests handled successfully"
+              },
+              "responseTime": 2160.6643667999974
+            },
+            {
+              "name": "Retry Mechanism Verification",
+              "success": true,
+              "details": {
+                "bothResponded": 500,
+                "reasonableTime": true,
+                "consistentBehavior": true,
+                "totalTime": 299,
+                "response1Status": 500,
+                "response2Status": 500,
+                "message": "Retry mechanism working"
+              },
+              "responseTime": 149.34056249999776
+            }
+          ]
+        }
+      },
+      "metrics": {
+        "totalTests": 28,
+        "passedTests": 24,
+        "failedTests": 4,
+        "testResults": [],
+        "startTime": 19.485625,
+        "errorPatterns": {
+          "validationErrors": [
+            {
+              "test": "Missing API Key Validation",
+              "errorMessage": "Invalid request data",
+              "status": 400
+            },
+            {
+              "test": "Invalid Data Format Validation",
+              "errorMessage": "Invalid request data",
+              "status": 400
+            },
+            {
+              "test": "Malformed JSON Handling",
+              "errorMessage": "Internal server error",
+              "status": 500
+            },
+            {
+              "test": "Missing API Key Validation",
+              "errorMessage": "Invalid request data",
+              "status": 400
+            },
+            {
+              "test": "Invalid Data Format Validation",
+              "errorMessage": "Invalid request data",
+              "status": 400
+            },
+            {
+              "test": "Malformed JSON Handling",
+              "errorMessage": "Internal server error",
+              "status": 500
+            }
+          ],
+          "databaseErrors": [
+            {
+              "test": "Database Connection Error Response",
+              "errorMessage": "Failed to setup OAuth",
+              "status": 500
+            },
+            {
+              "test": "Database Health Check Error Handling",
+              "status": 200
+            },
+            {
+              "test": "Status Check Database Error Handling",
+              "errorMessage": "Failed to check status",
+              "status": 500
+            },
+            {
+              "test": "Database Connection Error Response",
+              "errorMessage": "Failed to setup OAuth",
+              "status": 500
+            },
+            {
+              "test": "Database Health Check Error Handling",
+              "status": 200
+            },
+            {
+              "test": "Status Check Database Error Handling",
+              "errorMessage": "Failed to check status",
+              "status": 500
+            }
+          ],
+          "oauthErrors": [
+            {
+              "test": "Invalid OAuth Credentials Handling",
+              "errorMessage": "Failed to setup OAuth",
+              "status": 500
+            },
+            {
+              "test": "OAuth State Validation Error Handling",
+              "errorMessage": "Route not found",
+              "status": 404
+            },
+            {
+              "test": "Invalid OAuth Credentials Handling",
+              "errorMessage": "Failed to setup OAuth",
+              "status": 500
+            },
+            {
+              "test": "OAuth State Validation Error Handling",
+              "errorMessage": "Route not found",
+              "status": 404
+            }
+          ],
+          "networkErrors": [
+            {
+              "test": "Request Timeout Handling",
+              "message": "Timeout properly handled",
+              "responseTime": 101.64316599999984
+            },
+            {
+              "test": "Large Payload Handling",
+              "responseTime": 469.92012499999873
+            },
+            {
+              "test": "Concurrent Request Handling",
+              "message": "Concurrent requests handled successfully",
+              "responseTime": 2376.4251083999998
+            },
+            {
+              "test": "Retry Mechanism Verification",
+              "message": "Retry mechanism working",
+              "responseTime": 131.47864550000122
+            },
+            {
+              "test": "Request Timeout Handling",
+              "message": "Timeout properly handled",
+              "responseTime": 101.91279200000281
+            },
+            {
+              "test": "Large Payload Handling",
+              "responseTime": 377.7701670000024
+            },
+            {
+              "test": "Concurrent Request Handling",
+              "message": "Concurrent requests handled successfully",
+              "responseTime": 2160.6643667999974
+            },
+            {
+              "test": "Retry Mechanism Verification",
+              "message": "Retry mechanism working",
+              "responseTime": 149.34056249999776
+            }
+          ]
+        }
+      },
+      "summary": {
+        "totalTests": 28,
+        "totalPassed": 24,
+        "successRate": 86,
+        "avgResponseTime": 0,
+        "executionTime": 39096,
+        "phasesPasssed": 2,
+        "totalPhases": 4
+      }
+    },
+    "Security Verification": {
+      "secure": false,
+      "results": {
+        "encryption": {
+          "phase": "Credential Encryption Verification",
+          "passed": 4,
+          "total": 4,
+          "healthy": true,
+          "results": [
+            {
+              "name": "Sensitive Data Not Exposed in Responses",
+              "success": true,
+              "details": {
+                "status": 500,
+                "exposesApiKey": false,
+                "exposesApiSecret": false,
+                "exposesCredentials": false,
+                "responseContainsCredentials": "NO - SECURE",
+                "responseTime": 129.4127920000028
+              },
+              "responseTime": 129.4127920000028
+            },
+            {
+              "name": "Error Messages Do Not Expose Credentials",
+              "success": true,
+              "details": {
+                "status": 500,
+                "exposesApiKey": false,
+                "exposesApiSecret": false,
+                "exposesCredentials": false,
+                "errorResponseSecure": true,
+                "responseTime": 134.42162500000268
+              },
+              "responseTime": 134.42162500000268
+            },
+            {
+              "name": "Database Connection Strings Not Exposed",
+              "success": true,
+              "details": {
+                "status": 200,
+                "exposesDbUrl": false,
+                "exposesDbPassword": false,
+                "exposesDbCredentials": false,
+                "healthResponseSecure": true,
+                "responseTime": 655.5382500000051
+              },
+              "responseTime": 655.5382500000051
+            },
+            {
+              "name": "Internal System Details Not Exposed",
+              "success": true,
+              "details": {
+                "status": 200,
+                "exposesFilePaths": false,
+                "exposesEnvVars": false,
+                "exposesInternalDetails": false,
+                "debugResponseSecure": true,
+                "responseTime": 75.95087500000227
+              },
+              "responseTime": 75.95087500000227
+            }
+          ]
+        },
+        "tokenSecurity": {
+          "phase": "OAuth Token Security Validation",
+          "passed": 2,
+          "total": 4,
+          "healthy": false,
+          "results": [
+            {
+              "name": "OAuth State Parameter Generation",
+              "details": {
+                "status": 500,
+                "stateLength": 0,
+                "isSecureLength": false,
+                "stateValue": "none",
+                "responseTime": 138.57129200000054
+              },
+              "responseTime": 138.57129200000054
+            },
+            {
+              "name": "OAuth URL Security Parameters",
+              "details": {
+                "status": 500,
+                "hasState": false,
+                "hasResponseType": false,
+                "hasRedirectUri": false,
+                "isHttps": false,
+                "responseTime": 148.82229100000404
+              },
+              "responseTime": 148.82229100000404
+            },
+            {
+              "name": "Token Storage Security",
+              "success": true,
+              "details": {
+                "status": 500,
+                "exposesAccessToken": false,
+                "exposesRefreshToken": false,
+                "exposesTokens": false,
+                "tokenStorageSecure": true,
+                "responseTime": 160.58087499999965
+              },
+              "responseTime": 160.58087499999965
+            },
+            {
+              "name": "Secure Transmission Verification",
+              "success": true,
+              "details": {
+                "allHttps": true,
+                "hasSecurityHeaders": true,
+                "endpointChecks": [
+                  {
+                    "endpoint": "/api/modules/auth/broker/setup-oauth",
+                    "isHttps": true,
+                    "hasSecureHeaders": true,
+                    "status": 404
+                  },
+                  {
+                    "endpoint": "/api/modules/auth/broker/health",
+                    "isHttps": true,
+                    "hasSecureHeaders": true,
+                    "status": 200
+                  },
+                  {
+                    "endpoint": "/api/modules/auth/broker/status",
+                    "isHttps": true,
+                    "hasSecureHeaders": true,
+                    "status": 400
+                  }
+                ],
+                "secureTransmission": true,
+                "responseTime": 0
+              },
+              "responseTime": 0
+            }
+          ]
+        },
+        "csrf": {
+          "phase": "CSRF Protection Verification",
+          "passed": 2,
+          "total": 3,
+          "healthy": false,
+          "results": [
+            {
+              "name": "OAuth State Parameter Validation",
+              "success": "Route not found",
+              "details": {
+                "status": 404,
+                "rejectsInvalidState": true,
+                "hasErrorMessage": "Route not found",
+                "properCSRFProtection": "Route not found",
+                "errorMessage": "Route not found",
+                "responseTime": 75.515625
+              },
+              "responseTime": 75.515625
+            },
+            {
+              "name": "State Parameter Uniqueness",
+              "success": false,
+              "details": {
+                "statesGenerated": 0,
+                "uniqueStates": 0,
+                "allUnique": false,
+                "stateUniqueness": "INSECURE",
+                "responseTime": 0
+              },
+              "responseTime": 0
+            },
+            {
+              "name": "Cross-Site Request Forgery Prevention",
+              "success": "Failed to setup OAuth",
+              "details": {
+                "status": 500,
+                "hasCSRFProtection": "Failed to setup OAuth",
+                "csrfProtectionLevel": "PROTECTED",
+                "responseTime": 100
+              },
+              "responseTime": 100
+            }
+          ]
+        },
+        "https": {
+          "phase": "HTTPS and Security Headers Verification",
+          "passed": 4,
+          "total": 4,
+          "healthy": true,
+          "results": [
+            {
+              "name": "HTTPS Enforcement",
+              "success": true,
+              "details": {
+                "baseUrlHttps": true,
+                "healthEndpointAccessible": true,
+                "httpsEnforced": true,
+                "responseTime": 74.62133300000278
+              },
+              "responseTime": 74.62133300000278
+            },
+            {
+              "name": "Security Headers Verification",
+              "success": true,
+              "details": {
+                "status": 200,
+                "hasStrictTransportSecurity": true,
+                "hasXFrameOptions": true,
+                "hasXContentTypeOptions": true,
+                "hasXXSSProtection": true,
+                "hasContentSecurityPolicy": true,
+                "hasReferrerPolicy": true,
+                "securityHeaderCount": 6,
+                "hasBasicSecurity": true,
+                "allHeaders": [
+                  "access-control-allow-credentials",
+                  "content-length",
+                  "content-security-policy",
+                  "content-type",
+                  "cross-origin-opener-policy",
+                  "cross-origin-resource-policy",
+                  "date",
+                  "etag",
+                  "origin-agent-cluster",
+                  "referrer-policy",
+                  "server",
+                  "strict-transport-security",
+                  "vary",
+                  "x-content-type-options",
+                  "x-dns-prefetch-control",
+                  "x-download-options",
+                  "x-frame-options",
+                  "x-permitted-cross-domain-policies",
+                  "x-railway-edge",
+                  "x-railway-request-id",
+                  "x-request-id",
+                  "x-xss-protection"
+                ],
+                "responseTime": 630.351917
+              },
+              "responseTime": 630.351917
+            },
+            {
+              "name": "Content Type Security",
+              "success": true,
+              "details": {
+                "status": 200,
+                "contentType": "application/json; charset=utf-8",
+                "isJsonContentType": true,
+                "hasCharset": true,
+                "properContentType": true,
+                "responseTime": 588.539708999997
+              },
+              "responseTime": 588.539708999997
+            },
+            {
+              "name": "TLS/SSL Configuration",
+              "success": true,
+              "details": {
+                "httpsWorking": true,
+                "tlsSecure": true,
+                "baseUrl": "https://web-production-de0bc.up.railway.app",
+                "connectionSecure": true,
+                "responseTime": 73.07762500000536
+              },
+              "responseTime": 73.07762500000536
+            }
+          ]
+        }
+      },
+      "metrics": {
+        "totalTests": 30,
+        "passedTests": 24,
+        "failedTests": 6,
+        "testResults": [],
+        "startTime": 20.600042,
+        "securityFindings": {
+          "encryptionIssues": [],
+          "tokenSecurityIssues": [
+            {
+              "test": "OAuth State Parameter Generation",
+              "issue": {
+                "status": 500,
+                "stateLength": 0,
+                "isSecureLength": false,
+                "stateValue": "none",
+                "responseTime": 125.81774999999834
+              },
+              "severity": "HIGH"
+            },
+            {
+              "test": "OAuth URL Security Parameters",
+              "issue": {
+                "status": 500,
+                "hasState": false,
+                "hasResponseType": false,
+                "hasRedirectUri": false,
+                "isHttps": false,
+                "responseTime": 154.65199999999822
+              },
+              "severity": "HIGH"
+            },
+            {
+              "test": "OAuth State Parameter Generation",
+              "issue": {
+                "status": 500,
+                "stateLength": 0,
+                "isSecureLength": false,
+                "stateValue": "none",
+                "responseTime": 138.57129200000054
+              },
+              "severity": "HIGH"
+            },
+            {
+              "test": "OAuth URL Security Parameters",
+              "issue": {
+                "status": 500,
+                "hasState": false,
+                "hasResponseType": false,
+                "hasRedirectUri": false,
+                "isHttps": false,
+                "responseTime": 148.82229100000404
+              },
+              "severity": "HIGH"
+            }
+          ],
+          "csrfIssues": [
+            {
+              "test": "State Parameter Uniqueness",
+              "issue": {
+                "statesGenerated": 0,
+                "uniqueStates": 0,
+                "allUnique": false,
+                "stateUniqueness": "INSECURE",
+                "responseTime": 0
+              },
+              "severity": "HIGH"
+            },
+            {
+              "test": "State Parameter Uniqueness",
+              "issue": {
+                "statesGenerated": 0,
+                "uniqueStates": 0,
+                "allUnique": false,
+                "stateUniqueness": "INSECURE",
+                "responseTime": 0
+              },
+              "severity": "HIGH"
+            }
+          ],
+          "httpsIssues": []
+        }
+      },
+      "summary": {
+        "totalTests": 30,
+        "totalPassed": 24,
+        "securityScore": 80,
+        "avgResponseTime": 0,
+        "executionTime": 43494,
+        "securePhases": 2,
+        "totalPhases": 4,
+        "securityIssues": 6
+      }
+    }
+  },
+  "issues": {
+    "critical": [],
+    "high": [
+      {
+        "id": "end-to-end_oauth_verification_-_frontend_1758257251094_19uoj",
+        "phase": "End-to-End OAuth Verification - frontend",
+        "test": "Broker Setup Interface Detection",
+        "status": "FAIL",
+        "severity": "HIGH",
+        "category": "OAUTH",
+        "description": "OAuth URL generation or setup issues",
+        "recommendation": "Fix database connection to enable OAuth URL generation",
+        "impact": "Users cannot initiate broker connections",
+        "effort": "HIGH",
+        "timestamp": "2025-09-19T04:47:31.094Z"
+      },
+      {
+        "id": "end-to-end_oauth_verification_-_oauth_1758257251094_r3h8u",
+        "phase": "End-to-End OAuth Verification - oauth",
+        "test": "Valid OAuth URL Generation",
+        "status": "FAIL",
+        "severity": "HIGH",
+        "category": "OAUTH",
+        "description": "OAuth URL generation or setup issues",
+        "recommendation": "Fix database connection to enable OAuth URL generation",
+        "impact": "Users cannot initiate broker connections",
+        "effort": "HIGH",
+        "timestamp": "2025-09-19T04:47:31.094Z"
+      },
+      {
+        "id": "security_verification_-_tokensecurity_1758257259875_b6x7x",
+        "phase": "Security Verification - tokenSecurity",
+        "test": "OAuth State Parameter Generation",
+        "status": "FAIL",
+        "severity": "HIGH",
+        "category": "SECURITY",
+        "description": "CSRF protection or state validation issues",
+        "recommendation": "Implement proper OAuth state parameter validation",
+        "impact": "Vulnerability to CSRF attacks",
+        "effort": "MEDIUM",
+        "timestamp": "2025-09-19T04:47:39.875Z"
+      },
+      {
+        "id": "security_verification_-_csrf_1758257259875_dkhj0",
+        "phase": "Security Verification - csrf",
+        "test": "State Parameter Uniqueness",
+        "status": "FAIL",
+        "severity": "HIGH",
+        "category": "SECURITY",
+        "description": "CSRF protection or state validation issues",
+        "recommendation": "Implement proper OAuth state parameter validation",
+        "impact": "Vulnerability to CSRF attacks",
+        "effort": "MEDIUM",
+        "timestamp": "2025-09-19T04:47:39.875Z"
+      }
+    ],
+    "medium": [
+      {
+        "id": "end-to-end_oauth_verification_-_frontend_1758257251094_30tb6",
+        "phase": "End-to-End OAuth Verification - frontend",
+        "test": "Frontend Accessibility",
+        "status": "FAIL",
+        "severity": "MEDIUM",
+        "category": "OAUTH",
+        "description": "",
+        "recommendation": "",
+        "impact": "",
+        "effort": "MEDIUM",
+        "timestamp": "2025-09-19T04:47:31.094Z"
+      },
+      {
+        "id": "end-to-end_oauth_verification_-_oauth_1758257251094_z9nap",
+        "phase": "End-to-End OAuth Verification - oauth",
+        "test": "OAuth URL Structure Validation",
+        "status": "FAIL",
+        "severity": "MEDIUM",
+        "category": "OAUTH",
+        "description": "OAuth validation or fix verification issues",
+        "recommendation": "Review OAuth endpoint validation logic",
+        "impact": "May cause user experience issues",
+        "effort": "MEDIUM",
+        "timestamp": "2025-09-19T04:47:31.094Z"
+      },
+      {
+        "id": "end-to-end_oauth_verification_-_state_1758257251094_mq550",
+        "phase": "End-to-End OAuth Verification - state",
+        "test": "OAuth State Generation and Storage",
+        "status": "FAIL",
+        "severity": "MEDIUM",
+        "category": "OAUTH",
+        "description": "",
+        "recommendation": "",
+        "impact": "",
+        "effort": "MEDIUM",
+        "timestamp": "2025-09-19T04:47:31.094Z"
+      },
+      {
+        "id": "end-to-end_oauth_verification_-_state_1758257251094_ufd68",
+        "phase": "End-to-End OAuth Verification - state",
+        "test": "State Parameter Validation",
+        "status": "FAIL",
+        "severity": "MEDIUM",
+        "category": "OAUTH",
+        "description": "OAuth validation or fix verification issues",
+        "recommendation": "Review OAuth endpoint validation logic",
+        "impact": "May cause user experience issues",
+        "effort": "MEDIUM",
+        "timestamp": "2025-09-19T04:47:31.094Z"
+      },
+      {
+        "id": "end-to-end_oauth_verification_-_callback_1758257251094_0w34l",
+        "phase": "End-to-End OAuth Verification - callback",
+        "test": "Callback Endpoint Availability",
+        "status": "FAIL",
+        "severity": "MEDIUM",
+        "category": "OAUTH",
+        "description": "",
+        "recommendation": "",
+        "impact": "",
+        "effort": "MEDIUM",
+        "timestamp": "2025-09-19T04:47:31.094Z"
+      },
+      {
+        "id": "end-to-end_oauth_verification_-_callback_1758257251094_u65n9",
+        "phase": "End-to-End OAuth Verification - callback",
+        "test": "Connection Status Update Capability",
+        "status": "FAIL",
+        "severity": "MEDIUM",
+        "category": "OAUTH",
+        "description": "",
+        "recommendation": "",
+        "impact": "",
+        "effort": "MEDIUM",
+        "timestamp": "2025-09-19T04:47:31.094Z"
+      },
+      {
+        "id": "error_handling_verification_-_credentials_1758257255476_w9vue",
+        "phase": "Error Handling Verification - credentials",
+        "test": "Missing API Secret Validation",
+        "status": "FAIL",
+        "severity": "MEDIUM",
+        "category": "ERROR_HANDLING",
+        "description": "",
+        "recommendation": "",
+        "impact": "",
+        "effort": "MEDIUM",
+        "timestamp": "2025-09-19T04:47:35.476Z"
+      },
+      {
+        "id": "error_handling_verification_-_oauth_1758257255476_htyrf",
+        "phase": "Error Handling Verification - oauth",
+        "test": "OAuth Flow Interruption Handling",
+        "status": "FAIL",
+        "severity": "MEDIUM",
+        "category": "ERROR_HANDLING",
+        "description": "",
+        "recommendation": "",
+        "impact": "",
+        "effort": "MEDIUM",
+        "timestamp": "2025-09-19T04:47:35.476Z"
+      },
+      {
+        "id": "security_verification_-_tokensecurity_1758257259875_snwer",
+        "phase": "Security Verification - tokenSecurity",
+        "test": "OAuth URL Security Parameters",
+        "status": "FAIL",
+        "severity": "MEDIUM",
+        "category": "SECURITY",
+        "description": "",
+        "recommendation": "",
+        "impact": "",
+        "effort": "MEDIUM",
+        "timestamp": "2025-09-19T04:47:39.875Z"
+      }
+    ],
+    "low": []
+  },
+  "recommendations": {
+    "immediate": [
+      {
+        "category": "OAUTH",
+        "recommendation": "Fix database connection to enable OAuth URL generation",
+        "impact": "Users cannot initiate broker connections",
+        "effort": "HIGH"
+      },
+      {
+        "category": "OAUTH",
+        "recommendation": "Fix database connection to enable OAuth URL generation",
+        "impact": "Users cannot initiate broker connections",
+        "effort": "HIGH"
+      },
+      {
+        "category": "SECURITY",
+        "recommendation": "Implement proper OAuth state parameter validation",
+        "impact": "Vulnerability to CSRF attacks",
+        "effort": "MEDIUM"
+      },
+      {
+        "category": "SECURITY",
+        "recommendation": "Implement proper OAuth state parameter validation",
+        "impact": "Vulnerability to CSRF attacks",
+        "effort": "MEDIUM"
+      }
+    ],
+    "systemReadiness": "READY"
+  }
+}

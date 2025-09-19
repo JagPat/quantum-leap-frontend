@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OAuth Popup Communication Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        button { padding: 10px 20px; margin: 5px; }
+        .log { background: #f8f9fa; padding: 10px; margin: 10px 0; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>OAuth Popup Communication Test</h1>
+    
+    <div class="test-section">
+        <h3>Test 1: Open OAuth Popup</h3>
+        <button onclick="testOAuthPopup()">Open OAuth Popup</button>
+        <div id="popup-status"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 2: Simulate Callback</h3>
+        <button onclick="simulateCallback()">Simulate Callback URL</button>
+        <div id="callback-status"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Message Log</h3>
+        <div id="message-log" class="log"></div>
+    </div>
+
+    <script>
+        let popup = null;
+        
+        // Listen for messages from popup
+        window.addEventListener('message', function(event) {
+            console.log('📨 Received message:', event);
+            
+            const log = document.getElementById('message-log');
+            log.innerHTML += `
+                <div>
+                    <strong>Message Received:</strong><br>
+                    Origin: ${event.origin}<br>
+                    Data: ${JSON.stringify(event.data, null, 2)}<br>
+                    Time: ${new Date().toISOString()}<br>
+                    <hr>
+                </div>
+            `;
+            
+            if (event.data?.type === 'BROKER_AUTH_SUCCESS') {
+                document.getElementById('popup-status').innerHTML = 
+                    '<div class="success">✅ OAuth Success! Token: ' + event.data.requestToken + '</div>';
+                
+                if (popup && !popup.closed) {
+                    popup.close();
+                }
+            }
+        });
+        
+        function testOAuthPopup() {
+            const oauthUrl = 'https://kite.zerodha.com/connect/login?api_key=debug_popup_key_1234567890&v=3&state=test_state';
+            
+            console.log('🚀 Opening OAuth popup...');
+            popup = window.open(oauthUrl, 'oauthTest', 'width=800,height=600,scrollbars=yes,resizable=yes');
+            
+            if (!popup) {
+                document.getElementById('popup-status').innerHTML = 
+                    '<div class="error">❌ Popup blocked! Please allow popups.</div>';
+            } else {
+                document.getElementById('popup-status').innerHTML = 
+                    '<div>🔄 Popup opened. Complete OAuth in the popup window...</div>';
+                
+                // Monitor popup
+                const checkPopup = setInterval(() => {
+                    if (popup.closed) {
+                        console.log('🔄 Popup was closed');
+                        document.getElementById('popup-status').innerHTML += 
+                            '<div>🔄 Popup was closed.</div>';
+                        clearInterval(checkPopup);
+                    }
+                }, 1000);
+            }
+        }
+        
+        function simulateCallback() {
+            const callbackUrl = 'https://quantum-leap-frontend-production.up.railway.app/broker-callback?status=success&request_token=test_token_123&state=test_state';
+            
+            console.log('🔄 Opening callback URL in popup...');
+            popup = window.open(callbackUrl, 'callbackTest', 'width=800,height=600,scrollbars=yes,resizable=yes');
+            
+            if (!popup) {
+                document.getElementById('callback-status').innerHTML = 
+                    '<div class="error">❌ Popup blocked! Please allow popups.</div>';
+            } else {
+                document.getElementById('callback-status').innerHTML = 
+                    '<div>🔄 Callback popup opened. Should receive message...</div>';
+            }
+        }
+        
+        console.log('🔍 Test page loaded. Current origin:', window.location.origin);
+    </script>
+</body>
+</html>
