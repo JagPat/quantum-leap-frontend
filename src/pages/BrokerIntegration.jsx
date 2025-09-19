@@ -23,6 +23,7 @@ import BrokerSetup from "../components/broker/BrokerSetup";
 import PortfolioImport from "../components/broker/PortfolioImport";
 import { useToast } from "@/components/ui/use-toast";
 import { railwayAPI } from "../api/railwayAPI"; // Import the API wrapper
+import { config as deploymentConfig } from "@/config/deployment.js";
 
 // CRITICAL FIX: Defensive import validation with fallback
 const BrokerConfig = (() => {
@@ -61,6 +62,14 @@ export default function BrokerIntegration() {
   });
   const [heartbeatInterval, setHeartbeatInterval] = useState(null);
   const [isCheckingBackend, setIsCheckingBackend] = useState(false);
+
+  const getBackendBaseUrl = () => {
+    const envUrl = typeof import.meta !== 'undefined' && import.meta.env?.VITE_BACKEND_URL;
+    const baseUrl = envUrl && envUrl.length > 0
+      ? envUrl
+      : (deploymentConfig?.urls?.backend || 'https://web-production-de0bc.up.railway.app');
+    return baseUrl.replace(/\/$/, '');
+  };
 
   useEffect(() => {
     loadBrokerConfig();
@@ -106,7 +115,7 @@ export default function BrokerIntegration() {
         console.log("🔍 Checking backend status for user_id:", userId);
         
         // Check broker connection via Railway backend
-        const response = await fetch(`https://web-production-de0bc.up.railway.app/broker/status?user_id=${userId}`, {
+        const response = await fetch(`${getBackendBaseUrl()}/api/modules/auth/broker/status?user_id=${userId}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
@@ -254,9 +263,7 @@ export default function BrokerIntegration() {
         if (currentConfig.access_token && currentConfig.user_data?.user_id) {
           console.log("🔍 Checking backend status for user:", currentConfig.user_data.user_id);
           try {
-            const backendResponse = await fetch(
-              `https://web-production-de0bc.up.railway.app/broker/status?user_id=${currentConfig.user_data.user_id}`
-            );
+            const backendResponse = await fetch(`${getBackendBaseUrl()}/api/modules/auth/broker/status?user_id=${currentConfig.user_data.user_id}`);
             const backendResult = await backendResponse.json();
             console.log("🔍 Backend status response:", backendResult);
             
@@ -471,7 +478,7 @@ export default function BrokerIntegration() {
       
       console.log("🔍 Manual backend check for user_id:", userId);
       
-      const response = await fetch(`https://web-production-de0bc.up.railway.app/broker/status?user_id=${userId}`, {
+      const response = await fetch(`${getBackendBaseUrl()}/api/modules/auth/broker/status?user_id=${userId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'

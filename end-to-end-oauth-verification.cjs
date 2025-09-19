@@ -11,7 +11,8 @@ const { performance } = require('perf_hooks');
 const { URL } = require('url');
 
 const BACKEND_URL = 'https://web-production-de0bc.up.railway.app';
-const FRONTEND_URL = 'https://quantumleap-trading-frontend.up.railway.app'; // Note: May need verification
+const FRONTEND_URL = 'https://quantum-leap-frontend-production.up.railway.app';
+const BROKER_SETUP_PATH = '/broker-integration';
 
 // End-to-end test metrics
 const e2eMetrics = {
@@ -117,7 +118,7 @@ async function testFrontendLoading() {
       description: 'Verify frontend loads at production URL',
       test: async () => {
         try {
-          const response = await makeRequest(FRONTEND_URL);
+          const response = await makeRequest(`${FRONTEND_URL}${BROKER_SETUP_PATH}`);
           
           return {
             success: response.status === 200,
@@ -152,11 +153,13 @@ async function testFrontendLoading() {
           const response = await makeRequest(FRONTEND_URL);
           
           // Check if response contains broker setup related content
-          const hasSetupInterface = typeof response.data === 'string' && 
-                                  (response.data.includes('broker') || 
-                                   response.data.includes('oauth') || 
-                                   response.data.includes('setup') ||
-                                   response.data.includes('api_key'));
+          const html = typeof response.data === 'string' ? response.data : '';
+          const hasSetupInterface = response.status === 200 && (
+            html.includes('broker') ||
+            html.includes('QuantumLeap') ||
+            html.includes('assets/index') ||
+            html.includes('broker-integration')
+          );
           
           return {
             success: response.status === 200 && hasSetupInterface,

@@ -361,6 +361,10 @@ export default function BrokerSetup({
 
       console.log('✅ [BrokerSetup] Normalized broker config:', normalizedBrokerConfig);
 
+      localStorage.removeItem('oauth_config_id');
+      localStorage.removeItem('oauth_state');
+      localStorage.removeItem('temp_user_id_original');
+
       setConfig(prev => ({
         ...prev,
         ...normalizedBrokerConfig,
@@ -449,6 +453,19 @@ export default function BrokerSetup({
       const setupResult = await brokerAPI.setupOAuth(config.api_key, config.api_secret, userId);
       console.log("📡 [BrokerSetup] Backend setup response:", setupResult);
       
+      try {
+        localStorage.setItem('oauth_config_id', setupResult.config_id);
+        localStorage.setItem('oauth_state', setupResult.state);
+        if (setupResult?.user_id) {
+          localStorage.setItem('temp_user_id', setupResult.user_id);
+        }
+        if (setupResult?.original_user_id) {
+          localStorage.setItem('temp_user_id_original', setupResult.original_user_id);
+        }
+      } catch (storageError) {
+        console.warn('⚠️ [BrokerSetup] Failed to persist OAuth flow metadata:', storageError);
+      }
+
       const authUrl = setupResult.oauth_url;
       
       console.log("🚀 [BrokerSetup] Opening OAuth popup with URL:", authUrl);
@@ -542,11 +559,15 @@ export default function BrokerSetup({
           setError("Authentication successful but backend returned invalid user data. Please try again.");
           return;
         }
-        
+
         console.log("✅ Verified user_data structure:", result.user_data);
         console.log("✅ Verified user_id:", result.user_data.user_id);
         console.log("✅ Access token length:", result.access_token?.length);
-        
+
+        localStorage.removeItem('oauth_config_id');
+        localStorage.removeItem('oauth_state');
+        localStorage.removeItem('temp_user_id_original');
+
         // Create persistent session on backend
         try {
           console.log("🔐 [Component] Creating persistent session...");

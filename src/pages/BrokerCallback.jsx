@@ -1,10 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { config as deploymentConfig } from '@/config/deployment.js';
 
 export default function BrokerCallback() {
     const [status, setStatus] = useState('processing');
     const [message, setMessage] = useState('Processing authentication...');
+
+    const getBackendBaseUrl = () => {
+        const envUrl = typeof import.meta !== 'undefined' && import.meta.env?.VITE_BACKEND_URL;
+        const baseUrl = envUrl && envUrl.length > 0
+            ? envUrl
+            : (deploymentConfig?.urls?.backend || 'https://web-production-de0bc.up.railway.app');
+        return baseUrl.replace(/\/$/, '');
+    };
 
     useEffect(() => {
         console.log('🔄 BrokerCallback: Starting callback processing...');
@@ -66,7 +75,9 @@ export default function BrokerCallback() {
         // Process callback based on status
         if (statusParam === 'success' && requestTokenParam) {
             // OAuth completed successfully with request token
-            handleSuccessWithTokenCallback(requestTokenParam, sendToParent);
+            handleSuccessWithTokenCallback(requestTokenParam, sendToParent).catch((error) => {
+                console.error('❌ BrokerCallback: Error during backend exchange:', error);
+            });
         } else if (statusParam === 'success') {
             handleSuccessCallback(userIdParam, sendToParent);
         } else if (statusParam === 'error') {
@@ -77,34 +88,84 @@ export default function BrokerCallback() {
             handleNoParamsCallback(sendToParent);
         }
         
-        function handleSuccessWithTokenCallback(requestToken, sendToParent) {
+        async function handleSuccessWithTokenCallback(requestToken, sendToParent) {
             console.log('✅ BrokerCallback: OAuth completed successfully with request token:', requestToken);
-            
-            // Store the successful authentication
+
+            // Store the successful authentication for legacy flows
             localStorage.setItem('broker_status', 'Connected');
             localStorage.setItem('broker_request_token', requestToken);
-            
-            // Prepare comprehensive message data
+
+            const storedConfigId = localStorage.getItem('oauth_config_id');
+            const storedState = localStorage.getItem('oauth_state');
+
+            let backendExchange = false;
+            let backendData = null;
+
+            if (storedConfigId) {
+                try {
+                    const payload = {
+                        request_token: requestToken,
+                        state: stateParam || storedState,
+                        config_id: storedConfigId
+                    };
+
+                    if (!payload.state) {
+                        console.warn('⚠️ BrokerCallback: Missing OAuth state for backend exchange. Falling back to parent handling.');
+                    } else {
+                        console.log('🔐 BrokerCallback: Posting token to backend:', payload);
+                        const response = await fetch(`${getBackendBaseUrl()}/api/modules/auth/broker/callback`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(payload)
+                        });
+
+                        const result = await response.json();
+                        console.log('📡 BrokerCallback: Backend callback response:', result);
+
+                        if (!response.ok || !result.success) {
+                            throw new Error(result?.message || response.statusText);
+                        }
+
+                        backendExchange = true;
+                        backendData = result.data || null;
+                    }
+                } catch (exchangeError) {
+                    console.error('⚠️ BrokerCallback: Backend token exchange failed:', exchangeError);
+                } finally {
+                    localStorage.removeItem('oauth_config_id');
+                    localStorage.removeItem('oauth_state');
+                }
+            }
+
+            // Prepare message for parent window
             const messageData = {
                 type: 'BROKER_AUTH_SUCCESS',
                 status: 'success',
-                requestToken: requestToken,
-                state: stateParam,
-                backend_exchange: true,
+                backend_exchange: backendExchange,
+                state: stateParam || storedState,
                 timestamp: new Date().toISOString(),
                 source: 'broker-callback'
             };
-            
+
+            if (backendExchange && backendData) {
+                messageData.user_id = backendData.user_id || backendData.broker_user_id;
+                messageData.backend_data = backendData;
+            } else {
+                messageData.requestToken = requestToken;
+            }
+
             console.log('📤 BrokerCallback: Preparing to send success message:', messageData);
-            
+
             // Add a small delay to ensure parent window is ready
             setTimeout(() => {
                 const success = sendToParent(messageData);
-                
+
                 if (success) {
                     setStatus('success');
                     setMessage('Authentication successful! Connection established.\nThis window will close automatically.');
-                    
+
                     // Close window after a short delay
                     setTimeout(() => {
                         console.log('🔄 BrokerCallback: Closing popup window');
@@ -119,6 +180,8 @@ export default function BrokerCallback() {
 
         function handleSuccessCallback(userId, sendToParent) {
             console.log('✅ BrokerCallback: Backend completed token exchange successfully');
+            localStorage.removeItem('oauth_config_id');
+            localStorage.removeItem('oauth_state');
             
             if (userId) {
                 localStorage.setItem('broker_status', 'Connected');
