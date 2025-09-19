@@ -43,7 +43,10 @@ export default function BrokerCallback() {
         };
         
         // Process callback based on status
-        if (statusParam === 'success') {
+        if (statusParam === 'success' && requestTokenParam) {
+            // OAuth completed successfully with request token
+            handleSuccessWithTokenCallback(requestTokenParam, sendToParent);
+        } else if (statusParam === 'success') {
             handleSuccessCallback(userIdParam, sendToParent);
         } else if (statusParam === 'error') {
             handleErrorCallback(errorParam, sendToParent);
@@ -53,6 +56,32 @@ export default function BrokerCallback() {
             handleNoParamsCallback(sendToParent);
         }
         
+        function handleSuccessWithTokenCallback(requestToken, sendToParent) {
+            console.log('✅ BrokerCallback: OAuth completed successfully with request token:', requestToken);
+            
+            // Store the successful authentication
+            localStorage.setItem('broker_status', 'Connected');
+            localStorage.setItem('broker_request_token', requestToken);
+            
+            const success = sendToParent({
+                type: 'BROKER_AUTH_SUCCESS',
+                status: 'success',
+                requestToken: requestToken,
+                backend_exchange: true // Mark as complete since we have the token
+            });
+            
+            if (success) {
+                setStatus('success');
+                setMessage('Authentication successful! Connection established.');
+                setTimeout(() => {
+                    window.close();
+                }, 2000);
+            } else {
+                setStatus('error');
+                setMessage('Authentication successful but failed to communicate with parent window.\nPlease close this window and try again from the main application.');
+            }
+        }
+
         function handleSuccessCallback(userId, sendToParent) {
             console.log('✅ BrokerCallback: Backend completed token exchange successfully');
             

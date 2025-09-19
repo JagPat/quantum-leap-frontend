@@ -65,8 +65,31 @@ export default function BrokerSetup({
         console.log("✅ Received message from allowed origin:", event.origin, event.data);
         
         if (event.data?.type === 'BROKER_AUTH_SUCCESS') {
-            // NEW: Handle backend-exchanged tokens
-            if (event.data.backend_exchange) {
+            // Handle successful OAuth completion
+            if (event.data.backend_exchange && event.data.requestToken) {
+                console.log("🎉 OAuth completed successfully with request_token:", event.data.requestToken);
+                
+                // OAuth is complete - show success and update UI
+                toast({
+                    title: "Authentication Successful",
+                    description: "Broker connection established successfully!",
+                    variant: "default",
+                });
+                
+                // Update the config with success status
+                const updatedConfig = {
+                    ...config,
+                    connection_status: 'connected',
+                    is_connected: true,
+                    request_token: event.data.requestToken,
+                    connected_at: new Date().toISOString()
+                };
+                
+                onConfigSaved(updatedConfig);
+                setStep('complete');
+                setIsConnecting(false);
+                
+            } else if (event.data.backend_exchange && event.data.user_id) {
                 console.log("🎉 Backend completed token exchange, user_id:", event.data.user_id);
                 
                 // Fetch the session data from backend
