@@ -1,0 +1,49 @@
+{
+  "schedule": {
+    "enabled": true,
+    "interval": 300000,
+    "cronExpression": null
+  },
+  "thresholds": {
+    "successRate": 80,
+    "responseTime": 5000,
+    "errorRate": 10,
+    "consecutiveFailures": 3
+  },
+  "notifications": {
+    "email": {
+      "enabled": false,
+      "smtp": {
+        "host": "smtp.gmail.com",
+        "port": 587,
+        "secure": false,
+        "auth": {
+          "user": "",
+          "pass": ""
+        }
+      },
+      "recipients": []
+    },
+    "webhook": {
+      "enabled": false,
+      "url": "",
+      "headers": {},
+      "retries": 3
+    },
+    "slack": {
+      "enabled": false,
+      "webhookUrl": "",
+      "channel": "#alerts"
+    }
+  },
+  "verification": {
+    "url": "https://quantumleap-production.up.railway.app",
+    "tests": [
+      "health",
+      "oauth",
+      "security"
+    ],
+    "timeout": 60000,
+    "retries": 2
+  }
+}

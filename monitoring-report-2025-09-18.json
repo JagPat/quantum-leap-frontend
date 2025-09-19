@@ -1,0 +1,79 @@
+{
+  "timestamp": "2025-09-18T21:40:57.902Z",
+  "period": "24 hours",
+  "summary": {
+    "totalRuns": 1,
+    "healthyRuns": 0,
+    "unhealthyRuns": 1,
+    "errorRuns": 0,
+    "uptime": 0
+  },
+  "alerts": {
+    "active": 2,
+    "resolved": 0,
+    "critical": 0
+  },
+  "metrics": {
+    "avgSuccessRate": 33,
+    "avgResponseTime": 3934,
+    "minSuccessRate": 33,
+    "maxSuccessRate": 33,
+    "minResponseTime": 3934,
+    "maxResponseTime": 3934
+  },
+  "trends": null,
+  "activeAlerts": [
+    {
+      "id": "alert_1758231625058_tsjo0bxxo",
+      "type": "success_rate",
+      "severity": "high",
+      "message": "Success rate 33% below threshold 80%",
+      "firstDetected": "2025-09-18T21:40:25.056Z",
+      "lastSeen": "2025-09-18T21:40:25.056Z",
+      "occurrences": 1,
+      "status": "active",
+      "data": {
+        "type": "success_rate",
+        "severity": "high",
+        "message": "Success rate 33% below threshold 80%",
+        "value": 33,
+        "threshold": 80
+      }
+    },
+    {
+      "id": "alert_1758231625058_fp3ew5x0v",
+      "type": "error_rate",
+      "severity": "high",
+      "message": "Error rate 67% exceeds threshold 10%",
+      "firstDetected": "2025-09-18T21:40:25.056Z",
+      "lastSeen": "2025-09-18T21:40:25.056Z",
+      "occurrences": 1,
+      "status": "active",
+      "data": {
+        "type": "error_rate",
+        "severity": "high",
+        "message": "Error rate 67% exceeds threshold 10%",
+        "value": 67,
+        "threshold": 10
+      }
+    }
+  ],
+  "configuration": {
+    "schedule": {
+      "enabled": true,
+      "interval": 300000,
+      "cronExpression": null
+    },
+    "thresholds": {
+      "successRate": 80,
+      "responseTime": 5000,
+      "errorRate": 10,
+      "consecutiveFailures": 3
+    },
+    "tests": [
+      "health",
+      "oauth",
+      "security"
+    ]
+  }
+}

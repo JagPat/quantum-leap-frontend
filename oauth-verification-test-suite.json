@@ -1,0 +1,301 @@
+{
+  "name": "OAuth Deployment Verification Test Suite",
+  "description": "Comprehensive test suite for OAuth deployment verification",
+  "created_at": "2025-09-18T16:21:44.997Z",
+  "test_categories": {
+    "valid_oauth_tests": {
+      "name": "Valid OAuth Tests",
+      "scenarios": [
+        {
+          "id": "valid-oauth-basic",
+          "name": "Valid OAuth Basic Setup",
+          "category": "valid",
+          "description": "Basic valid OAuth setup with correct credentials",
+          "data": {
+            "api_key": "test_valid_key_123",
+            "api_secret": "test_valid_secret_456",
+            "user_id": "TEST001"
+          },
+          "expectedResult": "success",
+          "priority": "high"
+        },
+        {
+          "id": "valid-oauth-no-userid",
+          "name": "Valid OAuth Without User ID",
+          "category": "valid",
+          "description": "Valid OAuth setup without optional user_id parameter",
+          "data": {
+            "api_key": "test_valid_key_789",
+            "api_secret": "test_valid_secret_012"
+          },
+          "expectedResult": "success",
+          "priority": "high"
+        }
+      ],
+      "priority": "high",
+      "expected_success_rate": 100
+    },
+    "invalid_oauth_tests": {
+      "name": "Invalid OAuth Tests",
+      "scenarios": [
+        {
+          "id": "invalid-oauth-missing-key",
+          "name": "Missing API Key",
+          "category": "invalid",
+          "description": "OAuth request missing required api_key",
+          "data": {
+            "api_secret": "test_secret_only"
+          },
+          "expectedResult": "validation_error",
+          "expectedError": "api_key is required",
+          "priority": "high"
+        },
+        {
+          "id": "invalid-oauth-missing-secret",
+          "name": "Missing API Secret",
+          "category": "invalid",
+          "description": "OAuth request missing required api_secret",
+          "data": {
+            "api_key": "test_key_only"
+          },
+          "expectedResult": "validation_error",
+          "expectedError": "api_secret is required",
+          "priority": "high"
+        },
+        {
+          "id": "invalid-oauth-empty-values",
+          "name": "Empty Credential Values",
+          "category": "invalid",
+          "description": "OAuth request with empty credential values",
+          "data": {
+            "api_key": "",
+            "api_secret": ""
+          },
+          "expectedResult": "validation_error",
+          "expectedError": "credentials cannot be empty",
+          "priority": "medium"
+        },
+        {
+          "id": "invalid-oauth-malformed-json",
+          "name": "Malformed JSON Request",
+          "category": "invalid",
+          "description": "OAuth request with malformed JSON",
+          "data": "{\"api_key\": \"test\", \"api_secret\":}",
+          "rawData": true,
+          "expectedResult": "parse_error",
+          "priority": "medium"
+        }
+      ],
+      "priority": "high",
+      "expected_success_rate": 100
+    },
+    "edge_case_tests": {
+      "name": "Edge Case Tests",
+      "scenarios": [
+        {
+          "id": "edge-oauth-long-credentials",
+          "name": "Very Long Credentials",
+          "category": "edge",
+          "description": "OAuth request with extremely long credential values",
+          "data": {
+            "api_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "api_secret": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "user_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "expectedResult": "validation_error",
+          "expectedError": "credentials too long",
+          "priority": "low"
+        },
+        {
+          "id": "edge-oauth-special-chars",
+          "name": "Special Characters in Credentials",
+          "category": "edge",
+          "description": "OAuth request with special characters",
+          "data": {
+            "api_key": "test@#$%^&*()_+{}|:<>?[]\\;'\",./`~",
+            "api_secret": "!@#$%^&*()_+{}|:<>?[]\\;'\",./`~test",
+            "user_id": "user@test.com"
+          },
+          "expectedResult": "success",
+          "priority": "medium"
+        },
+        {
+          "id": "edge-oauth-unicode",
+          "name": "Unicode Characters",
+          "category": "edge",
+          "description": "OAuth request with unicode characters",
+          "data": {
+            "api_key": "test_🔑_key",
+            "api_secret": "secret_🔐_value",
+            "user_id": "user_测试_123"
+          },
+          "expectedResult": "success",
+          "priority": "low"
+        }
+      ],
+      "priority": "medium",
+      "expected_success_rate": 80
+    },
+    "database_tests": {
+      "name": "Database Integration Tests",
+      "scenarios": [
+        {
+          "id": "db-connection-valid",
+          "name": "Valid Database Connection",
+          "category": "database",
+          "description": "Test with valid database connection",
+          "data": {
+            "api_key": "db_test_key",
+            "api_secret": "db_test_secret",
+            "user_id": "DB_TEST_001"
+          },
+          "expectedResult": "success",
+          "requiresDatabase": true,
+          "priority": "high"
+        },
+        {
+          "id": "db-connection-failure",
+          "name": "Database Connection Failure",
+          "category": "database",
+          "description": "Test behavior when database is unavailable",
+          "data": {
+            "api_key": "db_fail_key",
+            "api_secret": "db_fail_secret"
+          },
+          "expectedResult": "database_error",
+          "simulateDbFailure": true,
+          "priority": "high"
+        }
+      ],
+      "priority": "high",
+      "expected_success_rate": 90
+    }
+  },
+  "test_execution_order": [
+    "valid_oauth_tests",
+    "invalid_oauth_tests",
+    "database_tests",
+    "edge_case_tests"
+  ],
+  "mock_data": {
+    "validCredentials": [
+      {
+        "api_key": "valid_key_001",
+        "api_secret": "valid_secret_001"
+      },
+      {
+        "api_key": "valid_key_002",
+        "api_secret": "valid_secret_002"
+      },
+      {
+        "api_key": "valid_key_003",
+        "api_secret": "valid_secret_003"
+      }
+    ],
+    "invalidCredentials": [
+      {
+        "api_key": "invalid_key_001",
+        "api_secret": "invalid_secret_001"
+      },
+      {
+        "api_key": "expired_key_002",
+        "api_secret": "expired_secret_002"
+      },
+      {
+        "api_key": "revoked_key_003",
+        "api_secret": "revoked_secret_003"
+      }
+    ],
+    "testUserIds": [
+      "TEST_USER_001",
+      "TEST_USER_002",
+      "TEST_USER_003",
+      "EDGE_CASE_USER_@#$",
+      "UNICODE_USER_测试",
+      "LONG_USER_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    ],
+    "oauthStates": [
+      "ba1044a000e3733bbcb1206f3db0b41722d3591ee5a89d8fd51d90375581ae46",
+      "dbe49e7023a406a29133de9767da9860bf942e02d188f2c187dc575dd150135e",
+      "8f3612527989cb4b0145b0dc96a4c5f3da8db4a7dc1fdc56d0cb6607e5564f0c",
+      "invalid_state_123",
+      "expired_state_456",
+      ""
+    ],
+    "oauthResponses": {
+      "success": {
+        "status": "success",
+        "oauth_url": "https://kite.zerodha.com/connect/login?api_key=test&state=mock_state",
+        "state": "mock_state_success",
+        "expires_in": 3600
+      },
+      "error": {
+        "status": "error",
+        "error": "Invalid credentials",
+        "error_code": "INVALID_CREDENTIALS"
+      },
+      "validation_error": {
+        "status": "error",
+        "error": "Validation failed",
+        "error_code": "VALIDATION_ERROR",
+        "details": {
+          "api_key": "API key is required",
+          "api_secret": "API secret is required"
+        }
+      }
+    },
+    "databaseTestData": {
+      "oauth_tokens": [
+        {
+          "id": 1,
+          "user_id": "TEST_USER_001",
+          "api_key": "test_key_001",
+          "encrypted_secret": "encrypted_secret_001",
+          "state": "test_state_001",
+          "created_at": "2025-09-18T16:19:45.999Z",
+          "expires_at": "2025-09-18T17:19:45.999Z"
+        }
+      ],
+      "users": [
+        {
+          "id": "TEST_USER_001",
+          "username": "testuser001",
+          "email": "test001@example.com",
+          "created_at": "2025-09-18T16:19:45.999Z"
+        }
+      ]
+    },
+    "networkScenarios": {
+      "timeout": {
+        "delay": 30000,
+        "description": "Simulate network timeout"
+      },
+      "slow_connection": {
+        "delay": 5000,
+        "description": "Simulate slow network connection"
+      },
+      "intermittent_failure": {
+        "failure_rate": 0.3,
+        "description": "Simulate intermittent network failures"
+      }
+    },
+    "errorScenarios": [
+      {
+        "type": "database_connection_error",
+        "message": "Unable to connect to database",
+        "code": "DB_CONNECTION_FAILED"
+      },
+      {
+        "type": "oauth_provider_error",
+        "message": "OAuth provider temporarily unavailable",
+        "code": "OAUTH_PROVIDER_ERROR"
+      },
+      {
+        "type": "rate_limit_error",
+        "message": "Rate limit exceeded",
+        "code": "RATE_LIMIT_EXCEEDED"
+      }
+    ],
+    "generated_at": "2025-09-18T16:19:45.999Z"
+  }
+}

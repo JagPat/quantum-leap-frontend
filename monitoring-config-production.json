@@ -1,0 +1,47 @@
+{
+  "schedule": {
+    "enabled": true,
+    "interval": 180000
+  },
+  "thresholds": {
+    "successRate": 95,
+    "responseTime": 3000,
+    "errorRate": 5,
+    "consecutiveFailures": 2
+  },
+  "notifications": {
+    "email": {
+      "enabled": false,
+      "smtp": {
+        "host": "smtp.gmail.com",
+        "port": 587,
+        "secure": false,
+        "auth": {
+          "user": "",
+          "pass": ""
+        }
+      },
+      "recipients": []
+    },
+    "webhook": {
+      "enabled": true,
+      "url": "https://hooks.slack.com/your-webhook"
+    },
+    "slack": {
+      "enabled": true,
+      "webhookUrl": "https://hooks.slack.com/your-webhook",
+      "channel": "#production-alerts"
+    }
+  },
+  "verification": {
+    "url": "https://quantumleap-production.up.railway.app",
+    "tests": [
+      "health",
+      "oauth",
+      "security",
+      "end-to-end"
+    ],
+    "timeout": 60000,
+    "retries": 3
+  }
+}

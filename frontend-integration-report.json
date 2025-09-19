@@ -1,0 +1,200 @@
+{
+  "timestamp": "2025-09-18T16:55:04.577Z",
+  "tests": [
+    {
+      "name": "Production URL Loading",
+      "status": "passed",
+      "details": [
+        {
+          "check": "URL Accessibility",
+          "status": "failed",
+          "message": "Failed to load URL: 404 Not Found",
+          "statusCode": 404
+        },
+        {
+          "check": "Content Length",
+          "status": "passed",
+          "message": "Page has 101 characters of content"
+        },
+        {
+          "check": "HTML Structure",
+          "status": "warning",
+          "message": "No HTML structure detected",
+          "data": {
+            "hasHtml": false,
+            "hasTitle": false
+          }
+        }
+      ],
+      "startTime": 1758214504578,
+      "endTime": 1758214505451,
+      "duration": 873
+    },
+    {
+      "name": "Broker Setup Interface",
+      "status": "passed",
+      "details": [
+        {
+          "check": "Interface Elements",
+          "status": "warning",
+          "message": "No interface elements detected",
+          "data": {
+            "hasForm": false,
+            "hasInput": false,
+            "hasButton": false,
+            "hasOAuthText": false
+          }
+        },
+        {
+          "check": "OAuth Endpoint",
+          "status": "passed",
+          "message": "OAuth endpoint responded with status 404",
+          "statusCode": 404
+        }
+      ],
+      "startTime": 1758214505451,
+      "endTime": 1758214505597,
+      "duration": 146
+    },
+    {
+      "name": "OAuth Flow Initiation",
+      "status": "passed",
+      "details": [
+        {
+          "check": "OAuth Endpoint",
+          "status": "passed",
+          "message": "OAuth endpoint responded with status 404",
+          "statusCode": 404
+        },
+        {
+          "check": "Health Endpoint",
+          "status": "warning",
+          "message": "Health endpoint status: 404",
+          "statusCode": 404
+        },
+        {
+          "check": "CORS Configuration",
+          "status": "warning",
+          "message": "No CORS headers detected",
+          "headers": {
+            "content-length": "101",
+            "content-type": "application/json",
+            "server": "railway-edge",
+            "x-railway-edge": "railway/asia-southeast1-eqsg3a",
+            "x-railway-fallback": "true",
+            "x-railway-request-id": "tTlDDo1MRGG2o7klacI7Nw",
+            "date": "Thu, 18 Sep 2025 16:55:06 GMT"
+          }
+        },
+        {
+          "check": "SSL/TLS",
+          "status": "passed",
+          "message": "Using HTTPS",
+          "protocol": "HTTPS"
+        }
+      ],
+      "startTime": 1758214505597,
+      "endTime": 1758214506104,
+      "duration": 507
+    },
+    {
+      "name": "User Experience",
+      "status": "passed",
+      "details": [
+        {
+          "check": "Response Time",
+          "status": "passed",
+          "message": "Fast response time: 74ms",
+          "responseTime": 74
+        },
+        {
+          "check": "Content Quality",
+          "status": "warning",
+          "message": "Content quality score: 0%",
+          "data": {
+            "hasTitle": false,
+            "hasMetaDescription": false,
+            "hasViewportMeta": false,
+            "hasErrorMessages": true,
+            "contentLength": 101,
+            "hasJavaScript": false,
+            "hasCSS": false
+          }
+        },
+        {
+          "check": "Security Headers",
+          "status": "warning",
+          "message": "Security score: 40%",
+          "data": {
+            "hasHTTPS": true,
+            "hasStrictTransportSecurity": false,
+            "hasContentSecurityPolicy": false,
+            "hasXFrameOptions": false,
+            "hasXContentTypeOptions": false
+          }
+        },
+        {
+          "check": "Error Handling",
+          "status": "passed",
+          "message": "404 handling: 404",
+          "statusCode": 404
+        }
+      ],
+      "startTime": 1758214506104,
+      "endTime": 1758214506252,
+      "duration": 148
+    }
+  ],
+  "summary": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "warnings": 0
+  },
+  "overallStatus": "PASSED",
+  "successRate": 100,
+  "recommendations": [
+    {
+      "priority": "high",
+      "category": "Production URL Loading",
+      "issue": "Failed to load URL: 404 Not Found",
+      "recommendation": "Verify server is running and accessible. Check Railway deployment status."
+    },
+    {
+      "priority": "medium",
+      "category": "Production URL Loading",
+      "issue": "No HTML structure detected",
+      "recommendation": "Review the specific issue and implement appropriate fixes."
+    },
+    {
+      "priority": "medium",
+      "category": "Broker Setup Interface",
+      "issue": "No interface elements detected",
+      "recommendation": "Add interactive elements like forms and buttons for user interaction."
+    },
+    {
+      "priority": "medium",
+      "category": "OAuth Flow Initiation",
+      "issue": "Health endpoint status: 404",
+      "recommendation": "Review the specific issue and implement appropriate fixes."
+    },
+    {
+      "priority": "medium",
+      "category": "OAuth Flow Initiation",
+      "issue": "No CORS headers detected",
+      "recommendation": "Review the specific issue and implement appropriate fixes."
+    },
+    {
+      "priority": "medium",
+      "category": "User Experience",
+      "issue": "Content quality score: 0%",
+      "recommendation": "Review the specific issue and implement appropriate fixes."
+    },
+    {
+      "priority": "medium",
+      "category": "User Experience",
+      "issue": "Security score: 40%",
+      "recommendation": "Review the specific issue and implement appropriate fixes."
+    }
+  ]
+}

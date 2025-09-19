@@ -1,0 +1,141 @@
+[
+  {
+    "id": "valid-oauth-basic",
+    "name": "Valid OAuth Basic Setup",
+    "category": "valid",
+    "description": "Basic valid OAuth setup with correct credentials",
+    "data": {
+      "api_key": "test_valid_key_123",
+      "api_secret": "test_valid_secret_456",
+      "user_id": "TEST001"
+    },
+    "expectedResult": "success",
+    "priority": "high"
+  },
+  {
+    "id": "valid-oauth-no-userid",
+    "name": "Valid OAuth Without User ID",
+    "category": "valid",
+    "description": "Valid OAuth setup without optional user_id parameter",
+    "data": {
+      "api_key": "test_valid_key_789",
+      "api_secret": "test_valid_secret_012"
+    },
+    "expectedResult": "success",
+    "priority": "high"
+  },
+  {
+    "id": "invalid-oauth-missing-key",
+    "name": "Missing API Key",
+    "category": "invalid",
+    "description": "OAuth request missing required api_key",
+    "data": {
+      "api_secret": "test_secret_only"
+    },
+    "expectedResult": "validation_error",
+    "expectedError": "api_key is required",
+    "priority": "high"
+  },
+  {
+    "id": "invalid-oauth-missing-secret",
+    "name": "Missing API Secret",
+    "category": "invalid",
+    "description": "OAuth request missing required api_secret",
+    "data": {
+      "api_key": "test_key_only"
+    },
+    "expectedResult": "validation_error",
+    "expectedError": "api_secret is required",
+    "priority": "high"
+  },
+  {
+    "id": "invalid-oauth-empty-values",
+    "name": "Empty Credential Values",
+    "category": "invalid",
+    "description": "OAuth request with empty credential values",
+    "data": {
+      "api_key": "",
+      "api_secret": ""
+    },
+    "expectedResult": "validation_error",
+    "expectedError": "credentials cannot be empty",
+    "priority": "medium"
+  },
+  {
+    "id": "invalid-oauth-malformed-json",
+    "name": "Malformed JSON Request",
+    "category": "invalid",
+    "description": "OAuth request with malformed JSON",
+    "data": "{\"api_key\": \"test\", \"api_secret\":}",
+    "rawData": true,
+    "expectedResult": "parse_error",
+    "priority": "medium"
+  },
+  {
+    "id": "edge-oauth-long-credentials",
+    "name": "Very Long Credentials",
+    "category": "edge",
+    "description": "OAuth request with extremely long credential values",
+    "data": {
+      "api_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "api_secret": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "user_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "expectedResult": "validation_error",
+    "expectedError": "credentials too long",
+    "priority": "low"
+  },
+  {
+    "id": "edge-oauth-special-chars",
+    "name": "Special Characters in Credentials",
+    "category": "edge",
+    "description": "OAuth request with special characters",
+    "data": {
+      "api_key": "test@#$%^&*()_+{}|:<>?[]\\;'\",./`~",
+      "api_secret": "!@#$%^&*()_+{}|:<>?[]\\;'\",./`~test",
+      "user_id": "user@test.com"
+    },
+    "expectedResult": "success",
+    "priority": "medium"
+  },
+  {
+    "id": "edge-oauth-unicode",
+    "name": "Unicode Characters",
+    "category": "edge",
+    "description": "OAuth request with unicode characters",
+    "data": {
+      "api_key": "test_🔑_key",
+      "api_secret": "secret_🔐_value",
+      "user_id": "user_测试_123"
+    },
+    "expectedResult": "success",
+    "priority": "low"
+  },
+  {
+    "id": "db-connection-valid",
+    "name": "Valid Database Connection",
+    "category": "database",
+    "description": "Test with valid database connection",
+    "data": {
+      "api_key": "db_test_key",
+      "api_secret": "db_test_secret",
+      "user_id": "DB_TEST_001"
+    },
+    "expectedResult": "success",
+    "requiresDatabase": true,
+    "priority": "high"
+  },
+  {
+    "id": "db-connection-failure",
+    "name": "Database Connection Failure",
+    "category": "database",
+    "description": "Test behavior when database is unavailable",
+    "data": {
+      "api_key": "db_fail_key",
+      "api_secret": "db_fail_secret"
+    },
+    "expectedResult": "database_error",
+    "simulateDbFailure": true,
+    "priority": "high"
+  }
+]

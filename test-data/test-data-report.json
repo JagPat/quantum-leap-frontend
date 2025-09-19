@@ -1,0 +1,125 @@
+{
+  "timestamp": "2025-09-18T16:20:13.650Z",
+  "summary": {
+    "testUsers": 5,
+    "activeUsers": 5,
+    "testScenarios": 11,
+    "activeSessions": 1,
+    "mockDataGenerated": true
+  },
+  "testUsers": [
+    {
+      "id": "TEST_1758212385995_E0F1B754",
+      "username": "env_user_1",
+      "status": "active",
+      "created_at": "2025-09-18T16:19:45.995Z",
+      "purpose": "environment_testing"
+    },
+    {
+      "id": "TEST_1758212385995_412E7591",
+      "username": "env_user_2",
+      "status": "active",
+      "created_at": "2025-09-18T16:19:45.995Z",
+      "purpose": "environment_testing"
+    },
+    {
+      "id": "TEST_1758212385995_CCD35E29",
+      "username": "env_user_3",
+      "status": "active",
+      "created_at": "2025-09-18T16:19:45.995Z",
+      "purpose": "environment_testing"
+    },
+    {
+      "id": "TEST_1758212385995_97F95340",
+      "username": "env_user_4",
+      "status": "active",
+      "created_at": "2025-09-18T16:19:45.996Z",
+      "purpose": "environment_testing"
+    },
+    {
+      "id": "TEST_1758212385999_CC94F337",
+      "username": "env_user_5",
+      "status": "active",
+      "created_at": "2025-09-18T16:19:45.999Z",
+      "purpose": "environment_testing"
+    }
+  ],
+  "testScenarios": [
+    {
+      "id": "valid-oauth-basic",
+      "name": "Valid OAuth Basic Setup",
+      "category": "valid",
+      "priority": "high"
+    },
+    {
+      "id": "valid-oauth-no-userid",
+      "name": "Valid OAuth Without User ID",
+      "category": "valid",
+      "priority": "high"
+    },
+    {
+      "id": "invalid-oauth-missing-key",
+      "name": "Missing API Key",
+      "category": "invalid",
+      "priority": "high"
+    },
+    {
+      "id": "invalid-oauth-missing-secret",
+      "name": "Missing API Secret",
+      "category": "invalid",
+      "priority": "high"
+    },
+    {
+      "id": "invalid-oauth-empty-values",
+      "name": "Empty Credential Values",
+      "category": "invalid",
+      "priority": "medium"
+    },
+    {
+      "id": "invalid-oauth-malformed-json",
+      "name": "Malformed JSON Request",
+      "category": "invalid",
+      "priority": "medium"
+    },
+    {
+      "id": "edge-oauth-long-credentials",
+      "name": "Very Long Credentials",
+      "category": "edge",
+      "priority": "low"
+    },
+    {
+      "id": "edge-oauth-special-chars",
+      "name": "Special Characters in Credentials",
+      "category": "edge",
+      "priority": "medium"
+    },
+    {
+      "id": "edge-oauth-unicode",
+      "name": "Unicode Characters",
+      "category": "edge",
+      "priority": "low"
+    },
+    {
+      "id": "db-connection-valid",
+      "name": "Valid Database Connection",
+      "category": "database",
+      "priority": "high"
+    },
+    {
+      "id": "db-connection-failure",
+      "name": "Database Connection Failure",
+      "category": "database",
+      "priority": "high"
+    }
+  ],
+  "activeSessions": [
+    {
+      "id": "SESSION_1758212385994_E62D54429F4A",
+      "name": "OAuth Verification Test Environment Session",
+      "status": "active",
+      "created_at": "2025-09-18T16:19:45.994Z",
+      "userCount": 0
+    }
+  ],
+  "recommendations": []
+}

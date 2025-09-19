@@ -1,0 +1,47 @@
+{
+  "schedule": {
+    "enabled": true,
+    "interval": 600000
+  },
+  "thresholds": {
+    "successRate": 70,
+    "responseTime": 10000,
+    "errorRate": 20,
+    "consecutiveFailures": 5
+  },
+  "notifications": {
+    "email": {
+      "enabled": false,
+      "smtp": {
+        "host": "smtp.gmail.com",
+        "port": 587,
+        "secure": false,
+        "auth": {
+          "user": "",
+          "pass": ""
+        }
+      },
+      "recipients": []
+    },
+    "webhook": {
+      "enabled": false,
+      "url": "",
+      "headers": {},
+      "retries": 3
+    },
+    "slack": {
+      "enabled": false,
+      "webhookUrl": "",
+      "channel": "#alerts"
+    }
+  },
+  "verification": {
+    "url": "http://localhost:3000",
+    "tests": [
+      "health",
+      "oauth"
+    ],
+    "timeout": 30000,
+    "retries": 1
+  }
+}

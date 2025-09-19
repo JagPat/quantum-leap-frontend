@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantumLeap Database Verification</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-item {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+        .test-item h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .test-url {
+            font-family: monospace;
+            background: #f0f0f0;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .loading {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .summary {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .test-all-button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 20px 0;
+        }
+        .test-all-button:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 QuantumLeap Database Verification</h1>
+        <p>This page will test your PostgreSQL database setup and OAuth integration.</p>
+        
+        <button class="test-all-button" onclick="runAllTests()">🚀 Run All Tests</button>
+        
+        <div class="test-item">
+            <h3>1. Application Health Check</h3>
+            <div class="test-url">GET /health</div>
+            <button class="test-button" onclick="testEndpoint('health', '/health')">Test Health</button>
+            <div id="health-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-item">
+            <h3>2. Auth Module Status</h3>
+            <div class="test-url">GET /api/modules/auth/debug</div>
+            <button class="test-button" onclick="testEndpoint('auth', '/api/modules/auth/debug')">Test Auth Module</button>
+            <div id="auth-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-item">
+            <h3>3. OAuth Database Health</h3>
+            <div class="test-url">GET /api/modules/auth/broker/health</div>
+            <button class="test-button" onclick="testEndpoint('oauth-health', '/api/modules/auth/broker/health')">Test OAuth Health</button>
+            <div id="oauth-health-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-item">
+            <h3>4. OAuth Service Status</h3>
+            <div class="test-url">GET /api/modules/auth/broker/status</div>
+            <button class="test-button" onclick="testEndpoint('oauth-status', '/api/modules/auth/broker/status')">Test OAuth Status</button>
+            <div id="oauth-status-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div id="summary" class="summary" style="display: none;">
+            <h2>📋 Test Summary</h2>
+            <div id="summary-content"></div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'https://web-production-de0bc.up.railway.app';
+        let testResults = {};
+
+        async function testEndpoint(testId, endpoint) {
+            const resultDiv = document.getElementById(`${testId}-result`);
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = 'Testing...';
+
+            try {
+                const response = await fetch(`${BASE_URL}${endpoint}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ SUCCESS (${response.status})\n\n${JSON.stringify(data, null, 2)}`;
+                    testResults[testId] = { success: true, status: response.status, data };
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ FAILED (${response.status})\n\n${JSON.stringify(data, null, 2)}`;
+                    testResults[testId] = { success: false, status: response.status, data };
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ ERROR\n\n${error.message}`;
+                testResults[testId] = { success: false, error: error.message };
+            }
+
+            updateSummary();
+        }
+
+        async function runAllTests() {
+            const tests = [
+                { id: 'health', endpoint: '/health' },
+                { id: 'auth', endpoint: '/api/modules/auth/debug' },
+                { id: 'oauth-health', endpoint: '/api/modules/auth/broker/health' },
+                { id: 'oauth-status', endpoint: '/api/modules/auth/broker/status' }
+            ];
+
+            for (const test of tests) {
+                await testEndpoint(test.id, test.endpoint);
+                // Small delay between tests
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+
+        function updateSummary() {
+            const summaryDiv = document.getElementById('summary');
+            const summaryContent = document.getElementById('summary-content');
+            
+            const totalTests = Object.keys(testResults).length;
+            const passedTests = Object.values(testResults).filter(r => r.success).length;
+            
+            if (totalTests > 0) {
+                summaryDiv.style.display = 'block';
+                
+                let summaryHtml = `
+                    <p>✅ Passed: ${passedTests}/${totalTests}</p>
+                    <p>❌ Failed: ${totalTests - passedTests}/${totalTests}</p>
+                `;
+
+                if (passedTests === totalTests && totalTests >= 4) {
+                    summaryDiv.className = 'summary success';
+                    summaryHtml += `
+                        <h3>🎉 All Tests Passed!</h3>
+                        <p>Your PostgreSQL database setup is working correctly!</p>
+                        <p><strong>Next Steps:</strong></p>
+                        <ul>
+                            <li>Test OAuth flow: <a href="${BASE_URL}/api/modules/auth/broker/connect/zerodha" target="_blank">Connect Zerodha</a></li>
+                            <li>Monitor database in Railway dashboard</li>
+                            <li>Start using OAuth features</li>
+                        </ul>
+                    `;
+                } else {
+                    summaryDiv.className = 'summary error';
+                    summaryHtml += `
+                        <h3>⚠️ Some Tests Failed</h3>
+                        <p>Check the failed tests above and:</p>
+                        <ul>
+                            <li>Verify DATABASE_URL environment variable</li>
+                            <li>Check Railway deployment logs</li>
+                            <li>Ensure PostgreSQL service is active</li>
+                            <li>Restart backend service if needed</li>
+                        </ul>
+                    `;
+                }
+
+                summaryContent.innerHTML = summaryHtml;
+            }
+        }
+    </script>
+</body>
+</html>

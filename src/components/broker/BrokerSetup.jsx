@@ -218,7 +218,12 @@ export default function BrokerSetup({
       // Setup OAuth credentials on backend
       console.log("🔧 [BrokerSetup] Setting up OAuth credentials on backend...");
       
-      const setupResult = await brokerAPI.setupOAuth(config.api_key, config.api_secret);
+      // Generate a consistent user ID for this session
+      const userId = localStorage.getItem('temp_user_id') || 
+                    `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('temp_user_id', userId);
+      
+      const setupResult = await brokerAPI.setupOAuth(config.api_key, config.api_secret, userId);
       console.log("📡 [BrokerSetup] Backend setup response:", setupResult);
       
       const authUrl = setupResult.oauth_url;

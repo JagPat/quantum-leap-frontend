@@ -1,0 +1,77 @@
+[
+  {
+    "id": "TEST_1758212385995_E0F1B754",
+    "username": "env_user_1",
+    "email": "test1758212385995@example.com",
+    "api_key": "test_key_c2d4d2899f872f55",
+    "api_secret": "test_secret_2dc79eabc99b4ab80e71f3630c92adc7",
+    "created_at": "2025-09-18T16:19:45.995Z",
+    "status": "active",
+    "test_session_id": "SESSION_1758212385994_E62D54429F4A",
+    "metadata": {
+      "purpose": "environment_testing",
+      "created_by": "test-data-manager",
+      "cleanup_after": "2025-09-19T16:19:45.995Z"
+    }
+  },
+  {
+    "id": "TEST_1758212385995_412E7591",
+    "username": "env_user_2",
+    "email": "test1758212385995@example.com",
+    "api_key": "test_key_f10d39387a187158",
+    "api_secret": "test_secret_5d9562539ed3157aea56843b51091421",
+    "created_at": "2025-09-18T16:19:45.995Z",
+    "status": "active",
+    "test_session_id": "SESSION_1758212385994_E62D54429F4A",
+    "metadata": {
+      "purpose": "environment_testing",
+      "created_by": "test-data-manager",
+      "cleanup_after": "2025-09-19T16:19:45.995Z"
+    }
+  },
+  {
+    "id": "TEST_1758212385995_CCD35E29",
+    "username": "env_user_3",
+    "email": "test1758212385995@example.com",
+    "api_key": "test_key_3562043c9702a2da",
+    "api_secret": "test_secret_0848a5c4be8d3123cb32ceead1a04579",
+    "created_at": "2025-09-18T16:19:45.995Z",
+    "status": "active",
+    "test_session_id": "SESSION_1758212385994_E62D54429F4A",
+    "metadata": {
+      "purpose": "environment_testing",
+      "created_by": "test-data-manager",
+      "cleanup_after": "2025-09-19T16:19:45.995Z"
+    }
+  },
+  {
+    "id": "TEST_1758212385995_97F95340",
+    "username": "env_user_4",
+    "email": "test1758212385995@example.com",
+    "api_key": "test_key_bfe23f8dc92fd82f",
+    "api_secret": "test_secret_6848be460310ac81f747e364623fd32a",
+    "created_at": "2025-09-18T16:19:45.996Z",
+    "status": "active",
+    "test_session_id": "SESSION_1758212385994_E62D54429F4A",
+    "metadata": {
+      "purpose": "environment_testing",
+      "created_by": "test-data-manager",
+      "cleanup_after": "2025-09-19T16:19:45.996Z"
+    }
+  },
+  {
+    "id": "TEST_1758212385999_CC94F337",
+    "username": "env_user_5",
+    "email": "test1758212385999@example.com",
+    "api_key": "test_key_74a53d634d3cdb5d",
+    "api_secret": "test_secret_a8ba2ead3629e24cf6cab2db9997e5e7",
+    "created_at": "2025-09-18T16:19:45.999Z",
+    "status": "active",
+    "test_session_id": "SESSION_1758212385994_E62D54429F4A",
+    "metadata": {
+      "purpose": "environment_testing",
+      "created_by": "test-data-manager",
+      "cleanup_after": "2025-09-19T16:19:45.999Z"
+    }
+  }
+]

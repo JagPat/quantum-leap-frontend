@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth Frontend Integration Verification</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .loading {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 OAuth Frontend Integration Verification</h1>
+        <p>This page tests the OAuth setup integration from the frontend perspective.</p>
+        
+        <div class="test-section">
+            <h3>1. Backend Connectivity Test</h3>
+            <button class="test-button" onclick="testBackendConnectivity()">Test Backend Connection</button>
+            <div id="backend-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. OAuth Setup API Test</h3>
+            <button class="test-button" onclick="testOAuthSetupAPI()">Test OAuth Setup Endpoint</button>
+            <div id="oauth-api-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Frontend OAuth Integration Test</h3>
+            <p>This simulates the actual frontend OAuth setup flow:</p>
+            <div>
+                <label>API Key: <input type="text" id="api-key" value="test_api_key_1234567890" style="width: 200px;"></label><br><br>
+                <label>API Secret: <input type="password" id="api-secret" value="test_api_secret_1234567890" style="width: 200px;"></label><br><br>
+                <button class="test-button" onclick="testFrontendOAuthFlow()">Start OAuth Flow</button>
+            </div>
+            <div id="frontend-oauth-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Database Integration Test</h3>
+            <button class="test-button" onclick="testDatabaseIntegration()">Test Database Operations</button>
+            <div id="database-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. Complete Flow Verification</h3>
+            <button class="test-button" onclick="runCompleteVerification()">Run All Tests</button>
+            <div id="complete-result" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const BACKEND_URL = 'https://web-production-de0bc.up.railway.app';
+        const FRONTEND_URL = 'https://quantumleap-trading-frontend.up.railway.app';
+
+        function showResult(elementId, content, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `result ${type}`;
+            element.textContent = content;
+        }
+
+        async function testBackendConnectivity() {
+            showResult('backend-result', 'Testing backend connectivity...', 'loading');
+            
+            try {
+                const response = await fetch(`${BACKEND_URL}/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('backend-result', 
+                        `✅ Backend Connected Successfully\n\nStatus: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`, 
+                        'success'
+                    );
+                } else {
+                    showResult('backend-result', 
+                        `❌ Backend Connection Failed\n\nStatus: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`, 
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showResult('backend-result', 
+                    `❌ Backend Connection Error\n\nError: ${error.message}`, 
+                    'error'
+                );
+            }
+        }
+
+        async function testOAuthSetupAPI() {
+            showResult('oauth-api-result', 'Testing OAuth setup API...', 'loading');
+            
+            try {
+                const testPayload = {
+                    api_key: 'test_api_key_1234567890',
+                    api_secret: 'test_api_secret_1234567890',
+                    user_id: 'frontend_test_user',
+                    frontend_url: window.location.origin
+                };
+                
+                const response = await fetch(`${BACKEND_URL}/api/modules/auth/broker/setup-oauth`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(testPayload)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showResult('oauth-api-result', 
+                        `✅ OAuth Setup API Working\n\nStatus: ${response.status}\nOAuth URL: ${data.data.oauth_url}\nConfig ID: ${data.data.config_id}\nState: ${data.data.state}`, 
+                        'success'
+                    );
+                } else {
+                    showResult('oauth-api-result', 
+                        `❌ OAuth Setup API Failed\n\nStatus: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`, 
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showResult('oauth-api-result', 
+                    `❌ OAuth Setup API Error\n\nError: ${error.message}`, 
+                    'error'
+                );
+            }
+        }
+
+        async function testFrontendOAuthFlow() {
+            showResult('frontend-oauth-result', 'Testing frontend OAuth flow...', 'loading');
+            
+            try {
+                const apiKey = document.getElementById('api-key').value;
+                const apiSecret = document.getElementById('api-secret').value;
+                
+                if (!apiKey || !apiSecret) {
+                    showResult('frontend-oauth-result', 
+                        '❌ Please enter API Key and API Secret', 
+                        'error'
+                    );
+                    return;
+                }
+                
+                // Generate user ID like the frontend does
+                const userId = localStorage.getItem('temp_user_id') || 
+                              `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                localStorage.setItem('temp_user_id', userId);
+                
+                // Simulate the brokerAPI.setupOAuth call
+                const setupPayload = {
+                    api_key: apiKey,
+                    api_secret: apiSecret,
+                    user_id: userId,
+                    frontend_url: window.location.origin
+                };
+                
+                const response = await fetch(`${BACKEND_URL}/api/modules/auth/broker/setup-oauth`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(setupPayload)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    showResult('frontend-oauth-result', 
+                        `✅ Frontend OAuth Flow Working\n\nUser ID: ${userId}\nOAuth URL: ${result.data.oauth_url}\nConfig ID: ${result.data.config_id}\n\n🔗 OAuth URL would open in popup window`, 
+                        'success'
+                    );
+                    
+                    // Optionally open the OAuth URL in a new window for testing
+                    if (confirm('Open OAuth URL in new window for testing?')) {
+                        window.open(result.data.oauth_url, 'oauth_test', 'width=800,height=600');
+                    }
+                } else {
+                    showResult('frontend-oauth-result', 
+                        `❌ Frontend OAuth Flow Failed\n\nStatus: ${response.status}\nError: ${result.error || 'Unknown error'}\nDetails: ${result.details || 'No details'}`, 
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showResult('frontend-oauth-result', 
+                    `❌ Frontend OAuth Flow Error\n\nError: ${error.message}`, 
+                    'error'
+                );
+            }
+        }
+
+        async function testDatabaseIntegration() {
+            showResult('database-result', 'Testing database integration...', 'loading');
+            
+            try {
+                // Test OAuth health endpoint which checks database
+                const response = await fetch(`${BACKEND_URL}/api/modules/auth/broker/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showResult('database-result', 
+                        `✅ Database Integration Working\n\nStatus: ${data.data.status}\nDatabase: ${data.data.database?.status || 'Unknown'}\nStats: ${JSON.stringify(data.data.stats || {}, null, 2)}`, 
+                        'success'
+                    );
+                } else {
+                    showResult('database-result', 
+                        `❌ Database Integration Failed\n\nStatus: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`, 
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showResult('database-result', 
+                    `❌ Database Integration Error\n\nError: ${error.message}`, 
+                    'error'
+                );
+            }
+        }
+
+        async function runCompleteVerification() {
+            showResult('complete-result', 'Running complete verification...', 'loading');
+            
+            let results = [];
+            
+            // Test 1: Backend Connectivity
+            try {
+                const response = await fetch(`${BACKEND_URL}/health`);
+                const data = await response.json();
+                results.push(`✅ Backend Connectivity: ${response.ok ? 'PASS' : 'FAIL'}`);
+            } catch (error) {
+                results.push(`❌ Backend Connectivity: FAIL - ${error.message}`);
+            }
+            
+            // Test 2: OAuth API
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/modules/auth/broker/setup-oauth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        api_key: 'test_api_key_1234567890',
+                        api_secret: 'test_api_secret_1234567890',
+                        user_id: 'complete_test_user'
+                    })
+                });
+                const data = await response.json();
+                results.push(`${response.ok && data.success ? '✅' : '❌'} OAuth Setup API: ${response.ok && data.success ? 'PASS' : 'FAIL'}`);
+            } catch (error) {
+                results.push(`❌ OAuth Setup API: FAIL - ${error.message}`);
+            }
+            
+            // Test 3: Database Health
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/modules/auth/broker/health`);
+                const data = await response.json();
+                results.push(`${response.ok && data.success ? '✅' : '❌'} Database Health: ${response.ok && data.success ? 'PASS' : 'FAIL'}`);
+            } catch (error) {
+                results.push(`❌ Database Health: FAIL - ${error.message}`);
+            }
+            
+            const passCount = results.filter(r => r.includes('✅')).length;
+            const totalCount = results.length;
+            
+            showResult('complete-result', 
+                `Complete Verification Results:\n\n${results.join('\n')}\n\n📊 Summary: ${passCount}/${totalCount} tests passed\n\n${passCount === totalCount ? '🎉 All systems operational!' : '⚠️ Some systems need attention'}`, 
+                passCount === totalCount ? 'success' : 'error'
+            );
+        }
+    </script>
+</body>
+</html>

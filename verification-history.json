@@ -1,0 +1,58 @@
+[
+  {
+    "timestamp": "2025-09-18T21:40:25.056Z",
+    "duration": 11833,
+    "results": {
+      "timestamp": "2025-09-18T21:40:13.248Z",
+      "selectedTests": [
+        "health",
+        "oauth",
+        "security"
+      ],
+      "tests": {
+        "health": {
+          "name": "Health Monitoring",
+          "status": "completed",
+          "timestamp": "2025-09-18T21:40:17.591Z",
+          "details": {
+            "exitCode": 0,
+            "output": "🏥 Production Endpoint Health Monitoring\n========================================\n🌐 Backend URL: https://web-production-de0bc.up.railway.app\n⏱️  Started at: 2025-09-18T21:40:13.273Z\n\n📋 Phase 1: Setup OAuth Endpoint Health Check\n==============================================\n🔍 Checking /api/auth/broker/setup-oauth endpoint health...\n  🔍 Endpoint Availability (404 Check)\n     Verify endpoint exists and is not returning 404\n  ✅ PASS (730ms)\n     📊 Details: {\n      \"status\": 400,\n      \"available\": true,\n      \"responseTime\": 730.262666,\n      \"timestamp\": \"2025-09-18T21:40:14.004Z\"\n}\n\n  🔍 Valid Request Processing\n     Test endpoint with valid data to ensure proper processing\n  ✅ PASS (194ms)\n     📊 Details: {\n      \"status\": 500,\n      \"validProcessing\": \"Database connection not initialized\",\n      \"response\": {\n            \"success\": false,\n            \"error\": \"Failed to setup OAuth\",\n            \"message\": \"Database connection not initialized\"\n      },\n      \"responseTime\": 194.30162500000006,\n      \"timestamp\": \"2025-09-18T21:40:14.199Z\"\n}\n\n  🔍 Invalid Request Data Detection\n     Verify proper error handling for invalid requests\n  ✅ PASS (76ms)\n     📊 Details: {\n      \"status\": 400,\n      \"properErrorHandling\": true,\n      \"errorMessage\": \"Invalid request data\",\n      \"responseTime\": 76.12895900000001,\n      \"timestamp\": \"2025-09-18T21:40:14.275Z\"\n}\n\n📋 Phase 2: Broker Health Endpoint Check\n========================================\n🔍 Checking /api/auth/broker/health endpoint health...\n  🔍 Endpoint Availability\n     Verify health endpoint is accessible\n  ✅ PASS (968ms)\n     📊 Details: {\n      \"status\": 200,\n      \"available\": true,\n      \"responseTime\": 968.0299160000001,\n      \"timestamp\": \"2025-09-18T21:40:15.244Z\"\n}\n\n  🔍 Successful Health Status\n     Verify health endpoint returns successful status\n  ✅ PASS (681ms)\n     📊 Details: {\n      \"status\": 200,\n      \"successField\": true,\n      \"healthData\": {\n            \"status\": \"healthy\",\n            \"brokerService\": \"operational\",\n            \"components\": {\n                  \"brokerConfigs\": {\n                        \"status\": \"error\",\n                        \"error\": \"Database connection not initialized\",\n                        \"timestamp\": \"2025-09-18T21:40:15.737Z\"\n                  },\n                  \"tokenManager\": {\n                        \"status\": \"healthy\",\n                        \"tokenManager\": \"operational\",\n                        \"components\": {\n                              \"oauthTokens\": {\n                                    \"status\": \"error\",\n                                    \"error\": \"Database connection not initialized\",\n                                    \"timestamp\": \"2025-09-18T21:40:15.737Z\"\n                              },\n                              \"brokerConfigs\": {\n                                    \"status\": \"error\",\n                                    \"error\": \"Database connection not initialized\",\n                                    \"timestamp\": \"2025-09-18T21:40:15.737Z\"\n                              },\n                              \"kiteClient\": {\n                                    \"status\": \"healthy\",\n                                    \"kiteApiReachable\": true,\n                                    \"statusCode\": 405,\n                                    \"timestamp\": \"2025-09-18T21:40:15.856Z\"\n                              }\n                        },\n                        \"refreshJob\": \"running\",\n                        \"timestamp\": \"2025-09-18T21:40:15.856Z\"\n                  },\n                  \"kiteClient\": {\n                        \"status\": \"healthy\",\n                        \"kiteApiReachable\": true,\n                        \"statusCode\": 405,\n                        \"timestamp\": \"2025-09-18T21:40:15.945Z\"\n                  }\n            },\n            \"monitoring\": \"active\",\n            \"timestamp\": \"2025-09-18T21:40:15.945Z\"\n      },\n      \"responseTime\": 680.9156249999999,\n      \"timestamp\": \"2025-09-18T21:40:15.926Z\"\n}\n\n  🔍 Response Format Validation\n     Verify health endpoint returns proper JSON structure\n  ✅ PASS (571ms)\n     📊 Details: {\n      \"status\": 200,\n      \"validFormat\": true,\n      \"hasSuccessField\": true,\n      \"hasDataField\": true,\n      \"responseTime\": 571.4015420000001,\n      \"timestamp\": \"2025-09-18T21:40:16.498Z\"\n}\n\n📋 Phase 3: HTTP Status and Response Format Verification\n========================================================\n🔍 Verifying HTTP status codes and response formats...\n  🔍 Application Health Status\n  ✅ PASS (75ms)\n     📊 Status: 200/200, Format: Valid\n\n  🔍 Auth Module Debug Status\n  ✅ PASS (74ms)\n     📊 Status: 200/200, Format: Valid\n\n  🔍 OAuth Health Status\n  ✅ PASS (535ms)\n     📊 Status: 200/200, Format: Valid\n\n  🔍 OAuth Setup Bad Request Status\n  ✅ PASS (78ms)\n     📊 Status: 400/400, Format: Valid\n\n📋 Phase 4: Error Response Analysis\n===================================\n🔍 Analyzing error response patterns...\n  🔍 Invalid Request Data Error Detection\n     Test for proper \"Invalid request data\" error responses\n  ✅ PASS (75ms)\n     📊 Details: {\n      \"hasInvalidRequestDataError\": true,\n      \"status\": 400,\n      \"errorMessage\": \"Invalid request data\",\n      \"responseTime\": 74.86637500000006\n}\n\n  🔍 Missing Required Fields Error\n     Test error responses for missing required fields\n  ✅ PASS (74ms)\n     📊 Details: {\n      \"hasProperValidationError\": true,\n      \"status\": 400,\n      \"errorMessage\": \"Invalid request data\",\n      \"details\": \"\\\"api_key\\\" is required\",\n      \"responseTime\": 74.18849999999975\n}\n\n  🔍 Database Connection Error Handling\n     Test error handling for database connection issues\n  ✅ PASS (171ms)\n     📊 Details: {\n      \"hasProperDbErrorHandling\": \"Database connection not initialized\",\n      \"status\": 500,\n      \"errorMessage\": \"Failed to setup OAuth\",\n      \"responseTime\": 170.5619999999999\n}\n\n📊 Production Health Monitoring Summary\n======================================\n🔧 Setup OAuth Endpoint: HEALTHY (3/3)\n🏥 Broker Health Endpoint: HEALTHY (3/3)\n📋 HTTP Status & Formats: HEALTHY (4/4)\n❌ Error Response Analysis: HEALTHY (3/3)\n\n⏱️  Total Execution Time: 4312ms\n📈 Total Health Checks: 13\n✅ Checks Passed: 13\n❌ Checks Failed: 0\n🔗 Average Response Time: 306ms\n📊 Health Score: 100%\n🕐 Last Check: 2025-09-18T21:40:13.273Z\n\n🎉 Production endpoints are healthy!\n✅ All OAuth endpoints responding correctly\n✅ No 404 errors detected\n✅ Proper HTTP status codes and response formats\n✅ Error handling working correctly\n✅ System ready for production use\n\n🏁 Health monitoring completed at: 2025-09-18T21:40:17.584Z\n📊 Final Health Status: HEALTHY\n",
+            "success": true
+          },
+          "duration": 4342
+        },
+        "oauth": {
+          "name": "OAuth Endpoint Verification",
+          "status": "failed",
+          "error": "Script failed with exit code 1: ",
+          "timestamp": "2025-09-18T21:40:20.508Z",
+          "duration": 2917
+        },
+        "security": {
+          "name": "Security Verification",
+          "status": "failed",
+          "error": "Script failed with exit code 1: ",
+          "timestamp": "2025-09-18T21:40:25.051Z",
+          "duration": 4543
+        }
+      },
+      "summary": {
+        "total": 3,
+        "completed": 1,
+        "failed": 2,
+        "skipped": 0
+      }
+    },
+    "metrics": {
+      "totalTests": 3,
+      "completedTests": 1,
+      "failedTests": 2,
+      "successRate": 33,
+      "errorRate": 67,
+      "avgResponseTime": 3934,
+      "maxResponseTime": 4543,
+      "minResponseTime": 2917
+    },
+    "status": "unhealthy"
+  }
+]
