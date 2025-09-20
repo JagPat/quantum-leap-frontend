@@ -115,7 +115,9 @@ export default function BrokerIntegration() {
         console.log("🔍 Checking backend status for user_id:", userId);
         
         // Check broker connection via Railway backend
-        const response = await fetch(`${getBackendBaseUrl()}/api/modules/auth/broker/status?user_id=${userId}`, {
+        const statusUrl = `${getBackendBaseUrl()}/api/modules/auth/broker/status?user_id=${userId}`;
+        console.info(`[BrokerIntegration] GET ${statusUrl}`);
+        const response = await fetch(statusUrl, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
@@ -263,7 +265,9 @@ export default function BrokerIntegration() {
         if (currentConfig.access_token && currentConfig.user_data?.user_id) {
           console.log("🔍 Checking backend status for user:", currentConfig.user_data.user_id);
           try {
-            const backendResponse = await fetch(`${getBackendBaseUrl()}/api/modules/auth/broker/status?user_id=${currentConfig.user_data.user_id}`);
+            const statusUrl = `${getBackendBaseUrl()}/api/modules/auth/broker/status?user_id=${currentConfig.user_data.user_id}`;
+            console.info(`[BrokerIntegration] GET ${statusUrl}`);
+            const backendResponse = await fetch(statusUrl);
             const backendResult = await backendResponse.json();
             console.log("🔍 Backend status response:", backendResult);
             
@@ -478,7 +482,9 @@ export default function BrokerIntegration() {
       
       console.log("🔍 Manual backend check for user_id:", userId);
       
-      const response = await fetch(`${getBackendBaseUrl()}/api/modules/auth/broker/status?user_id=${userId}`, {
+      const statusUrl = `${getBackendBaseUrl()}/api/modules/auth/broker/status?user_id=${userId}`;
+      console.info(`[BrokerIntegration] GET ${statusUrl}`);
+      const response = await fetch(statusUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
