@@ -127,6 +127,21 @@ export default function BrokerIntegration() {
         const result = await response.json();
         console.log("🔍 Heartbeat check result:", result);
         
+        const backendStatusState = result.data?.connectionStatus?.state;
+        const backendStatusMessage = result.data?.connectionStatus?.message;
+        const tokenStatus = result.data?.tokenStatus;
+
+        if (backendStatusState === 'refreshing') {
+          setLiveStatus(prev => ({
+            ...prev,
+            state: 'refreshing',
+            message: backendStatusMessage || 'Attempting automatic reconnection…',
+            lastChecked: new Date().toLocaleTimeString(),
+            backendConnected: false
+          }));
+          return;
+        }
+
         if (result.status === 'success' && result.data?.is_connected) {
           setLiveStatus(prev => ({ 
             ...prev,
@@ -135,6 +150,7 @@ export default function BrokerIntegration() {
             lastChecked: new Date().toLocaleTimeString(),
             backendConnected: true
           }));
+          return;
         } else {
           // Don't immediately disconnect - show warning but maintain local status
           setLiveStatus(prev => ({ 
@@ -146,6 +162,15 @@ export default function BrokerIntegration() {
           }));
           
           console.warn("⚠️ Backend reports disconnected but local config shows connected. Possible session sync issue.");
+        }
+
+        if (tokenStatus?.status === 'expiring_soon') {
+          setLiveStatus(prev => ({
+            ...prev,
+            state: prev.state === 'connected' ? 'connected' : prev.state,
+            message: `Access token expiring soon. Awaiting automatic refresh…`,
+            lastChecked: new Date().toLocaleTimeString()
+          }));
         }
       } catch (error) {
         console.error("Heartbeat check failed:", error);
@@ -271,7 +296,18 @@ export default function BrokerIntegration() {
             const backendResult = await backendResponse.json();
             console.log("🔍 Backend status response:", backendResult);
             
-            if (backendResult.status === 'success' && backendResult.data?.is_connected) {
+            const backendState = backendResult.data?.connectionStatus?.state;
+            if (backendState === 'refreshing') {
+              setLiveStatus(prev => ({
+                ...prev,
+                state: 'refreshing',
+                message: backendResult.data?.connectionStatus?.message || 'Attempting automatic reconnection…',
+                lastChecked: new Date().toLocaleTimeString(),
+                backendConnected: false
+              }));
+            }
+
+            if (backendResult.status === 'success' && backendResult.data?.is_connected && backendState !== 'refreshing') {
               // Update local config with backend confirmation
               const updatedConfig = {
                 ...currentConfig,
@@ -306,8 +342,10 @@ export default function BrokerIntegration() {
               console.log("❌ Backend reports disconnected - updating to DISCONNECTED");
               setLiveStatus(prev => ({ 
                 ...prev,
-                state: 'disconnected', 
-                message: `Backend reports: ${backendResult.data?.message || 'Disconnected'}`,
+                state: backendState === 'refreshing' ? 'refreshing' : 'disconnected', 
+                message: backendState === 'refreshing'
+                  ? (backendResult.data?.connectionStatus?.message || 'Attempting automatic reconnection…')
+                  : `Backend reports: ${backendResult.data?.message || 'Disconnected'}`,
                 lastChecked: new Date().toLocaleTimeString(),
                 backendConnected: false,
                 last_successful_connection: backendResult.data?.last_successful_connection,
@@ -495,9 +533,11 @@ export default function BrokerIntegration() {
       console.log("🔍 Manual backend check result:", result);
       
       if (result.status === 'success') {
-        const isBackendConnected = result.data?.is_connected || false;
-        const backendMessage = result.data?.message || 'Unknown status';
-        
+        const backendState = result.data?.connectionStatus?.state;
+        const backendMessage = result.data?.connectionStatus?.message || result.data?.message || 'Unknown status';
+        const tokenStatus = result.data?.tokenStatus;
+        const isBackendConnected = result.data?.is_connected || backendState === 'connected';
+
         // Update local broker config state to reflect backend connection
         if (brokerConfig) {
           const updatedConfigs = configs.map(config => 
@@ -509,19 +549,36 @@ export default function BrokerIntegration() {
           setBrokerConfig({ ...brokerConfig, is_connected: isBackendConnected, backend_status: isBackendConnected ? 'connected' : 'disconnected' });
         }
         
+        const nextState = backendState === 'refreshing'
+          ? 'refreshing'
+          : (isBackendConnected ? 'connected' : 'connected_local');
+
+        const message = backendState === 'refreshing'
+          ? backendMessage || 'Attempting automatic reconnection…'
+          : (isBackendConnected
+              ? `Backend confirms connection at ${new Date().toLocaleTimeString()}`
+              : `Connected (Local) - Backend: ${backendMessage}`);
+
         setLiveStatus(prev => ({ 
           ...prev,
-          state: isBackendConnected ? 'connected' : 'connected_local',
-          message: isBackendConnected 
-            ? `Backend confirms connection at ${new Date().toLocaleTimeString()}`
-            : `Connected (Local) - Backend: ${backendMessage}`,
+          state: nextState,
+          message,
           lastChecked: new Date().toLocaleTimeString(),
           backendConnected: isBackendConnected,
           last_successful_connection: result.data?.last_successful_connection,
           token_expiry: result.data?.token_expiry,
           last_error: result.data?.last_error
         }));
-        
+
+        if (tokenStatus?.status === 'expiring_soon') {
+          setLiveStatus(prev => ({
+            ...prev,
+            state: prev.state,
+            message: 'Access token expiring soon. Awaiting automatic refresh…',
+            lastChecked: new Date().toLocaleTimeString()
+          }));
+        }
+
         toast({
           title: isBackendConnected ? "Backend Connected" : "Backend Disconnected",
           description: isBackendConnected 
