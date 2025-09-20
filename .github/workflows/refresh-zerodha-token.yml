@@ -1,0 +1,45 @@
+name: Refresh Zerodha Access Token
+
+on:
+  schedule:
+    - cron: '15 3 * * *'  # 08:45 IST daily
+  workflow_dispatch:
+
+jobs:
+  refresh-token:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Google Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list'
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r automation/requirements.txt
+
+      - name: Run token refresh automation
+        env:
+          Z_API_KEY: ${{ secrets.Z_API_KEY }}
+          Z_API_SECRET: ${{ secrets.Z_API_SECRET }}
+          Z_TOTP_SECRET: ${{ secrets.Z_TOTP_SECRET }}
+          Z_USER_ID: ${{ secrets.Z_USER_ID }}
+          Z_PASSWORD: ${{ secrets.Z_PASSWORD }}
+          BACKEND_UPDATE_URL: ${{ secrets.BACKEND_UPDATE_URL }}
+          BACKEND_SOURCE_LABEL: automation
+        run: |
+          python automation/fetch_access_token.py

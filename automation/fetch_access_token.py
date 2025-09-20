@@ -20,6 +20,7 @@ import os
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import pyotp
@@ -147,6 +148,26 @@ def generate_access_token(cfg: ZerodhaConfig, request_token: str) -> dict:
     session_data = kite.generate_session(request_token, api_secret=cfg.api_secret)
     access_token = session_data["access_token"]
 
+    # Determine approximate expiry. Kite returns login_time (ISO) and tokens last ~24h.
+    login_time_raw = session_data.get("login_time")
+    if login_time_raw:
+        try:
+            login_time = datetime.fromisoformat(login_time_raw.replace("Z", "+00:00"))
+        except ValueError:
+            login_time = datetime.now(timezone.utc)
+    else:
+        login_time = datetime.now(timezone.utc)
+
+    # Subtract a 5 minute buffer to stay ahead of expiry.
+    buffered_expiry = login_time + timedelta(hours=24) - timedelta(minutes=5)
+    session_data["expires_at"] = buffered_expiry.isoformat().replace("+00:00", "Z")
+    session_data["expires_in"] = max(900, int((buffered_expiry - datetime.now(timezone.utc)).total_seconds()))
+    if session_data["expires_in"] < 3600:
+        print(
+            "Warning: computed access token lifetime is less than one hour. "
+            "Verify Zerodha session duration."
+        )
+
     if cfg.token_output_path:
         with open(cfg.token_output_path, "w", encoding="utf-8") as f:
             f.write(access_token)
@@ -176,7 +197,11 @@ def notify_backend(cfg: ZerodhaConfig, session_data: dict, max_retries: int = 3,
             )
 
             if response.ok:
-                print("Backend token update succeeded:", response.json())
+                try:
+                    payload = response.json()
+                except ValueError:
+                    payload = {"raw": response.text}
+                print("Backend token update succeeded:", payload)
                 return
 
             print(
@@ -204,6 +229,8 @@ def main():
 
     session_data = generate_access_token(cfg, request_token)
     print("Access token generated successfully.")
+    if session_data.get("expires_at"):
+        print(f"Approximate expiry (buffered): {session_data['expires_at']}")
 
     notify_backend(cfg, session_data)
     print("All done.")
