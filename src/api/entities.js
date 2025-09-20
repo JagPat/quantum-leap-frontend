@@ -117,7 +117,7 @@ export const BrokerConfig = {
   
   update: (id, data) => {
     const configs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-    const index = configs.findIndex(c => c.id === id);
+    const index = configs.findIndex(c => String(c.id) === String(id));
     if (index !== -1) {
       configs[index] = { ...configs[index], ...data };
       localStorage.setItem('brokerConfigs', JSON.stringify(configs));
@@ -128,7 +128,7 @@ export const BrokerConfig = {
   
   delete: (id) => {
     const configs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-    const filtered = configs.filter(c => c.id !== id);
+    const filtered = configs.filter(c => String(c.id) !== String(id));
     localStorage.setItem('brokerConfigs', JSON.stringify(filtered));
     return Promise.resolve({ success: true });
   },
