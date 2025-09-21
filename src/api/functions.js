@@ -77,6 +77,16 @@ const markSessionNeedsAuth = () => {
   brokerSessionStore.markNeedsReauth();
 };
 
+const shouldTreatAsAuthError = (error) => {
+  if (!error) return false;
+  const status = error.status;
+  const code = error.code;
+  if (status === 401 || status === 403) return true;
+  if (code && ['TOKEN_EXPIRED', 'TOKEN_INVALID', 'BROKER_UNAUTHORIZED', 'TOKEN_ERROR'].includes(code)) return true;
+  const message = String(error.message || '').toLowerCase();
+  return message.includes('token') && (message.includes('expire') || message.includes('invalid'));
+};
+
 export const portfolioAPI = async (userInput, { bypassCache = false } = {}) => {
   try {
     const context = getActiveBrokerContext();
@@ -132,11 +142,15 @@ export const portfolioAPI = async (userInput, { bypassCache = false } = {}) => {
     };
   } catch (error) {
     console.error('❌ [portfolioAPI] Error:', error);
+    const needsAuth = shouldTreatAsAuthError(error);
+    if (needsAuth) {
+      markSessionNeedsAuth();
+    }
     return {
       success: false,
       status: 'error',
       message: error.message,
-      needsAuth: true,
+      needsAuth,
       data: {
         summary: {
           total_value: 0,

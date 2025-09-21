@@ -8,33 +8,60 @@ const isReauthRequired = (session) => {
 };
 
 export const useBrokerSession = () => {
-  const [session, setSession] = useState(() => brokerSession.load());
-  const [loading, setLoading] = useState(!session);
+  const initialSession = brokerSession.load();
+  const [session, setSession] = useState(initialSession);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const refresh = useCallback(async ({ configId = null, userId = null } = {}) => {
+  const refresh = useCallback(async ({ configId = null, userId = null, silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       setError(null);
       const status = await brokerAPI.checkConnectionStatus(configId, userId);
       const normalized = brokerSession.persist(status);
       setSession(normalized);
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
       return normalized;
     } catch (err) {
       console.error('❌ [useBrokerSession] Failed to refresh session', err);
       setError(err);
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
       throw err;
     }
   }, []);
 
   useEffect(() => {
-    if (!session) {
-      refresh().catch(() => {});
-    } else {
-      setLoading(false);
-    }
+    let active = true;
+
+    const bootstrap = async () => {
+      try {
+        await refresh({
+          configId: initialSession?.configId || undefined,
+          userId: initialSession?.userId || undefined,
+          silent: false
+        });
+      } catch (err) {
+        if (!initialSession && active) {
+          setSession(null);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    bootstrap();
+
+    return () => {
+      active = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -49,6 +76,7 @@ export const useBrokerSession = () => {
   const clearSession = useCallback(() => {
     brokerSession.clear();
     setSession(null);
+    setLoading(false);
   }, []);
 
   const value = useMemo(() => ({

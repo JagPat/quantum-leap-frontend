@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { railwayAPI } from '@/api/railwayAPI';
+import { brokerSessionStore } from '@/api/sessionStore.js';
 
 /**
  * Persistent Authentication Hook
@@ -211,15 +212,9 @@ export const usePersistentAuth = () => {
     console.log('🚪 [usePersistentAuth] Logging out...');
     
     // Clear stored authentication
-    const storedConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-    const updatedConfigs = storedConfigs.map(config => ({
-      ...config,
-      is_connected: false,
-      access_token: null,
-      user_data: null
-    }));
-    localStorage.setItem('brokerConfigs', JSON.stringify(updatedConfigs));
-    
+    localStorage.removeItem('brokerConfigs');
+    brokerSessionStore.clear();
+
     setIsAuthenticated(false);
     setUserData(null);
     setConnectionStatus('disconnected');
