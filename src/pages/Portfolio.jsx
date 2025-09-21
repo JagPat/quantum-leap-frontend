@@ -29,7 +29,8 @@ import {
   Activity,
   Shield,
   Loader2,
-  Brain
+  Brain,
+  Clock
 } from "lucide-react";
 
 // Lazy load AI Co-Pilot component to improve initial page load
@@ -56,11 +57,14 @@ export default function Portfolio() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [refreshing, setRefreshing] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState(null);
     const [selectedTab, setSelectedTab] = useState('overview');
     const [searchTerm, setSearchTerm] = useState('');
     const [sortBy, setSortBy] = useState('pnl');
     const [sortOrder, setSortOrder] = useState('desc');
     const [hideSmallPositions, setHideSmallPositions] = useState(false);
+    const [cacheInfo, setCacheInfo] = useState(null);
+    const [needsAuth, setNeedsAuth] = useState(false);
 
     useEffect(() => {
         fetchPortfolioData();
@@ -77,10 +81,31 @@ export default function Portfolio() {
         });
     }, [portfolioData]);
 
+    const formatTimestamp = (value) => {
+        if (!value) return null;
+        try {
+            return new Intl.DateTimeFormat('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            }).format(new Date(value));
+        } catch (err) {
+            return new Date(value).toLocaleTimeString();
+        }
+    };
+
+    const getDisplaySymbol = (instrument) => {
+        if (!instrument) return '—';
+        return instrument.tradingsymbol || instrument.symbol || instrument.name || instrument.isin || '—';
+    };
+
     const fetchPortfolioData = async (showRefreshIndicator = false) => {
         if (showRefreshIndicator) setRefreshing(true);
         else setLoading(true);
         setError(null);
+        setNeedsAuth(false);
+        setCacheInfo(null);
         
         try {
             // Get authenticated broker user_id
@@ -91,16 +116,17 @@ export default function Portfolio() {
             console.log("🔍 [Portfolio] ActiveBrokerConfig:", activeBrokerConfig);
             
             if (!activeBrokerConfig?.user_data?.user_id) {
+                setNeedsAuth(true);
                 throw new Error('No authenticated broker found. Please connect to your broker first.');
             }
 
             const userIdentifier = activeBrokerConfig.user_data.user_id;
             console.log("🔍 [Portfolio] Fetching data for user:", userIdentifier);
             
-            const result = await portfolioAPI(userIdentifier);
+            const result = await portfolioAPI(userIdentifier, { bypassCache: showRefreshIndicator });
             console.log("📊 [Portfolio] Complete API result:", result);
             
-            if (result?.status === 'success' && result?.data) {
+            if ((result?.status === 'success' || result?.success === true) && result?.data) {
                 console.log("✅ [Portfolio] Data received - Status: success");
                 console.log("📊 [Portfolio] Data structure:", {
                     summary: result.data.summary,
@@ -118,6 +144,9 @@ export default function Portfolio() {
                 }
                 
                 setPortfolioData(result.data);
+                setCacheInfo(result.data.cache || null);
+                setNeedsAuth(result?.needsAuth || false);
+                setLastUpdated(result.data.lastUpdated || result.data.summary?.last_updated || new Date().toISOString());
                 console.log("✅ [Portfolio] Data loaded successfully - State should be updated");
             } else {
                 console.warn("⚠️ [Portfolio] API result not successful:", {
@@ -126,13 +155,25 @@ export default function Portfolio() {
                     message: result?.message,
                     fullResult: result
                 });
-                setPortfolioData(null);
-                setError(result?.message || "No portfolio data available");
+                if (result?.data?.holdings || result?.data?.positions) {
+                    setPortfolioData(result.data);
+                } else {
+                    setPortfolioData(null);
+                }
+                setLastUpdated(null);
+                setCacheInfo(null);
+                const shouldPromptAuth = ['unauthorized', 'forbidden', 'no_connection'].includes(result?.status) || result?.needsAuth;
+                setNeedsAuth(shouldPromptAuth);
+                setError(result?.message || (shouldPromptAuth ? "Broker session expired. Please reconnect to fetch live data." : "No portfolio data available"));
             }
         } catch (err) {
             console.error("❌ [Portfolio] Error fetching portfolio data:", err);
             setError(err.message || "Failed to load portfolio data");
             setPortfolioData(null);
+            setLastUpdated(null);
+            if (err.message && err.message.toLowerCase().includes('connect')) {
+                setNeedsAuth(true);
+            }
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -168,12 +209,18 @@ export default function Portfolio() {
         return 'bg-slate-500/10 border-slate-500/30';
     };
 
+    const summary = portfolioData?.summary || {};
+    const currentValue = summary.current_value ?? summary.total_value ?? 0;
+    const totalInvestment = summary.total_investment ?? (currentValue - (summary.total_pnl || 0));
+    const dayPnl = summary.day_pnl ?? 0;
+    const totalPnl = summary.total_pnl ?? 0;
+
     const getAllPositions = () => {
         if (!portfolioData) return [];
         
         const holdings = portfolioData.holdings || [];
         const positions = portfolioData.positions || [];
-        
+
         // Combine and mark source
         const allPositions = [
             ...holdings.map(h => ({ ...h, source: 'holdings' })),
@@ -184,8 +231,9 @@ export default function Portfolio() {
         let filtered = allPositions;
 
         if (searchTerm) {
+            const lowerSearch = searchTerm.toLowerCase();
             filtered = filtered.filter(pos => 
-                pos.tradingsymbol?.toLowerCase().includes(searchTerm.toLowerCase())
+                getDisplaySymbol(pos).toLowerCase().includes(lowerSearch)
             );
         }
 
@@ -197,19 +245,25 @@ export default function Portfolio() {
 
         // Sort
         filtered.sort((a, b) => {
-            let aVal = a[sortBy] || 0;
-            let bVal = b[sortBy] || 0;
-            
             if (sortBy === 'tradingsymbol') {
-                aVal = String(aVal).toLowerCase();
-                bVal = String(bVal).toLowerCase();
-                return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                const aSymbol = getDisplaySymbol(a).toLowerCase();
+                const bSymbol = getDisplaySymbol(b).toLowerCase();
+                return sortOrder === 'asc' ? aSymbol.localeCompare(bSymbol) : bSymbol.localeCompare(aSymbol);
             }
-            
-            aVal = parseFloat(aVal) || 0;
-            bVal = parseFloat(bVal) || 0;
-            
-            return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+
+            const aRaw = a[sortBy];
+            const bRaw = b[sortBy];
+
+            const aNumeric = parseFloat(aRaw);
+            const bNumeric = parseFloat(bRaw);
+
+            if (!Number.isNaN(aNumeric) && !Number.isNaN(bNumeric)) {
+                return sortOrder === 'asc' ? aNumeric - bNumeric : bNumeric - aNumeric;
+            }
+
+            const aText = String(aRaw ?? '').toLowerCase();
+            const bText = String(bRaw ?? '').toLowerCase();
+            return sortOrder === 'asc' ? aText.localeCompare(bText) : bText.localeCompare(aText);
         });
 
         return filtered;
@@ -253,16 +307,32 @@ export default function Portfolio() {
                         <AlertTriangle className="h-4 w-4" />
                         <AlertDescription className="text-red-200">
                             <strong>Portfolio Error:</strong> {error}
+                            {needsAuth && (
+                                <span className="block mt-2 text-sm text-red-100">
+                                    Your Zerodha session appears to be inactive. Please reconnect to resume live updates.
+                                </span>
+                            )}
                         </AlertDescription>
                     </Alert>
                     <div className="mt-6 text-center">
-                        <Button 
-                            onClick={() => fetchPortfolioData()} 
-                            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-md"
-                        >
-                            <RefreshCw className="w-4 h-4 mr-2" />
-                            Try Again
-                        </Button>
+                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                            <Button 
+                                onClick={() => fetchPortfolioData()} 
+                                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0 shadow-md"
+                            >
+                                <RefreshCw className="w-4 h-4 mr-2" />
+                                Try Again
+                            </Button>
+                            {needsAuth && (
+                                <Button 
+                                    variant="outline"
+                                    className="border-slate-600/50 text-slate-200 hover:bg-slate-700/50"
+                                    onClick={() => window.location.href = '/broker-integration'}
+                                >
+                                    Reconnect Broker
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -290,7 +360,9 @@ export default function Portfolio() {
                         <p className="text-slate-400 mb-6">
                             {portfolioData ? 
                                 "Your portfolio appears to be empty. This could be normal if you have no current holdings or positions." :
-                                "Unable to load portfolio data. Please check your broker connection."}
+                                (needsAuth
+                                    ? "We were unable to fetch live data from Zerodha. Please reconnect your broker account to resume updates."
+                                    : "Unable to load portfolio data. Please check your broker connection.")}
                         </p>
                         
                         <div className="space-y-3">
@@ -313,7 +385,7 @@ export default function Portfolio() {
                                 className="w-full border-slate-600/50 text-slate-300 hover:bg-slate-700/50"
                                 onClick={() => window.location.href = '/broker-integration'}
                             >
-                                Check Broker Connection
+                                {needsAuth ? 'Reconnect Broker' : 'Open Broker Integration'}
                             </Button>
                         </div>
                     </div>
@@ -338,6 +410,22 @@ export default function Portfolio() {
                             <p className="text-slate-300 mt-1">Track your investments and performance</p>
                         </div>
                         <div className="flex items-center space-x-3">
+                            <div className="hidden sm:flex flex-col items-end text-xs text-slate-400 mr-3">
+                                {lastUpdated && (
+                                    <div className="flex items-center gap-1">
+                                        <Clock className="w-4 h-4 text-slate-500" />
+                                        <span>Last updated {formatTimestamp(lastUpdated)}</span>
+                                        {cacheInfo?.holdingsCached && (
+                                            <Badge variant="outline" className="ml-1 text-[10px] uppercase tracking-wide text-slate-300 border-slate-600/60">
+                                                Cached
+                                            </Badge>
+                                        )}
+                                    </div>
+                                )}
+                                {cacheInfo?.ttlMs && (
+                                    <span className="text-[11px] text-slate-500">Cache TTL {Math.round(cacheInfo.ttlMs / 1000)}s</span>
+                                )}
+                            </div>
                             <Button
                                 onClick={() => fetchPortfolioData(true)}
                                 disabled={refreshing}
@@ -353,20 +441,21 @@ export default function Portfolio() {
                             </Button>
                         </div>
                     </div>
+                    {lastUpdated && (
+                        <div className="sm:hidden mt-4 flex items-center gap-2 text-xs text-slate-400">
+                            <Clock className="w-4 h-4 text-slate-500" />
+                            <span>Last updated {formatTimestamp(lastUpdated)}</span>
+                            {cacheInfo?.holdingsCached && (
+                                <Badge variant="outline" className="ml-1 text-[10px] uppercase tracking-wide text-slate-300 border-slate-600/60">
+                                    Cached
+                                </Badge>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Demo Mode Banner */}
-                <div className="mb-6">
-                    <Alert className="border-yellow-500/20 bg-yellow-500/10 backdrop-blur-sm">
-                        <AlertTriangle className="h-4 w-4 text-yellow-400" />
-                        <AlertDescription className="text-yellow-200">
-                            <strong>Demo Mode:</strong> Showing sample portfolio data. Connect your broker to view live data from your actual portfolio.
-                        </AlertDescription>
-                    </Alert>
-                </div>
-
                 {/* Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <Card className="border-slate-700/50 bg-slate-800/50 backdrop-blur-sm shadow-lg border-0 rounded-xl">
@@ -378,10 +467,10 @@ export default function Portfolio() {
                                 <div className="ml-4 flex-1">
                                     <p className="text-sm font-medium text-slate-400">Current Value</p>
                                     <p className="text-2xl font-bold text-white">
-                                        {formatCurrency(summary.current_value)}
+                                        {formatCurrency(currentValue)}
                                     </p>
                                     <p className="text-xs text-slate-500 mt-1">
-                                        Invested: {formatCurrency(summary.total_investment)}
+                                        Invested: {formatCurrency(totalInvestment)}
                                     </p>
                                 </div>
                             </div>
@@ -391,19 +480,19 @@ export default function Portfolio() {
                     <Card className="border-slate-700/50 bg-slate-800/50 backdrop-blur-sm shadow-lg border-0 rounded-xl">
                         <CardContent className="p-6">
                             <div className="flex items-center">
-                                <div className={`p-2 rounded-lg ${summary.total_pnl >= 0 ? 'bg-green-500/20 border-green-500/30' : 'bg-red-500/20 border-red-500/30'} border`}>
-                                    {summary.total_pnl >= 0 ? 
+                                <div className={`p-2 rounded-lg ${totalPnl >= 0 ? 'bg-green-500/20 border-green-500/30' : 'bg-red-500/20 border-red-500/30'} border`}>
+                                    {totalPnl >= 0 ? 
                                         <TrendingUp className="h-6 w-6 text-green-400" /> : 
                                         <TrendingDown className="h-6 w-6 text-red-400" />
                                     }
                                 </div>
                                 <div className="ml-4 flex-1">
                                     <p className="text-sm font-medium text-slate-400">Total P&L</p>
-                                    <p className={`text-2xl font-bold ${getChangeColor(summary.total_pnl)}`}>
-                                        {formatCurrency(summary.total_pnl)}
+                                    <p className={`text-2xl font-bold ${getChangeColor(totalPnl)}`}>
+                                        {formatCurrency(totalPnl)}
                                     </p>
-                                    <p className={`text-xs mt-1 ${getChangeColor(summary.total_pnl)}`}>
-                                        {formatPercentage((summary.total_pnl / summary.total_investment) * 100)}
+                                    <p className={`text-xs mt-1 ${getChangeColor(totalPnl)}`}>
+                                        {formatPercentage(totalInvestment ? (totalPnl / totalInvestment) * 100 : 0)}
                                     </p>
                                 </div>
                             </div>
@@ -422,7 +511,7 @@ export default function Portfolio() {
                                         {formatCurrency(summary.day_pnl)}
                                     </p>
                                     <p className={`text-xs mt-1 ${getChangeColor(summary.day_pnl)}`}>
-                                        {formatPercentage((summary.day_pnl / summary.current_value) * 100)}
+                                        {formatPercentage(currentValue ? (dayPnl / currentValue) * 100 : 0)}
                                     </p>
                                 </div>
                             </div>
@@ -498,9 +587,9 @@ export default function Portfolio() {
                                 <CardContent>
                                     <div className="space-y-3">
                                         {topPerformers.length > 0 ? topPerformers.map((position, index) => (
-                                            <div key={`${position.tradingsymbol}-${index}`} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                                            <div key={`${getDisplaySymbol(position)}-${index}`} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
                                                 <div>
-                                                    <p className="font-semibold text-gray-900">{position.tradingsymbol}</p>
+                                                    <p className="font-semibold text-gray-900">{getDisplaySymbol(position)}</p>
                                                     <p className="text-sm text-gray-600">{position.quantity} shares</p>
                                                 </div>
                                                 <div className="text-right">
@@ -528,9 +617,9 @@ export default function Portfolio() {
                                 <CardContent>
                                     <div className="space-y-3">
                                         {topLosers.length > 0 ? topLosers.map((position, index) => (
-                                            <div key={`${position.tradingsymbol}-${index}`} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
+                                            <div key={`${getDisplaySymbol(position)}-${index}`} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
                                                 <div>
-                                                    <p className="font-semibold text-gray-900">{position.tradingsymbol}</p>
+                                                    <p className="font-semibold text-gray-900">{getDisplaySymbol(position)}</p>
                                                     <p className="text-sm text-gray-600">{position.quantity} shares</p>
                                                 </div>
                                                 <div className="text-right">
@@ -618,9 +707,9 @@ export default function Portfolio() {
                                         </TableHeader>
                                         <TableBody>
                                             {allPositions.map((position, index) => (
-                                                <TableRow key={`${position.tradingsymbol}-${index}`} className="hover:bg-gray-50">
+                                                <TableRow key={`${getDisplaySymbol(position)}-${index}`} className="hover:bg-gray-50">
                                                     <TableCell className="font-semibold">
-                                                        {position.tradingsymbol}
+                                                        {getDisplaySymbol(position)}
                                                         <div className="text-xs text-gray-500">{position.exchange}</div>
                                                     </TableCell>
                                                     <TableCell className="text-right">{position.quantity?.toLocaleString()}</TableCell>
@@ -674,7 +763,7 @@ export default function Portfolio() {
                                         {topPerformers.map((position, index) => (
                                             <div key={index} className="border border-green-200 rounded-lg p-4 bg-green-50">
                                                 <div className="flex items-center justify-between mb-2">
-                                                    <h4 className="font-bold text-lg">{position.tradingsymbol}</h4>
+                                                    <h4 className="font-bold text-lg">{getDisplaySymbol(position)}</h4>
                                                     <Badge className="bg-green-100 text-green-800">#{index + 1}</Badge>
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -710,7 +799,7 @@ export default function Portfolio() {
                                         {topLosers.map((position, index) => (
                                             <div key={index} className="border border-red-200 rounded-lg p-4 bg-red-50">
                                                 <div className="flex items-center justify-between mb-2">
-                                                    <h4 className="font-bold text-lg">{position.tradingsymbol}</h4>
+                                                    <h4 className="font-bold text-lg">{getDisplaySymbol(position)}</h4>
                                                     <Badge variant="destructive">Loss</Badge>
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -749,11 +838,11 @@ export default function Portfolio() {
                                 <CardContent>
                                     <div className="space-y-3">
                                         {allPositions.slice(0, 8).map((position, index) => {
-                                            const percentage = ((position.current_value || 0) / (summary.current_value || 1)) * 100;
+                                            const percentage = ((position.current_value || 0) / (currentValue || 1)) * 100;
                                             return (
                                                 <div key={index} className="space-y-1">
                                                     <div className="flex justify-between text-sm">
-                                                        <span className="font-medium">{position.tradingsymbol}</span>
+                                                        <span className="font-medium">{getDisplaySymbol(position)}</span>
                                                         <span className="text-gray-600">{percentage.toFixed(1)}%</span>
                                                     </div>
                                                     <Progress value={percentage} className="h-2" />
@@ -771,11 +860,11 @@ export default function Portfolio() {
                                 <CardContent className="space-y-4">
                                     <div className="border-b pb-3">
                                         <p className="text-sm text-gray-600">Total Invested</p>
-                                        <p className="text-xl font-bold">{formatCurrency(summary.total_investment)}</p>
+                                        <p className="text-xl font-bold">{formatCurrency(totalInvestment)}</p>
                                     </div>
                                     <div className="border-b pb-3">
                                         <p className="text-sm text-gray-600">Current Value</p>
-                                        <p className="text-xl font-bold">{formatCurrency(summary.current_value)}</p>
+                                        <p className="text-xl font-bold">{formatCurrency(currentValue)}</p>
                                     </div>
                                     <div className="border-b pb-3">
                                         <p className="text-sm text-gray-600">Absolute Return</p>
@@ -785,8 +874,8 @@ export default function Portfolio() {
                                     </div>
                                     <div>
                                         <p className="text-sm text-gray-600">Return %</p>
-                                        <p className={`text-xl font-bold ${getChangeColor(summary.total_pnl)}`}>
-                                            {formatPercentage((summary.total_pnl / summary.total_investment) * 100)}
+                                        <p className={`text-xl font-bold ${getChangeColor(totalPnl)}`}>
+                                            {formatPercentage(totalInvestment ? (totalPnl / totalInvestment) * 100 : 0)}
                                         </p>
                                     </div>
                                 </CardContent>

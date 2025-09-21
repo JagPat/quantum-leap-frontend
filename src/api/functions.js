@@ -31,20 +31,41 @@ const extractUserId = (userInput) => {
   return 'local@development.com'; // Fallback
 };
 
+const getActiveBrokerContext = () => {
+  try {
+    const configs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
+    const activeConfig = configs.find(config => config.is_connected && (config.access_token || config.accessToken));
+
+    if (!activeConfig) {
+      return null;
+    }
+
+    const userId = activeConfig.user_data?.user_id || activeConfig.user_id;
+    return {
+      activeConfig,
+      userId
+    };
+  } catch (error) {
+    console.error('❌ [getActiveBrokerContext] Failed to read broker configs:', error);
+    return null;
+  }
+};
+
 // CRITICAL FIX: Enhanced portfolioAPI that uses proper user identification
-export const portfolioAPI = async (userInput) => {
+export const portfolioAPI = async (userInput, options = {}) => {
   try {
     // First priority: Use authenticated broker user_id if available
-    const configs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-    const activeConfig = configs.find(config => config.is_connected && config.access_token);
-    
+    const context = getActiveBrokerContext();
+
     // Check if we have valid broker authentication
-    if (!activeConfig || !activeConfig.access_token || !activeConfig.api_key) {
+    if (!context || !context.activeConfig.access_token || !context.activeConfig.api_key) {
       console.warn("⚠️ [portfolioAPI] No active broker authentication found - returning empty portfolio data");
       // Return empty portfolio data instead of throwing error
       return {
+        success: false,
         status: 'no_connection',
-        message: 'No active broker connection',
+        message: 'No active broker connection. Please connect to Zerodha to view live data.',
+        needsAuth: true,
         data: {
           summary: {
             total_value: 0,
@@ -59,30 +80,24 @@ export const portfolioAPI = async (userInput) => {
       };
     }
     
-    let userId;
-    
-    if (activeConfig?.user_data?.user_id) {
-      userId = activeConfig.user_data.user_id;
-      console.log("🔍 [portfolioAPI] Using authenticated broker user_id:", userId);
-    } else {
-      // Fallback: Extract from provided input
-      userId = extractUserId(userInput);
-      console.log("🔍 [portfolioAPI] No broker user_id found, using fallback:", userId);
-    }
+    const userId = context.userId || extractUserId(userInput);
+
+    console.log("🔍 [portfolioAPI] Using authenticated broker user_id:", userId);
     
     console.log("🔍 [portfolioAPI] Final user_id:", userId, "Type:", typeof userId);
     console.log("🔍 [portfolioAPI] Active broker config:", {
-      broker_name: activeConfig.broker_name,
-      user_id: activeConfig.user_data?.user_id,
-      has_access_token: !!activeConfig.access_token,
-      has_api_key: !!activeConfig.api_key
+      broker_name: context.activeConfig.broker_name,
+      user_id: context.activeConfig.user_data?.user_id,
+      has_access_token: !!context.activeConfig.access_token,
+      has_api_key: !!context.activeConfig.api_key
     });
     
-    return await railwayAPI.getPortfolioData(userId);
+    return await railwayAPI.getPortfolioData(userId, options);
   } catch (error) {
     console.error("❌ [portfolioAPI] Error:", error);
     // Return empty data instead of throwing error to prevent dashboard crashes
     return {
+      success: false,
       status: 'error',
       message: error.message,
       data: {
@@ -95,7 +110,8 @@ export const portfolioAPI = async (userInput) => {
         },
         holdings: [],
         positions: []
-      }
+      },
+      needsAuth: error.code === 'TOKEN_EXPIRED' || error.code === 'BROKER_UNAUTHORIZED'
     };
   }
 };
@@ -131,4 +147,24 @@ export const brokerAPI = async ({ endpoint, user_id }) => {
     default:
       throw new Error(`Unknown endpoint: ${endpoint}`);
   }
+};
+
+export const fetchBrokerOrders = async ({ userInput, bypassCache = false } = {}) => {
+  const context = getActiveBrokerContext();
+
+  if (!context?.userId) {
+    return {
+      success: false,
+      status: 'no_connection',
+      message: 'No active broker connection. Please connect to Zerodha to view order history.',
+      needsAuth: true,
+      data: []
+    };
+  }
+
+  const userId = context.userId || extractUserId(userInput);
+  console.log('🔍 [fetchBrokerOrders] Fetching orders for user', userId, { bypassCache });
+
+  const result = await railwayAPI.getBrokerOrders(userId, { bypassCache });
+  return result;
 };

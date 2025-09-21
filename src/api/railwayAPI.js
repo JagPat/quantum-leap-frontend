@@ -1,12 +1,24 @@
 // Railway Backend API Service
-// Direct API calls to Railway backend for optimal performance
+// Direct API calls to backend for optimal performance
 
-// const BACKEND_URL = 'http://127.0.0.1:8000'; // Local development
-const BACKEND_URL = 'https://web-production-de0bc.up.railway.app'; // Production
+import { config } from '@/config/deployment.js';
+
+const FALLBACK_BACKEND_URL = 'https://web-production-de0bc.up.railway.app';
+
+const detectBackendUrl = () => {
+  try {
+    if (config?.urls?.backend) {
+      return config.urls.backend;
+    }
+  } catch (error) {
+    console.warn('⚠️ [RailwayAPI] Failed to resolve deployment config:', error);
+  }
+  return FALLBACK_BACKEND_URL;
+};
 
 class RailwayAPI {
   constructor() {
-    this.baseURL = BACKEND_URL;
+    this.baseURL = detectBackendUrl();
     this.pendingRequests = new Map(); // For request deduplication
   }
 
@@ -85,37 +97,56 @@ class RailwayAPI {
     const requestPromise = (async () => {
       try {
         console.log(`🚀 [RailwayAPI] ${config.method} ${url}`);
-        
+
         const response = await fetch(url, config);
-        
+
         if (!response.ok) {
-          if (response.status === 401) {
-            console.warn(`⚠️ [RailwayAPI] Unauthorized (401) for ${endpoint} - user needs to connect broker`);
+          const payload = await response.json().catch(() => ({ detail: response.statusText }));
+
+          if (response.status === 401 || response.status === 403) {
+            const statusKey = response.status === 401 ? 'unauthorized' : 'forbidden';
+            console.warn(`⚠️ [RailwayAPI] ${response.status} for ${endpoint} - broker authentication required`, payload);
             return {
-              status: 'unauthorized',
-              message: 'Please connect to your broker to access this feature.',
-              data: null,
-              requiresAuth: true
+              success: false,
+              status: statusKey,
+              message: payload.error || payload.message || (response.status === 401 ? 'Broker session expired. Please reconnect.' : 'Broker access denied.'),
+              code: payload.code || (response.status === 401 ? 'TOKEN_EXPIRED' : 'BROKER_UNAUTHORIZED'),
+              needsAuth: payload.needs_reauth ?? true,
+              requiresAuth: true,
+              data: payload.data || null
             };
           }
-          
+
+          if (response.status === 429) {
+            console.warn(`⚠️ [RailwayAPI] Rate limited (429) for ${endpoint}`);
+            return {
+              success: false,
+              status: 'rate_limited',
+              message: payload.error || payload.message || 'Rate limit reached. Please try again shortly.',
+              code: payload.code || 'RATE_LIMIT',
+              retryAfter: response.headers.get('Retry-After') || null
+            };
+          }
+
           if (response.status === 404) {
-            console.warn(`⚠️ [RailwayAPI] Endpoint not found (404) for ${endpoint} - feature not yet implemented`);
+            console.warn(`⚠️ [RailwayAPI] Endpoint not found (404) for ${endpoint}`);
             return {
+              success: false,
               status: 'not_implemented',
-              message: 'This feature is planned but not yet implemented.',
-              data: null,
-              endpoint: endpoint
+              message: payload.error || payload.message || 'This feature is planned but not yet implemented.',
+              endpoint
             };
           }
-          
-          const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-          throw new Error(errorData.detail || `HTTP ${response.status}`);
+
+          const error = new Error(payload.detail || payload.error || `HTTP ${response.status}`);
+          error.status = response.status;
+          error.payload = payload;
+          throw error;
         }
-        
-        const data = await response.json();
-        
-        console.log(`✅ [RailwayAPI] Success:`, data);
+
+        const data = await response.json().catch(() => ({}));
+
+        console.log(`✅ [RailwayAPI] Success`, { endpoint, hasData: !!data, keys: Object.keys(data || {}) });
         return data;
       } catch (error) {
         console.error(`❌ [RailwayAPI] Error:`, error);
@@ -173,12 +204,22 @@ class RailwayAPI {
     return this.request('/api/broker/status');
   }
 
-  async getBrokerHoldings(userId) {
-    return this.request(`/api/broker/holdings?user_id=${userId}`);
+  async getBrokerHoldings(userId, options = {}) {
+    const params = new URLSearchParams({ user_id: userId });
+    if (options.bypassCache) params.append('bypass_cache', 'true');
+    return this.request(`/api/broker/holdings?${params.toString()}`);
   }
 
-  async getBrokerPositions(userId) {
-    return this.request(`/api/broker/positions?user_id=${userId}`);
+  async getBrokerPositions(userId, options = {}) {
+    const params = new URLSearchParams({ user_id: userId });
+    if (options.bypassCache) params.append('bypass_cache', 'true');
+    return this.request(`/api/broker/positions?${params.toString()}`);
+  }
+
+  async getBrokerOrders(userId, options = {}) {
+    const params = new URLSearchParams({ user_id: userId });
+    if (options.bypassCache) params.append('bypass_cache', 'true');
+    return this.request(`/api/broker/orders?${params.toString()}`);
   }
 
   async getBrokerProfile(userId) {
@@ -187,15 +228,6 @@ class RailwayAPI {
 
   async getBrokerMargins(userId) {
     return this.request(`/broker/margins?user_id=${userId}`);
-  }
-
-  // ========================================
-  // Missing Broker Endpoints (Frontend Expected)
-  // ========================================
-
-  async getBrokerOrders(userId) {
-    // This endpoint is not yet implemented - returns not_implemented status
-    return this.request(`/api/broker/orders?user_id=${userId}`);
   }
 
   // ========================================
@@ -216,8 +248,10 @@ class RailwayAPI {
   // Portfolio Functions
   // ========================================
 
-  async getPortfolioData(userId) {
-    return this.request(`/api/portfolio/latest-simple?user_id=${userId}`);
+  async getPortfolioData(userId, options = {}) {
+    const params = new URLSearchParams({ user_id: userId });
+    if (options.bypassCache) params.append('bypass_cache', 'true');
+    return this.request(`/api/broker/portfolio?${params.toString()}`);
   }
 
   async fetchLivePortfolio(userId) {
