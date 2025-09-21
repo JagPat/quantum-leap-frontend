@@ -73,6 +73,10 @@ const handleSessionFromResponse = (payload) => {
   return null;
 };
 
+const markSessionNeedsAuth = () => {
+  brokerSessionStore.markNeedsReauth();
+};
+
 export const portfolioAPI = async (userInput, { bypassCache = false } = {}) => {
   try {
     const context = getActiveBrokerContext();
@@ -111,7 +115,7 @@ export const portfolioAPI = async (userInput, { bypassCache = false } = {}) => {
       );
 
       if (needsAuth) {
-        brokerSessionStore.markNeedsReauth();
+        markSessionNeedsAuth();
       }
 
       return {
@@ -202,13 +206,17 @@ export const fetchBrokerOrders = async ({ userInput, bypassCache = false } = {})
     );
 
     if (needsAuth) {
-      brokerSessionStore.markNeedsReauth();
+      markSessionNeedsAuth();
     }
 
     return {
       ...response,
       needsAuth
     };
+  }
+
+  if (response?.data?.session) {
+    brokerSessionStore.persist(response.data.session);
   }
 
   return {

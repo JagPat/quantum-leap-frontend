@@ -103,7 +103,7 @@ class RailwayAPI {
         if (!response.ok) {
           const payload = await response.json().catch(() => ({ detail: response.statusText }));
 
-          if (response.status === 401 || response.status === 403) {
+         if (response.status === 401 || response.status === 403) {
             const statusKey = response.status === 401 ? 'unauthorized' : 'forbidden';
             console.warn(`⚠️ [RailwayAPI] ${response.status} for ${endpoint} - broker authentication required`, payload);
             return {
@@ -113,6 +113,7 @@ class RailwayAPI {
               code: payload.code || (response.status === 401 ? 'TOKEN_EXPIRED' : 'BROKER_UNAUTHORIZED'),
               needsAuth: payload.needs_reauth ?? true,
               requiresAuth: true,
+              needs_reauth: payload.needs_reauth ?? true,
               data: payload.data || null
             };
           }

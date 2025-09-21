@@ -211,7 +211,7 @@ class BrokerAPIService {
     }
 
     // Check connection status
-    async checkConnectionStatus(configId = null, userId = null) {
+  async checkConnectionStatus(configId = null, userId = null) {
         try {
             const params = new URLSearchParams();
             const session = this.getActiveSession();
@@ -226,10 +226,15 @@ class BrokerAPIService {
             }
 
             const response = await fetch(`${this.endpoints.status}?${params}`);
-            const result = await response.json();
-            
-            if (!result.success) {
-                throw new Error(result.error || 'Status check failed');
+            const result = await response.json().catch(() => ({}));
+
+            if (!response.ok || result.success === false) {
+                if (response.status === 401 || response.status === 403 || result?.needs_reauth) {
+                    this.clearSession();
+                    brokerSessionStore.markNeedsReauth();
+                    throw new Error(result.error || 'Broker session requires reauthentication');
+                }
+                throw new Error(result.error || result.message || 'Status check failed');
             }
 
             this.persistSession(result.data);
