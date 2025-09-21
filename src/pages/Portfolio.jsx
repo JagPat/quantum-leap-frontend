@@ -394,7 +394,6 @@ export default function Portfolio() {
         );
     }
 
-    const summary = portfolioData.summary || {};
     const allPositions = getAllPositions();
     const topPerformers = getTopPerformers();
     const topLosers = getTopLosers();
