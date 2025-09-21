@@ -2,6 +2,7 @@
 // Handles all backend communication for broker authentication and operations
 
 import { config } from '../config/deployment.js';
+import { brokerSessionStore, normalizeBrokerSession } from '../api/sessionStore.js';
 
 class BrokerAPIService {
     constructor() {
@@ -20,11 +21,24 @@ class BrokerAPIService {
             health: `${this.baseURL}/api/modules/auth/broker/health`
         };
         
-        // OAuth flow management
-        this.currentOAuthFlow = null;
-        this.oauthWindow = null;
-        this.oauthCheckInterval = null;
-    }
+    // OAuth flow management
+    this.currentOAuthFlow = null;
+    this.oauthWindow = null;
+    this.oauthCheckInterval = null;
+  }
+
+  getActiveSession() {
+    return brokerSessionStore.load();
+  }
+
+  persistSession(payload) {
+    if (!payload) return null;
+    return brokerSessionStore.persist(normalizeBrokerSession(payload));
+  }
+
+  clearSession() {
+    brokerSessionStore.clear();
+  }
 
     // Setup OAuth credentials and get OAuth URL
     async setupOAuth(apiKey, apiSecret, userId) {
@@ -177,6 +191,14 @@ class BrokerAPIService {
             }
 
             const data = result.data || {};
+            this.persistSession({
+                config_id: data.config_id,
+                user_id: data.user_id,
+                broker_name: data.broker_name || 'zerodha',
+                connection_status: data.connection_status,
+                session_status: 'connected',
+                needs_reauth: false
+            });
 
             return {
                 status: 'success',
@@ -192,8 +214,16 @@ class BrokerAPIService {
     async checkConnectionStatus(configId = null, userId = null) {
         try {
             const params = new URLSearchParams();
+            const session = this.getActiveSession();
+            const effectiveConfigId = configId || session?.configId || null;
+            const effectiveUserId = userId || session?.userId || null;
+
             if (configId) params.append('config_id', configId);
             if (userId) params.append('user_id', userId);
+            if (!configId && !userId) {
+                if (effectiveConfigId) params.append('config_id', effectiveConfigId);
+                if (effectiveUserId) params.append('user_id', effectiveUserId);
+            }
 
             const response = await fetch(`${this.endpoints.status}?${params}`);
             const result = await response.json();
@@ -201,6 +231,8 @@ class BrokerAPIService {
             if (!result.success) {
                 throw new Error(result.error || 'Status check failed');
             }
+
+            this.persistSession(result.data);
 
             return result.data;
         } catch (error) {
@@ -228,6 +260,10 @@ class BrokerAPIService {
                 throw new Error(result.error || result.message || 'Token refresh failed');
             }
 
+            if (result.success && result.data) {
+                this.persistSession(result.data);
+            }
+
             return result;
         } catch (error) {
             console.error('Token refresh error:', error);
@@ -252,6 +288,10 @@ class BrokerAPIService {
             
             if (!result.success) {
                 throw new Error(result.error || result.message || 'Disconnect failed');
+            }
+
+            if (result.success) {
+                this.clearSession();
             }
 
             return result;

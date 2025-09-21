@@ -204,21 +204,42 @@ class RailwayAPI {
     return this.request('/api/broker/status');
   }
 
-  async getBrokerHoldings(userId, options = {}) {
-    const params = new URLSearchParams({ user_id: userId });
-    if (options.bypassCache) params.append('bypass_cache', 'true');
+  buildQueryParams({ userId = null, configId = null, options = {} } = {}) {
+    const params = new URLSearchParams();
+    if (userId) params.append('user_id', userId);
+    if (configId) params.append('config_id', configId);
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        params.append(key, value);
+      }
+    });
+    return params;
+  }
+
+  async getBrokerHoldings(userId, { configId = null, bypassCache = false } = {}) {
+    const params = this.buildQueryParams({
+      userId,
+      configId,
+      options: bypassCache ? { bypass_cache: 'true' } : {}
+    });
     return this.request(`/api/broker/holdings?${params.toString()}`);
   }
 
-  async getBrokerPositions(userId, options = {}) {
-    const params = new URLSearchParams({ user_id: userId });
-    if (options.bypassCache) params.append('bypass_cache', 'true');
+  async getBrokerPositions(userId, { configId = null, bypassCache = false } = {}) {
+    const params = this.buildQueryParams({
+      userId,
+      configId,
+      options: bypassCache ? { bypass_cache: 'true' } : {}
+    });
     return this.request(`/api/broker/positions?${params.toString()}`);
   }
 
-  async getBrokerOrders(userId, options = {}) {
-    const params = new URLSearchParams({ user_id: userId });
-    if (options.bypassCache) params.append('bypass_cache', 'true');
+  async getBrokerOrders(userId, { configId = null, bypassCache = false } = {}) {
+    const params = this.buildQueryParams({
+      userId,
+      configId,
+      options: bypassCache ? { bypass_cache: 'true' } : {}
+    });
     return this.request(`/api/broker/orders?${params.toString()}`);
   }
 
@@ -249,8 +270,12 @@ class RailwayAPI {
   // ========================================
 
   async getPortfolioData(userId, options = {}) {
-    const params = new URLSearchParams({ user_id: userId });
-    if (options.bypassCache) params.append('bypass_cache', 'true');
+    const { configId = null, bypassCache = false } = options;
+    const params = this.buildQueryParams({
+      userId,
+      configId,
+      options: bypassCache ? { bypass_cache: 'true' } : {}
+    });
     return this.request(`/api/broker/portfolio?${params.toString()}`);
   }
 

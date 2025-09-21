@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { fetchBrokerOrders } from "@/api/functions";
+import useBrokerSession from '@/hooks/useBrokerSession.js';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -82,6 +83,7 @@ const getStatusBadgeClass = (status) => {
 const toLower = (value) => (value || "").toString().toLowerCase();
 
 export default function TradeHistoryTable() {
+  const { session, refresh: refreshSession, needsReauth, loading: sessionLoading } = useBrokerSession();
   const [trades, setTrades] = useState([]);
   const [filteredTrades, setFilteredTrades] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -98,9 +100,27 @@ export default function TradeHistoryTable() {
   const [cacheInfo, setCacheInfo] = useState(null);
 
   useEffect(() => {
+    if (!sessionLoading) {
+      setNeedsAuth(Boolean(needsReauth));
+    }
+  }, [needsReauth, sessionLoading]);
+
+  useEffect(() => {
+    if (sessionLoading) {
+      setIsLoading(true);
+      return;
+    }
+
+    if (!session || needsReauth) {
+      setNeedsAuth(true);
+      setIsLoading(false);
+      setTrades([]);
+      return;
+    }
+
     loadTradeHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [sessionLoading, session?.configId, needsReauth]);
 
   useEffect(() => {
     filterTrades();
@@ -127,6 +147,13 @@ export default function TradeHistoryTable() {
   }, [trades]);
 
   const loadTradeHistory = async ({ bypassCache = false } = {}) => {
+    if (!session || needsReauth) {
+      setNeedsAuth(true);
+      setIsLoading(false);
+      setIsRefreshing(false);
+      return;
+    }
+
     if (bypassCache) {
       setIsRefreshing(true);
     } else {
@@ -142,6 +169,7 @@ export default function TradeHistoryTable() {
         setTrades(orders);
         setLastUpdated(result.data.lastUpdated || null);
         setCacheInfo({ cached: result.data.cached || false });
+        await refreshSession();
       } else {
         setTrades([]);
         setLastUpdated(null);
@@ -154,6 +182,9 @@ export default function TradeHistoryTable() {
               ? "Your Zerodha session appears to be inactive. Please reconnect to view order history."
               : "Unable to load order history.")
         );
+        if (shouldPromptAuth) {
+          refreshSession().catch(() => {});
+        }
       }
     } catch (err) {
       console.error("❌ [TradeHistoryTable] Failed to load orders:", err);
@@ -163,6 +194,7 @@ export default function TradeHistoryTable() {
       setError(err.message || "Failed to load order history");
       if (err.message && err.message.toLowerCase().includes("token")) {
         setNeedsAuth(true);
+        refreshSession().catch(() => {});
       }
     } finally {
       setIsLoading(false);
@@ -281,7 +313,18 @@ export default function TradeHistoryTable() {
               )}
               <div className="flex flex-wrap items-center gap-2">
                 <Button
-                  onClick={handleRefresh}
+                  onClick={async () => {
+                    if (!session) {
+                      setNeedsAuth(true);
+                      return;
+                    }
+                    try {
+                      await refreshSession({ configId: session.configId, userId: session.userId });
+                    } catch (err) {
+                      console.error('❌ [TradeHistoryTable] Failed to refresh session', err);
+                    }
+                    handleRefresh();
+                  }}
                   disabled={isRefreshing}
                   variant="outline"
                   className="border-slate-600/50 hover:bg-slate-700/50 text-slate-200"

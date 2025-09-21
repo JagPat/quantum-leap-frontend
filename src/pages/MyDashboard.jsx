@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { portfolioAPI } from '@/api/functions';
+import { portfolioAPI, brokerSession } from '@/api/functions';
+import useBrokerSession from '@/hooks/useBrokerSession.js';
 
 // Lazy load heavy widgets to dramatically improve initial dashboard performance
 const PortfolioAnalytics = React.lazy(() => import('../components/portfolio/PortfolioAnalytics'));
@@ -58,6 +59,7 @@ const CUSTOMIZABLE_WIDGET_TYPES = Object.keys(widgetMap).filter(type =>
 const MAX_CUSTOMIZABLE_WIDGETS = 8;
 
 export default function MyDashboardPage() {
+  const { session, loading: sessionLoading, needsReauth: sessionNeedsReauth } = useBrokerSession();
   const [customizableWidgets, setCustomizableWidgets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -81,38 +83,35 @@ export default function MyDashboardPage() {
     try {
       // PHASE 1: Load essential data first for immediate dashboard display
       let userIdentifier = null;
-      
-      // First priority: Check for authenticated broker user_id
-      const brokerConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-      const activeBrokerConfig = brokerConfigs.find(config => config.is_connected && config.access_token);
-      
-      if (activeBrokerConfig?.user_data?.user_id) {
-        userIdentifier = activeBrokerConfig.user_data.user_id;
-        console.log("🔍 [MyDashboard] Using authenticated broker user_id:", userIdentifier);
-        
-        // Only call portfolio API if we have a valid user
-        const portfolioResponse = await portfolioAPI(userIdentifier);
 
-        // Handle the new portfolioAPI response format
-        if (portfolioResponse.status === 'no_connection') {
-          console.warn("⚠️ [MyDashboard] No broker connection - showing empty portfolio");
+      if (session && !sessionNeedsReauth) {
+        userIdentifier = session.userId;
+        console.log('🔍 [MyDashboard] Using authenticated broker user_id:', userIdentifier);
+
+        const portfolioResponse = await portfolioAPI(userIdentifier, {
+          configId: session.configId
+        });
+
+        if (portfolioResponse.status === 'no_connection' || portfolioResponse.needsAuth) {
+          console.warn('⚠️ [MyDashboard] No broker connection - showing empty portfolio');
           setError('Connect to your broker to view portfolio data');
           setPortfolioData([]);
-          setPortfolioSummary(portfolioResponse.data.summary);
+          setPortfolioSummary(portfolioResponse.data?.summary || null);
         } else if (portfolioResponse.status === 'error') {
-          console.error("❌ [MyDashboard] Portfolio API error:", portfolioResponse.message);
+          console.error('❌ [MyDashboard] Portfolio API error:', portfolioResponse.message);
           setError(`Portfolio error: ${portfolioResponse.message}`);
           setPortfolioData([]);
-          setPortfolioSummary(portfolioResponse.data.summary);
+          setPortfolioSummary(portfolioResponse.data?.summary || null);
         } else {
-          // Successful response
           setPortfolioData(portfolioResponse?.data || []);
           setPortfolioSummary(portfolioResponse?.data?.summary || null);
-          setError(''); // Clear any previous errors
+          setError('');
+          if (portfolioResponse?.data?.session) {
+            brokerSession.persist(portfolioResponse.data.session);
+          }
         }
       } else {
-        // No authenticated user found
-        console.warn("⚠️ [MyDashboard] No authenticated user found - showing default state");
+        console.warn('⚠️ [MyDashboard] No authenticated user found - showing default state');
         setError('Please authenticate with your broker to view portfolio data');
         setPortfolioData([]);
         setPortfolioSummary({
@@ -174,8 +173,11 @@ export default function MyDashboardPage() {
   };
   
   useEffect(() => {
-    loadData();
-  }, []);
+    if (!sessionLoading) {
+      loadData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionLoading, session?.configId, sessionNeedsReauth]);
 
   const onRemoveWidget = async (widgetId) => {
     try {

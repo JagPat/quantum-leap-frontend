@@ -1,5 +1,6 @@
-import React, { useState, useEffect, Suspense } from 'react';
-import { portfolioAPI } from '@/api/functions';
+import React, { useState, useEffect, Suspense, useCallback } from 'react';
+import { portfolioAPI, brokerSession } from '@/api/functions';
+import useBrokerSession from '@/hooks/useBrokerSession.js';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,8 @@ const AICoPilotLoading = () => (
 );
 
 export default function Portfolio() {
+    const { session, refresh: refreshSession, needsReauth: sessionNeedsReauth, loading: sessionLoading } = useBrokerSession();
+    const [sessionInfo, setSessionInfo] = useState(() => brokerSession.load());
     const [portfolioData, setPortfolioData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -67,8 +70,25 @@ export default function Portfolio() {
     const [needsAuth, setNeedsAuth] = useState(false);
 
     useEffect(() => {
-        fetchPortfolioData();
-    }, []);
+        setSessionInfo(session || brokerSession.load());
+    }, [session]);
+
+    useEffect(() => {
+        if (sessionLoading) {
+            setLoading(true);
+            return;
+        }
+
+        if (!session || sessionNeedsReauth) {
+            setNeedsAuth(true);
+            setLoading(false);
+            setPortfolioData(null);
+            return;
+        }
+
+        fetchPortfolioData(session);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sessionLoading, session?.configId, sessionNeedsReauth]);
 
     // Debug effect to track portfolioData changes
     useEffect(() => {
@@ -100,7 +120,13 @@ export default function Portfolio() {
         return instrument.tradingsymbol || instrument.symbol || instrument.name || instrument.isin || '—';
     };
 
-    const fetchPortfolioData = async (showRefreshIndicator = false) => {
+    const fetchPortfolioData = useCallback(async (activeSession = session, showRefreshIndicator = false) => {
+        if (!activeSession || activeSession.needsReauth) {
+            setNeedsAuth(true);
+            setLoading(false);
+            return;
+        }
+
         if (showRefreshIndicator) setRefreshing(true);
         else setLoading(true);
         setError(null);
@@ -108,22 +134,10 @@ export default function Portfolio() {
         setCacheInfo(null);
         
         try {
-            // Get authenticated broker user_id
-            const brokerConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-            const activeBrokerConfig = brokerConfigs.find(config => config.is_connected && config.access_token);
-            
-            console.log("🔍 [Portfolio] BrokerConfigs:", brokerConfigs);
-            console.log("🔍 [Portfolio] ActiveBrokerConfig:", activeBrokerConfig);
-            
-            if (!activeBrokerConfig?.user_data?.user_id) {
-                setNeedsAuth(true);
-                throw new Error('No authenticated broker found. Please connect to your broker first.');
-            }
-
-            const userIdentifier = activeBrokerConfig.user_data.user_id;
-            console.log("🔍 [Portfolio] Fetching data for user:", userIdentifier);
-            
-            const result = await portfolioAPI(userIdentifier, { bypassCache: showRefreshIndicator });
+            const userIdentifier = activeSession.userId;
+            const result = await portfolioAPI(userIdentifier, {
+                bypassCache: showRefreshIndicator
+            });
             console.log("📊 [Portfolio] Complete API result:", result);
             
             if ((result?.status === 'success' || result?.success === true) && result?.data) {
@@ -147,6 +161,10 @@ export default function Portfolio() {
                 setCacheInfo(result.data.cache || null);
                 setNeedsAuth(result?.needsAuth || false);
                 setLastUpdated(result.data.lastUpdated || result.data.summary?.last_updated || new Date().toISOString());
+                if (result.data.session) {
+                    const updated = brokerSession.persist(result.data.session);
+                    setSessionInfo(updated);
+                }
                 console.log("✅ [Portfolio] Data loaded successfully - State should be updated");
             } else {
                 console.warn("⚠️ [Portfolio] API result not successful:", {
@@ -155,16 +173,16 @@ export default function Portfolio() {
                     message: result?.message,
                     fullResult: result
                 });
-                if (result?.data?.holdings || result?.data?.positions) {
-                    setPortfolioData(result.data);
-                } else {
-                    setPortfolioData(null);
-                }
+                setPortfolioData(result?.data && (result.data.holdings || result.data.positions) ? result.data : null);
                 setLastUpdated(null);
                 setCacheInfo(null);
                 const shouldPromptAuth = ['unauthorized', 'forbidden', 'no_connection'].includes(result?.status) || result?.needsAuth;
                 setNeedsAuth(shouldPromptAuth);
                 setError(result?.message || (shouldPromptAuth ? "Broker session expired. Please reconnect to fetch live data." : "No portfolio data available"));
+                if (shouldPromptAuth) {
+                    brokerSession.markNeedsReauth();
+                    setSessionInfo(prev => prev ? { ...prev, needsReauth: true, sessionStatus: 'needs_reauth' } : prev);
+                }
             }
         } catch (err) {
             console.error("❌ [Portfolio] Error fetching portfolio data:", err);
@@ -178,7 +196,8 @@ export default function Portfolio() {
             setLoading(false);
             setRefreshing(false);
         }
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [session]);
 
     const formatCurrency = (value) => {
         return new Intl.NumberFormat('en-IN', {
@@ -424,9 +443,25 @@ export default function Portfolio() {
                                 {cacheInfo?.ttlMs && (
                                     <span className="text-[11px] text-slate-500">Cache TTL {Math.round(cacheInfo.ttlMs / 1000)}s</span>
                                 )}
+                                {sessionInfo?.tokenStatus?.expiresAt && (
+                                    <span className="text-[11px] text-slate-500">
+                                        Token expires at {formatTimestamp(sessionInfo.tokenStatus.expiresAt)}
+                                    </span>
+                                )}
                             </div>
                             <Button
-                                onClick={() => fetchPortfolioData(true)}
+                                onClick={async () => {
+                                    if (!session) {
+                                        setNeedsAuth(true);
+                                        return;
+                                    }
+                                    try {
+                                        await refreshSession({ configId: session.configId, userId: session.userId });
+                                    } catch (err) {
+                                        console.error('❌ [Portfolio] Failed to refresh session before manual refresh', err);
+                                    }
+                                    fetchPortfolioData(session, true);
+                                }}
                                 disabled={refreshing}
                                 variant="outline"
                                 className="border-slate-600/50 hover:bg-slate-700/50 hover:border-slate-500/50 text-slate-300 font-medium shadow-sm"
@@ -448,6 +483,9 @@ export default function Portfolio() {
                                 <Badge variant="outline" className="ml-1 text-[10px] uppercase tracking-wide text-slate-300 border-slate-600/60">
                                     Cached
                                 </Badge>
+                            )}
+                            {sessionInfo?.tokenStatus?.expiresAt && (
+                                <span>(Token expires {formatTimestamp(sessionInfo.tokenStatus.expiresAt)})</span>
                             )}
                         </div>
                     )}
