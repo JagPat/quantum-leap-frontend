@@ -22,12 +22,49 @@ import {
 import BackendConnectionHelper from './BackendConnectionHelper';
 import { useToast } from "@/components/ui/use-toast";
 
-export default function PortfolioImport({ onImportComplete, fetchLivePortfolio, portfolio }) {
+const formatTimestamp = (value) => {
+  if (!value) return null;
+  try {
+    return new Intl.DateTimeFormat('en-IN', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }).format(new Date(value));
+  } catch (error) {
+    console.warn('[PortfolioImport] Failed to format timestamp', value, error);
+    return value;
+  }
+};
+
+export default function PortfolioImport({
+  onImportComplete,
+  fetchLivePortfolio,
+  portfolio,
+  brokerSession = null,
+  liveStatus = null,
+  onDisconnect = () => {},
+  onConnectAlternative = () => {}
+}) {
   const { toast } = useToast();
   const [selectedPositions, setSelectedPositions] = useState(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [isImporting, setIsImporting] = useState(false);
+
+  const brokerName = brokerSession?.brokerName || 'Zerodha';
+  const connectionState =
+    liveStatus?.connectionStatus?.state ||
+    liveStatus?.sessionStatus ||
+    brokerSession?.connectionStatus?.state ||
+    brokerSession?.sessionStatus ||
+    'Unknown';
+
+  const lastSync = formatTimestamp(
+    liveStatus?.lastSync ||
+    liveStatus?.connectionStatus?.lastChecked ||
+    brokerSession?.connectionStatus?.lastChecked ||
+    brokerSession?.updatedAt ||
+    null
+  );
 
   const portfolioData = (portfolio?.holdings || []).concat(portfolio?.positions || []);
 
@@ -80,9 +117,27 @@ export default function PortfolioImport({ onImportComplete, fetchLivePortfolio, 
 
   const totals = calculateTotals();
 
+  const handleFetchLiveData = async () => {
+    if (!fetchLivePortfolio) return;
+    setIsLoading(true);
+    try {
+      await fetchLivePortfolio();
+    } catch (error) {
+      console.error('[PortfolioImport] Live portfolio fetch failed', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <BackendConnectionHelper />
+      <BackendConnectionHelper
+        brokerName={brokerName}
+        brokerStatus={connectionState}
+        lastSync={lastSync}
+        onDisconnect={onDisconnect}
+        onConnectAlternative={onConnectAlternative}
+      />
 
       <Card className="trading-card">
         <CardHeader>
@@ -93,7 +148,7 @@ export default function PortfolioImport({ onImportComplete, fetchLivePortfolio, 
             </span>
             <Button
               variant="outline"
-              onClick={fetchLivePortfolio}
+              onClick={handleFetchLiveData}
               disabled={isLoading}
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />

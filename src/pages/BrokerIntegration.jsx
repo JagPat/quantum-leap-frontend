@@ -54,7 +54,8 @@ const BrokerIntegration = () => {
     refresh: refreshSession,
     needsReauth,
     markNeedsReauth,
-    setBrokerSession
+    setBrokerSession,
+    clearSession
   } = useBrokerSession();
   const [status, setStatus] = useState(null);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -254,6 +255,34 @@ const BrokerIntegration = () => {
     };
   }, [needsReauth, session, status]);
 
+  const handleDisconnectBroker = useCallback(async () => {
+    if (!session?.configId) {
+      markNeedsReauth();
+      clearSession();
+      setActiveTab('setup');
+      return;
+    }
+
+    try {
+      await brokerAPI.disconnectBroker(session.configId);
+      toast({
+        title: 'Broker disconnected',
+        description: 'Your Zerodha connection has been removed.'
+      });
+    } catch (error) {
+      console.error('❌ [BrokerIntegration] Disconnect failed', error);
+      toast({
+        title: 'Disconnect failed',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      markNeedsReauth();
+      clearSession();
+      setActiveTab('setup');
+    }
+  }, [session?.configId, markNeedsReauth, clearSession, toast, setActiveTab]);
+
   return (
     <div className="container mx-auto py-8 space-y-6">
       <Card className="border border-slate-700/50 bg-slate-900/50">
@@ -356,6 +385,10 @@ const BrokerIntegration = () => {
             <PortfolioImport
               portfolio={portfolioSnapshot}
               fetchLivePortfolio={handleFetchPortfolio}
+              brokerSession={session}
+              liveStatus={status}
+              onDisconnect={handleDisconnectBroker}
+              onConnectAlternative={() => setActiveTab('setup')}
               onImportComplete={() => fetchStatus()}
             />
           )}
