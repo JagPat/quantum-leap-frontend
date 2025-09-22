@@ -248,16 +248,34 @@ class BrokerAPIService {
             if (effectiveConfigId && !params.has('config_id')) params.append('config_id', effectiveConfigId);
             if (effectiveUserId && !params.has('user_id')) params.append('user_id', effectiveUserId);
 
-            const response = await fetch(`${this.endpoints.status}?${params}`);
+            const queryString = params.toString();
+            if (typeof import.meta !== 'undefined' && import.meta.env?.MODE !== 'production') {
+                console.debug('[BrokerAPI] Checking broker status', {
+                    configId: effectiveConfigId,
+                    userId: effectiveUserId,
+                    query: queryString
+                });
+            }
+
+            const response = await fetch(`${this.endpoints.status}?${queryString}`);
             const result = await response.json().catch(() => ({}));
 
             if (!response.ok || result.success === false) {
+                const message = result.error || result.message;
+                if (response.status === 400 && message && message.toLowerCase().includes('either config_id or user_id is required')) {
+                    console.warn('[BrokerAPI] Backend rejected status check due to missing identifiers', {
+                        configId: effectiveConfigId,
+                        userId: effectiveUserId,
+                        response: result
+                    });
+                    return null;
+                }
                 if (response.status === 401 || response.status === 403 || result?.needs_reauth) {
                     this.clearSession();
                     brokerSessionStore.markNeedsReauth();
                     throw new Error(result.error || 'Broker session requires reauthentication');
                 }
-                throw new Error(result.error || result.message || 'Status check failed');
+                throw new Error(message || 'Status check failed');
             }
 
             this.persistSession(result.data);
