@@ -22,6 +22,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { createPageUrl } from '@/utils';
 import { config as deploymentConfig } from '@/config/deployment.js';
 import brokerAPI from '../../services/brokerAPI.js';
+import { brokerSession } from '@/api/functions.js';
 
 export default function BrokerSetup({ 
   onConfigSaved, 
