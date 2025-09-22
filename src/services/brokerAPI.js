@@ -236,12 +236,17 @@ class BrokerAPIService {
             const effectiveConfigId = configId || session?.configId || null;
             const effectiveUserId = userId || session?.userId || null;
 
-            if (configId) params.append('config_id', configId);
-            if (userId) params.append('user_id', userId);
-            if (!configId && !userId) {
-                if (effectiveConfigId) params.append('config_id', effectiveConfigId);
-                if (effectiveUserId) params.append('user_id', effectiveUserId);
+            if (!effectiveConfigId && !effectiveUserId) {
+                console.warn('[BrokerAPI] Refusing to call status without identifiers', {
+                    requestedConfigId: configId,
+                    requestedUserId: userId,
+                    storedSession: session
+                });
+                return null;
             }
+
+            if (effectiveConfigId && !params.has('config_id')) params.append('config_id', effectiveConfigId);
+            if (effectiveUserId && !params.has('user_id')) params.append('user_id', effectiveUserId);
 
             const response = await fetch(`${this.endpoints.status}?${params}`);
             const result = await response.json().catch(() => ({}));

@@ -39,6 +39,12 @@ export const useBrokerSession = () => {
       }
 
       const status = await brokerAPI.checkConnectionStatus(effectiveConfigId, effectiveUserId);
+      if (!status) {
+        console.info('[useBrokerSession] Status refresh skipped - broker API returned no data');
+        if (!silent) setLoading(false);
+        return null;
+      }
+
       const normalized = brokerSession.persist(status);
       setSession(normalized);
       if (!silent) setLoading(false);
