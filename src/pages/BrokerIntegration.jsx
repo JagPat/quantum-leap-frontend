@@ -130,7 +130,9 @@ const BrokerIntegration = () => {
     }
 
     try {
-      const response = await railwayAPI.fetchLivePortfolio(session.userId);
+      const response = await railwayAPI.fetchLivePortfolio(session.userId, {
+        configId: session.configId
+      });
       if (response?.status === 'success' && response.snapshot) {
         setPortfolioSnapshot(response.snapshot);
         toast({

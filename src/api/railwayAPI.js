@@ -280,8 +280,27 @@ class RailwayAPI {
     return this.request(`/api/broker/portfolio?${params.toString()}`);
   }
 
-  async fetchLivePortfolio(userId) {
-    return this.request(`/api/portfolio/fetch-live-simple?user_id=${userId}`, {
+  async fetchLivePortfolio(userId, options = {}) {
+    const { configId = null } = options;
+
+    if (!userId && !configId) {
+      console.warn('[railwayAPI] Skipping live portfolio fetch - missing identifiers', {
+        userId,
+        configId
+      });
+      return {
+        success: false,
+        status: 'no_connection',
+        message: 'Missing broker identifiers',
+        needsAuth: true
+      };
+    }
+
+    const params = new URLSearchParams();
+    if (userId) params.append('user_id', userId);
+    if (configId) params.append('config_id', configId);
+
+    return this.request(`/api/portfolio/fetch-live-simple?${params.toString()}`, {
       method: 'POST',
     });
   }
