@@ -48,7 +48,14 @@ const deriveExistingConfig = (session) => {
 };
 
 const BrokerIntegration = () => {
-  const { session, loading: sessionLoading, refresh: refreshSession, needsReauth, markNeedsReauth } = useBrokerSession();
+  const {
+    session,
+    loading: sessionLoading,
+    refresh: refreshSession,
+    needsReauth,
+    markNeedsReauth,
+    setBrokerSession
+  } = useBrokerSession();
   const [status, setStatus] = useState(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [portfolioSnapshot, setPortfolioSnapshot] = useState(null);
@@ -144,9 +151,68 @@ const BrokerIntegration = () => {
     }
   };
 
-  const handleConnectionComplete = async () => {
+  const persistIdentifiers = useCallback((payload = {}) => {
+    const resolvedConfigId =
+      payload.config_id ||
+      payload.configId ||
+      payload.id ||
+      payload?.connectionStatus?.configId ||
+      payload?.connection_status?.config_id ||
+      payload?.backend_connection?.connectionStatus?.configId ||
+      payload?.backend_connection?.connectionStatus?.config_id ||
+      null;
+
+    const resolvedUserId =
+      payload.user_id ||
+      payload.userId ||
+      payload?.user_data?.user_id ||
+      payload?.user_data?.userId ||
+      payload?.resolvedUserId ||
+      payload?.backend_connection?.connectionStatus?.userId ||
+      null;
+
+    if (resolvedConfigId && resolvedUserId) {
+      setBrokerSession({
+        configId: resolvedConfigId,
+        userId: resolvedUserId,
+        brokerName: payload.broker_name || payload.brokerName || 'zerodha',
+        sessionStatus: payload.connection_status || payload.connectionStatus?.state || 'pending'
+      });
+      return { configId: resolvedConfigId, userId: resolvedUserId };
+    }
+
+    console.warn('[BrokerIntegration] Missing broker identifiers after auth flow', {
+      payload,
+      inferredConfigId: resolvedConfigId,
+      inferredUserId: resolvedUserId
+    });
+    return { configId: null, userId: null };
+  }, [setBrokerSession]);
+
+  const handleConfigSaved = useCallback(async (configPayload = {}) => {
+    const { configId, userId } = persistIdentifiers(configPayload);
+
     try {
-      await refreshSession();
+      await refreshSession({
+        configId: configId || undefined,
+        userId: userId || undefined,
+        silent: true
+      });
+    } catch (error) {
+      console.warn('[BrokerIntegration] Session refresh failed during config save', error);
+    }
+
+    await fetchStatus();
+  }, [persistIdentifiers, refreshSession, fetchStatus]);
+
+  const handleConnectionComplete = async (configPayload = {}) => {
+    const { configId, userId } = persistIdentifiers(configPayload);
+    try {
+      await refreshSession({
+        configId: configId || undefined,
+        userId: userId || undefined,
+        silent: true
+      });
       await fetchStatus();
       setActiveTab('import');
     } catch (error) {
@@ -269,7 +335,7 @@ const BrokerIntegration = () => {
         <TabsContent value="setup" className="space-y-4">
           <BrokerSetup
             existingConfig={existingConfig}
-            onConfigSaved={() => refreshSession().then(fetchStatus)}
+            onConfigSaved={handleConfigSaved}
             onConnectionComplete={handleConnectionComplete}
             isLoading={sessionLoading}
             liveStatus={status}

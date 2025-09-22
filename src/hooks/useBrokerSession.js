@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import brokerAPI from '@/services/brokerAPI.js';
 import { brokerSession } from '@/api/functions.js';
 
@@ -12,26 +12,41 @@ export const useBrokerSession = () => {
   const [session, setSession] = useState(initialSession);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const sessionRef = useRef(initialSession);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
   const refresh = useCallback(async ({ configId = null, userId = null, silent = false } = {}) => {
     try {
-      if (!silent) {
-        setLoading(true);
-      }
+      if (!silent) setLoading(true);
       setError(null);
-      const status = await brokerAPI.checkConnectionStatus(configId, userId);
+
+      const fallback = brokerSession.load();
+      const snapshot = sessionRef.current;
+      const effectiveConfigId = configId ?? snapshot?.configId ?? fallback?.configId ?? null;
+      const effectiveUserId = userId ?? snapshot?.userId ?? fallback?.userId ?? null;
+
+      if (!effectiveConfigId && !effectiveUserId) {
+        console.warn('[useBrokerSession] Skipping status refresh - no config_id or user_id available', {
+          fromArgs: { configId, userId },
+          fromSession: snapshot,
+          fromStorage: fallback
+        });
+        if (!silent) setLoading(false);
+        return null;
+      }
+
+      const status = await brokerAPI.checkConnectionStatus(effectiveConfigId, effectiveUserId);
       const normalized = brokerSession.persist(status);
       setSession(normalized);
-      if (!silent) {
-        setLoading(false);
-      }
+      if (!silent) setLoading(false);
       return normalized;
     } catch (err) {
       console.error('❌ [useBrokerSession] Failed to refresh session', err);
       setError(err);
-      if (!silent) {
-        setLoading(false);
-      }
+      if (!silent) setLoading(false);
       throw err;
     }
   }, []);
@@ -41,10 +56,27 @@ export const useBrokerSession = () => {
 
     const bootstrap = async () => {
       try {
+        const stored = brokerSession.load();
+        if (stored && active) {
+          setSession(stored);
+          sessionRef.current = stored;
+        }
+
+        const bootstrapConfigId = stored?.configId ?? initialSession?.configId ?? null;
+        const bootstrapUserId = stored?.userId ?? initialSession?.userId ?? null;
+
+        if (!bootstrapConfigId && !bootstrapUserId) {
+          console.info('[useBrokerSession] Bootstrap skipped - no broker identifiers available yet');
+          if (active) {
+            setLoading(false);
+          }
+          return;
+        }
+
         await refresh({
-          configId: initialSession?.configId || undefined,
-          userId: initialSession?.userId || undefined,
-          silent: false
+          configId: bootstrapConfigId,
+          userId: bootstrapUserId,
+          silent: true
         });
       } catch (err) {
         if (!initialSession && active) {
@@ -73,6 +105,30 @@ export const useBrokerSession = () => {
     });
   }, []);
 
+  const setBrokerSession = useCallback(({ configId, userId, brokerName = 'zerodha', sessionStatus = 'pending' } = {}) => {
+    if (!configId || !userId) {
+      console.warn('[useBrokerSession] Refusing to persist broker session without identifiers', {
+        configId,
+        userId,
+        brokerName,
+        sessionStatus
+      });
+      return null;
+    }
+
+    const persisted = brokerSession.persist({
+      config_id: configId,
+      user_id: userId,
+      broker_name: brokerName,
+      session_status: sessionStatus,
+      needs_reauth: false
+    });
+
+    setSession(persisted);
+    sessionRef.current = persisted;
+    return persisted;
+  }, []);
+
   const clearSession = useCallback(() => {
     brokerSession.clear();
     setSession(null);
@@ -85,9 +141,10 @@ export const useBrokerSession = () => {
     error,
     refresh,
     markNeedsReauth,
+    setBrokerSession,
     clearSession,
     needsReauth: isReauthRequired(session)
-  }), [session, loading, error, refresh, markNeedsReauth, clearSession]);
+  }), [session, loading, error, refresh, markNeedsReauth, setBrokerSession, clearSession]);
 
   return value;
 };

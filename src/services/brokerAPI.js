@@ -62,15 +62,33 @@ class BrokerAPIService {
                 throw new Error(result.error || result.message || 'OAuth setup failed');
             }
 
-            // Store OAuth flow data
-            this.currentOAuthFlow = {
-                configId: result.data.config_id,
-                state: result.data.state,
-                oauthUrl: result.data.oauth_url,
-                redirectUri: result.data.redirect_uri
+            const responseData = result.data || {};
+            const normalized = {
+                ...responseData,
+                config_id: responseData.config_id || result.config_id || null,
+                user_id: responseData.user_id || result.user_id || null,
+                state: responseData.state,
+                oauth_url: responseData.oauth_url,
+                redirect_uri: responseData.redirect_uri
             };
 
-            return result.data;
+            if (!normalized.config_id || !normalized.user_id) {
+                console.warn('[BrokerAPI] OAuth setup response missing identifiers', {
+                    configId: normalized.config_id,
+                    userId: normalized.user_id,
+                    raw: result
+                });
+            }
+
+            // Store OAuth flow data
+            this.currentOAuthFlow = {
+                configId: normalized.config_id,
+                state: normalized.state,
+                oauthUrl: normalized.oauth_url,
+                redirectUri: normalized.redirect_uri
+            };
+
+            return normalized;
         } catch (error) {
             console.error('OAuth setup error:', error);
             throw error;

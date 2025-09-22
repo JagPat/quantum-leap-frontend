@@ -365,6 +365,19 @@ export default function BrokerSetup({
       localStorage.removeItem('oauth_state');
       localStorage.removeItem('temp_user_id_original');
 
+      brokerSession.persist({
+        config_id: normalizedBrokerConfig.id,
+        user_id: connectedUserId,
+        broker_name: normalizedBrokerConfig.broker_name,
+        session_status: 'connected',
+        needs_reauth: false,
+        connection_status: {
+          state: 'connected',
+          message: 'Broker connected',
+          lastChecked: new Date().toISOString()
+        }
+      });
+
       setConfig(prev => ({
         ...prev,
         ...normalizedBrokerConfig,
