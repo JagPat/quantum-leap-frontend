@@ -298,9 +298,8 @@ class RailwayAPI {
     if (userId) params.append('user_id', userId);
     if (configId) params.append('config_id', configId);
 
-    return this.request(`/api/portfolio/fetch-live-simple?${params.toString()}`, {
-      method: 'POST',
-    });
+    // Prefer consolidated broker portfolio endpoint handled by auth module
+    return this.request(`/api/broker/portfolio?${params.toString()}`);
   }
 
   // Legacy method for backward compatibility
