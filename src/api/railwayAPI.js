@@ -58,13 +58,11 @@ class RailwayAPI {
     }
     
     // Define which endpoints require authentication
-    const requiresAuth = endpoint.includes('/api/portfolio/') || 
-                         endpoint.includes('/api/broker/') ||
-                         endpoint.includes('/api/trading/') ||
-                         endpoint.includes('/api/ai/') ||
-                         endpoint.includes('/broker/') ||
-                         endpoint.includes('/ai/') ||
-                         endpoint.includes('/auth/');
+    // IMPORTANT: Broker and portfolio endpoints are authenticated server-side using user_id/config_id,
+    // so the frontend MUST NOT block these calls for missing client auth headers.
+    // Keep auth requirements only for explicitly protected domains like AI/Trading if needed.
+    const requiresAuth = endpoint.includes('/api/trading/') ||
+                         endpoint.includes('/api/ai/');
     
     const authHeaders = requiresAuth ? this.getAuthHeaders() : {};
     
