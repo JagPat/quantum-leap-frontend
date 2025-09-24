@@ -530,9 +530,12 @@ export default function BrokerSetup({
       
       const apiKey = config.api_key || sessionStorage.getItem('broker_api_key');
       const apiSecret = config.api_secret || sessionStorage.getItem('broker_api_secret');
+      const finalConfigId = config.id || localStorage.getItem('oauth_config_id');
 
-      if (!apiKey || !apiSecret) {
-        throw new Error("API Key or Secret is missing. Please re-enter your credentials.");
+      // Backend now supports finalization using config_id + request_token only.
+      // If keys are missing in memory, we rely on the stored broker_config credentials.
+      if (!finalConfigId) {
+        throw new Error("Missing configuration identifier. Please restart authentication.");
       }
       
       // Clean the request token if it contains a URL
@@ -551,10 +554,15 @@ export default function BrokerSetup({
       }
       
       // Generate session via API service
-      const result = await brokerAPI.generateSession(cleanRequestToken, apiKey, apiSecret, {
-        userId: config.user_id || config.userId || localStorage.getItem('temp_user_id'),
-        configId: config.id
-      });
+      const result = await brokerAPI.generateSession(
+        cleanRequestToken,
+        apiKey || undefined,
+        apiSecret || undefined,
+        {
+          userId: config.user_id || config.userId || localStorage.getItem('temp_user_id'),
+          configId: finalConfigId
+        }
+      );
       console.log("📡 Backend response:", result);
 
       if (result.status === 'success') {
