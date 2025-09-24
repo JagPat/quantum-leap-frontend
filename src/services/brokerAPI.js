@@ -98,13 +98,55 @@ class BrokerAPIService {
             }
 
             const responseData = result.data || {};
+
+            // Normalize identifier fields since backend responses may change casing/shape
+            const normalizedConfigId = responseData.config_id
+                || responseData.configId
+                || responseData.configuration_id
+                || responseData.configurationId
+                || responseData.id
+                || result.config_id
+                || result.configId
+                || result.id
+                || null;
+
+            const normalizedUserId = responseData.user_id
+                || responseData.userId
+                || responseData.userID
+                || result.user_id
+                || result.userId
+                || result.userID
+                || null;
+
+            const normalizedState = responseData.state
+                || responseData.oauth_state
+                || result.state
+                || result.oauth_state;
+
+            const normalizedOauthUrl = responseData.oauth_url
+                || responseData.oauthUrl
+                || responseData.authorization_url
+                || result.oauth_url
+                || result.oauthUrl
+                || result.authorization_url;
+
+            const normalizedRedirectUri = responseData.redirect_uri
+                || responseData.redirectUri
+                || result.redirect_uri
+                || result.redirectUri;
+
             const normalized = {
                 ...responseData,
-                config_id: responseData.config_id || result.config_id || null,
-                user_id: responseData.user_id || result.user_id || null,
-                state: responseData.state,
-                oauth_url: responseData.oauth_url,
-                redirect_uri: responseData.redirect_uri
+                config_id: normalizedConfigId,
+                configId: normalizedConfigId,
+                user_id: normalizedUserId,
+                userId: normalizedUserId,
+                state: normalizedState,
+                oauth_state: normalizedState,
+                oauth_url: normalizedOauthUrl,
+                oauthUrl: normalizedOauthUrl,
+                redirect_uri: normalizedRedirectUri,
+                redirectUri: normalizedRedirectUri
             };
 
             if (!normalized.config_id || !normalized.user_id) {
