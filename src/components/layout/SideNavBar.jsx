@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import useBrokerSession from '@/hooks/useBrokerSession.js';
 import { Link, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import {
@@ -70,34 +71,22 @@ const NavItem = ({ href, icon: Icon, label }) => {
 };
 
 export default function SideNavBar() {
+  const { session, needsReauth } = useBrokerSession();
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [brokerName, setBrokerName] = useState('');
 
   useEffect(() => {
-    const checkConnectionStatus = () => {
-      try {
-        const brokerConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-        const activeBrokerConfig = brokerConfigs.find(config => config.is_connected && config.access_token);
-        
-        if (activeBrokerConfig) {
-          setConnectionStatus('connected');
-          setBrokerName(activeBrokerConfig.broker_name || 'Zerodha');
-        } else {
-          setConnectionStatus('disconnected');
-          setBrokerName('');
-        }
-      } catch (error) {
-        console.error('Error checking connection status:', error);
-        setConnectionStatus('error');
-        setBrokerName('');
-      }
-    };
-
-    checkConnectionStatus();
-    // Check status every 30 seconds
-    const interval = setInterval(checkConnectionStatus, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    if (session && !needsReauth) {
+      setConnectionStatus('connected');
+      setBrokerName(session.brokerName || 'Zerodha');
+    } else if (session && needsReauth) {
+      setConnectionStatus('disconnected');
+      setBrokerName(session.brokerName || 'Zerodha');
+    } else {
+      setConnectionStatus('disconnected');
+      setBrokerName('');
+    }
+  }, [session, needsReauth]);
 
   const getConnectionIcon = () => {
     switch (connectionStatus) {
