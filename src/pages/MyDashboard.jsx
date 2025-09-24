@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { portfolioAPI, brokerSession } from '@/api/functions';
+import { railwayAPI } from '@/api/railwayAPI';
 import useBrokerSession from '@/hooks/useBrokerSession.js';
 
 // Lazy load heavy widgets to dramatically improve initial dashboard performance
@@ -72,6 +73,7 @@ export default function MyDashboardPage() {
   const [positions, setPositions] = useState([]);
   const [strategies, setStrategies] = useState([]);
   const [deferredDataLoaded, setDeferredDataLoaded] = useState(false);
+  const [brokerProfile, setBrokerProfile] = useState(null);
   const [fixedWidgetsProps, setFixedWidgetsProps] = useState({
       tradingStatus: { isEngineRunning: true, activeStrategies: ['RSI Momentum', 'AI Strategy 4'], lastSignal: null, tradingMode: 'sandbox' },
       recentTrades: { trades: [] }
@@ -108,6 +110,16 @@ export default function MyDashboardPage() {
           setError('');
           if (portfolioResponse?.data?.session) {
             brokerSession.persist(portfolioResponse.data.session);
+          }
+
+          // Fetch broker profile for identity display (best-effort)
+          try {
+            const profileResp = await railwayAPI.getBrokerProfile(userIdentifier);
+            if (profileResp?.success && profileResp?.data?.profile) {
+              setBrokerProfile(profileResp.data.profile);
+            }
+          } catch {
+            // non-fatal
           }
         }
       } else {
@@ -213,6 +225,17 @@ export default function MyDashboardPage() {
               My Dashboard
             </h1>
             <p className="text-slate-400 mt-2">Essential insights above, customize below</p>
+            {session && !sessionNeedsReauth && (
+              <div className="mt-2 text-sm text-slate-400">
+                Connected to {session.brokerName || 'Zerodha'}
+                {brokerProfile?.userShortname && (
+                  <span> · {brokerProfile.userShortname}</span>
+                )}
+                {!brokerProfile?.userShortname && session?.userId && (
+                  <span> · {session.userId}</span>
+                )}
+              </div>
+            )}
             
             <div className="flex gap-3 mt-3">
               <Badge variant="outline" className="bg-slate-800/50 text-slate-300 border-slate-600">
@@ -236,13 +259,13 @@ export default function MyDashboardPage() {
           </div>
         </div>
         
-        {/* Connection Status Banner */}
-        {error && error.includes('Connect to your broker') && (
+        {/* Connection Status Banner (consistent with session state) */}
+        {(!session || sessionNeedsReauth) && (
           <div className="mb-6">
             <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-300">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="flex items-center justify-between">
-                <span>{error}</span>
+                <span>Connect to your broker to view portfolio data</span>
                 <Button 
                   size="sm" 
                   className="bg-amber-500 hover:bg-amber-600 text-slate-900 ml-4"
