@@ -56,10 +56,45 @@ class BrokerAPIService {
                 })
             });
 
-            const result = await response.json();
-            
-            if (!result.success) {
-                throw new Error(result.error || result.message || 'OAuth setup failed');
+            let result;
+            const isJson = (response.headers.get('content-type') || '').includes('application/json');
+            if (isJson) {
+                result = await response.json();
+            } else {
+                const text = await response.text();
+                const fallbackMessage = text?.trim() || response.statusText || 'Unexpected response from OAuth setup endpoint';
+                const nonJsonError = new Error(`OAuth setup failed: ${fallbackMessage}`);
+                nonJsonError.status = response.status;
+                nonJsonError.data = { raw: text };
+                throw nonJsonError;
+            }
+
+            if (!response.ok || !result?.success) {
+                const messageParts = [];
+
+                if (result?.error) {
+                    messageParts.push(result.error);
+                }
+
+                if (result?.message && !messageParts.includes(result.message)) {
+                    messageParts.push(result.message);
+                }
+
+                if (typeof result?.details === 'string' && !messageParts.includes(result.details)) {
+                    messageParts.push(result.details);
+                }
+
+                if (!messageParts.length) {
+                    messageParts.push('OAuth setup failed');
+                }
+
+                const error = new Error(messageParts.join(': '));
+                error.status = response.status;
+                if (result?.code) {
+                    error.code = result.code;
+                }
+                error.data = result;
+                throw error;
             }
 
             const responseData = result.data || {};

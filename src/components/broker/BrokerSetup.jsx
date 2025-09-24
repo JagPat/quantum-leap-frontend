@@ -500,10 +500,14 @@ export default function BrokerSetup({
       }
     } catch (e) {
       console.error("❌ [BrokerSetup] Error in handleCredentialsSubmit:", e);
-      setError(`Failed to setup OAuth: ${e.message}`);
+      const baseMessage = e?.message || 'Failed to setup OAuth';
+      const displayMessage = baseMessage.startsWith('Failed to setup OAuth')
+        ? baseMessage
+        : `Failed to setup OAuth: ${baseMessage}`;
+      setError(displayMessage);
       toast({
         title: "Setup Error",
-        description: e.message,
+        description: displayMessage,
         variant: "destructive",
       });
     } finally {
