@@ -804,18 +804,24 @@ export default function BrokerSetup({
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-1">
-                  <Label>API Key</Label>
+                  <Label htmlFor="broker_api_key">API Key</Label>
                   <Input 
+                    id="broker_api_key"
+                    name="api_key"
                     placeholder="Enter your API Key" 
+                    autoComplete="off"
                     value={config.api_key}
                     onChange={(e) => setConfig({...config, api_key: e.target.value})}
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>API Secret</Label>
+                  <Label htmlFor="broker_api_secret">API Secret</Label>
                   <Input 
+                    id="broker_api_secret"
+                    name="api_secret"
                     type="password"
                     placeholder="Enter your API Secret"
+                    autoComplete="off"
                     value={config.api_secret}
                     onChange={(e) => setConfig({...config, api_secret: e.target.value})}
                   />
