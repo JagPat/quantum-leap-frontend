@@ -544,6 +544,17 @@ export default function BrokerSetup({
         } catch {}
       }
 
+      // Final fallback: query configs endpoint and pick zerodha
+      if (!finalConfigId && effectiveUserId) {
+        try {
+          const cfgResp = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/modules/auth/broker/configs?user_id=${encodeURIComponent(effectiveUserId)}`);
+          const cfgJson = await cfgResp.json().catch(() => ({}));
+          const cfg = Array.isArray(cfgJson?.data) ? cfgJson.data.find(c => (c.brokerName||c.broker_name||'').toLowerCase()==='zerodha') : null;
+          finalConfigId = cfg?.id || finalConfigId;
+          if (finalConfigId) localStorage.setItem('oauth_config_id', finalConfigId);
+        } catch {}
+      }
+
       if (!finalConfigId) throw new Error("Missing configuration identifier. Please restart authentication.");
       
       // Clean the request token if it contains a URL
