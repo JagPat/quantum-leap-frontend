@@ -530,13 +530,21 @@ export default function BrokerSetup({
       
       const apiKey = config.api_key || sessionStorage.getItem('broker_api_key');
       const apiSecret = config.api_secret || sessionStorage.getItem('broker_api_secret');
-      const finalConfigId = config.id || localStorage.getItem('oauth_config_id');
+      let finalConfigId = config.id || localStorage.getItem('oauth_config_id');
+      const effectiveUserId = config.user_id || config.userId || localStorage.getItem('temp_user_id');
 
       // Backend now supports finalization using config_id + request_token only.
       // If keys are missing in memory, we rely on the stored broker_config credentials.
-      if (!finalConfigId) {
-        throw new Error("Missing configuration identifier. Please restart authentication.");
+      if (!finalConfigId && effectiveUserId) {
+        try {
+          const sessResp = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/modules/auth/broker/session?user_id=${encodeURIComponent(effectiveUserId)}`);
+          const sessJson = await sessResp.json().catch(() => ({}));
+          finalConfigId = sessJson?.data?.id || finalConfigId;
+          if (finalConfigId) localStorage.setItem('oauth_config_id', finalConfigId);
+        } catch {}
       }
+
+      if (!finalConfigId) throw new Error("Missing configuration identifier. Please restart authentication.");
       
       // Clean the request token if it contains a URL
       let cleanRequestToken = requestToken.trim();
@@ -559,7 +567,7 @@ export default function BrokerSetup({
         apiKey || undefined,
         apiSecret || undefined,
         {
-          userId: config.user_id || config.userId || localStorage.getItem('temp_user_id'),
+          userId: effectiveUserId,
           configId: finalConfigId
         }
       );
