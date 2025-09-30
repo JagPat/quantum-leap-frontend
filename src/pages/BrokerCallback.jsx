@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { config as deploymentConfig } from '@/config/deployment.js';
+import { brokerSessionStore } from '@/api/sessionStore.js';
 
 export default function BrokerCallback() {
     const [status, setStatus] = useState('processing');
@@ -182,17 +183,31 @@ export default function BrokerCallback() {
             console.log('✅ BrokerCallback: Backend completed token exchange successfully');
             const configIdParam = urlParams.get('config_id');
             
+            // Clean up OAuth temp storage
             localStorage.removeItem('oauth_config_id');
             localStorage.removeItem('oauth_state');
             
-            if (userId) {
+            // Persist the broker session using the proper API
+            if (configIdParam && userId) {
+                console.log('📝 BrokerCallback: Persisting broker session', { configId: configIdParam, userId });
+                brokerSessionStore.persist({
+                    config_id: configIdParam,
+                    user_id: userId,
+                    broker_name: 'zerodha',
+                    session_status: 'connected',
+                    needs_reauth: false,
+                    connection_status: {
+                        state: 'connected',
+                        message: 'Successfully authenticated',
+                        lastChecked: new Date().toISOString()
+                    }
+                });
+                
+                // Also set legacy localStorage keys for backwards compatibility
                 localStorage.setItem('broker_status', 'Connected');
                 localStorage.setItem('broker_user_id', userId);
-                localStorage.setItem('broker_access_token', 'authenticated');
-            }
-            
-            if (configIdParam) {
                 localStorage.setItem('broker_config_id', configIdParam);
+                localStorage.setItem('broker_access_token', 'authenticated');
             }
             
             // Check if this is a popup callback (has window.opener) or direct redirect
@@ -220,12 +235,12 @@ export default function BrokerCallback() {
                     setMessage('Authentication successful but failed to communicate with parent window. Please close this window.');
                 }
             } else {
-                // Direct redirect flow: navigate back to main app
+                // Direct redirect flow: navigate back to settings page
                 setStatus('success');
-                setMessage('Authentication successful! Redirecting to dashboard...');
+                setMessage('Authentication successful! Redirecting to settings...');
                 
                 setTimeout(() => {
-                    window.location.href = '/dashboard';
+                    window.location.href = '/settings';
                 }, 2000);
             }
         }
