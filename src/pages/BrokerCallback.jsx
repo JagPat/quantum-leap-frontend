@@ -180,6 +180,8 @@ export default function BrokerCallback() {
 
         function handleSuccessCallback(userId, sendToParent) {
             console.log('✅ BrokerCallback: Backend completed token exchange successfully');
+            const configIdParam = urlParams.get('config_id');
+            
             localStorage.removeItem('oauth_config_id');
             localStorage.removeItem('oauth_state');
             
@@ -189,24 +191,42 @@ export default function BrokerCallback() {
                 localStorage.setItem('broker_access_token', 'authenticated');
             }
             
-            const success = sendToParent({
-                type: 'BROKER_AUTH_SUCCESS',
-                status: 'success',
-                user_id: userId,
-                backend_exchange: true
-            });
+            if (configIdParam) {
+                localStorage.setItem('broker_config_id', configIdParam);
+            }
             
-            if (success) {
-                setStatus('success');
-                setMessage('Authentication successful! Connection established.');
-                setTimeout(() => {
-                    if (window.opener && !window.opener.closed) {
+            // Check if this is a popup callback (has window.opener) or direct redirect
+            const isPopupCallback = window.opener && !window.opener.closed;
+            
+            if (isPopupCallback) {
+                // Popup flow: send message to parent
+                const success = sendToParent({
+                    type: 'BROKER_AUTH_SUCCESS',
+                    status: 'success',
+                    user_id: userId,
+                    config_id: configIdParam,
+                    backend_exchange: true
+                });
+                
+                if (success) {
+                    setStatus('success');
+                    setMessage('Authentication successful! Connection established. This window will close automatically.');
+                    setTimeout(() => {
                         window.opener.location.reload();
-                    }
-                }, 1500);
+                        window.close();
+                    }, 2000);
+                } else {
+                    setStatus('error');
+                    setMessage('Authentication successful but failed to communicate with parent window. Please close this window.');
+                }
             } else {
-                setStatus('error');
-                setMessage('Authentication successful but failed to communicate with parent window.');
+                // Direct redirect flow: navigate back to main app
+                setStatus('success');
+                setMessage('Authentication successful! Redirecting to dashboard...');
+                
+                setTimeout(() => {
+                    window.location.href = '/dashboard';
+                }, 2000);
             }
         }
         
