@@ -1,0 +1,18 @@
+# Backend and non-frontend code
+backend-temp/
+ARCHIVE/
+node_modules/
+dist/
+build/
+
+# Test and verification scripts
+**/*.cjs
+**/*.test.js
+**/*.test.jsx
+
+# Config files
+*.config.js
+*.config.ts
+
+# Documentation
+**/*.md

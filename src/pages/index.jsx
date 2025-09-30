@@ -7,7 +7,6 @@ import ErrorBoundary from '../components/ErrorBoundary'
 
 // Lazy load all heavy components for optimal performance
 const Portfolio = React.lazy(() => import('./Portfolio'))
-const PortfolioNew = React.lazy(() => import('./PortfolioNew'))
 const AI = React.lazy(() => import('./AI'))
 const Trading = React.lazy(() => import('./Trading'))
 const TradeHistory = React.lazy(() => import('./TradeHistory'))
@@ -63,14 +62,6 @@ export default function Pages() {
         <Route path="/portfolio" element={
           <Layout>
             <LazyWrapper fallbackText="Loading Portfolio...">
-              <PortfolioNew />
-            </LazyWrapper>
-          </Layout>
-        } />
-        
-        <Route path="/portfolio-old" element={
-          <Layout>
-            <LazyWrapper fallbackText="Loading Old Portfolio...">
               <Portfolio />
             </LazyWrapper>
           </Layout>

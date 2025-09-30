@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { usePersistentAuth } from '@/hooks/usePersistentAuth';
+import { useBrokerSession } from '@/hooks/useBrokerSession';
 
 const AuthContext = createContext();
 
@@ -13,14 +13,19 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const {
-    isAuthenticated,
-    userData,
+    session,
     isLoading,
-    connectionStatus,
-    lastChecked,
-    refreshSession,
-    logout
-  } = usePersistentAuth();
+    checkConnection,
+    disconnect
+  } = useBrokerSession();
+
+  // Map useBrokerSession to legacy usePersistentAuth interface
+  const isAuthenticated = session?.session_status === 'connected';
+  const userData = session?.user_data || null;
+  const connectionStatus = session?.connection_status?.state || 'disconnected';
+  const lastChecked = session?.connection_status?.lastChecked || null;
+  const refreshSession = checkConnection;
+  const logout = disconnect;
 
   const [aiStatus, setAiStatus] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
