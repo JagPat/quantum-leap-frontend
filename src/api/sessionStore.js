@@ -96,7 +96,25 @@ export const brokerSessionStore = {
       const raw = localStorage.getItem(ACTIVE_SESSION_KEY);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      return normalizeSessionPayload(parsed);
+      const normalized = normalizeSessionPayload(parsed);
+      
+      if (!normalized) return null;
+      
+      // Transform snake_case (storage format) to camelCase (component interface)
+      // This maintains backward compatibility with components expecting camelCase
+      return {
+        configId: normalized.config_id,
+        userId: normalized.user_id,
+        brokerName: normalized.broker_name,
+        sessionStatus: normalized.session_status,
+        needsReauth: normalized.needs_reauth,
+        connectionStatus: normalized.connection_status,
+        lastTokenRefresh: normalized.last_token_refresh,
+        lastStatusCheck: normalized.last_status_check,
+        tokenStatus: normalized.token_status,
+        userData: normalized.user_data,
+        updatedAt: normalized.updated_at
+      };
     } catch (error) {
       console.error('❌ [brokerSessionStore] Failed to load active session:', error);
       return null;
