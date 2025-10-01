@@ -5,8 +5,8 @@ const LEGACY_CONFIGS_KEY = 'brokerConfigs';
 
 const extractUserId = (userInput) => {
   if (!userInput) {
-    console.warn('⚠️ [extractUserId] No user input provided');
-    return 'local@development.com';
+    console.warn('⚠️ [extractUserId] No user input provided - returning null');
+    return null;  // Return null instead of hardcoded fake email
   }
 
   if (typeof userInput === 'string') {
@@ -19,12 +19,12 @@ const extractUserId = (userInput) => {
       return userId;
     }
 
-    console.error('❌ [extractUserId] Could not extract user ID from object', userInput);
-    return 'local@development.com';
+    console.error('❌ [extractUserId] Could not extract user ID from object - returning null', userInput);
+    return null;  // Return null instead of hardcoded fake email
   }
 
-  console.error('❌ [extractUserId] Unexpected user input type:', typeof userInput, userInput);
-  return 'local@development.com';
+  console.error('❌ [extractUserId] Unexpected user input type - returning null:', typeof userInput, userInput);
+  return null;  // Return null instead of hardcoded fake email
 };
 
 const hydrateSessionFromLegacy = () => {
@@ -112,8 +112,23 @@ export const portfolioAPI = async (userInput, { bypassCache = false } = {}) => {
     }
 
     const userId = context.userId || extractUserId(userInput);
+    const configId = context.configId;
+    
+    // CRITICAL: Only pass userId if it's valid, rely on configId otherwise
+    if (!userId && !configId) {
+      console.error('❌ [getPortfolio] Missing both userId and configId');
+      return {
+        success: false,
+        status: 'error',
+        needsAuth: true,
+        message: 'Missing broker identifiers',
+        holdings: [],
+        positions: []
+      };
+    }
+    
     const response = await railwayAPI.getPortfolioData(userId, {
-      configId: context.configId,
+      configId,
       bypassCache
     });
 

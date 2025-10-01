@@ -270,11 +270,20 @@ class RailwayAPI {
 
   async getPortfolioData(userId, options = {}) {
     const { configId = null, bypassCache = false } = options;
-    const params = this.buildQueryParams({
-      userId,
-      configId,
-      options: bypassCache ? { bypass_cache: 'true' } : {}
-    });
+    
+    // Only add userId if it's valid
+    const params = new URLSearchParams();
+    if (userId && userId !== 'null' && userId !== 'undefined') {
+      params.append('user_id', userId);
+    }
+    if (configId) {
+      params.append('config_id', configId);
+    }
+    if (bypassCache) {
+      params.append('bypass_cache', 'true');
+    }
+    
+    console.log('[railwayAPI] getPortfolioData params:', params.toString());
     return this.request(`/api/broker/portfolio?${params.toString()}`);
   }
 
