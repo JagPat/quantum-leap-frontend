@@ -126,12 +126,15 @@ export default function AISettingsForm() {
     try {
       console.log('🔧 [AISettingsForm] Loading current AI settings...');
       
-      // Get stored broker config for API calls
-      const storedConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-      const activeConfig = storedConfigs.find(config => 
-        config.is_connected && 
-        config.user_data?.user_id
-      );
+      // Get active session from single source of truth
+      const { brokerSessionStore } = await import('@/api/sessionStore');
+      const activeSession = brokerSessionStore.load();
+      
+      const activeConfig = activeSession && activeSession.session_status === 'connected' ? {
+        user_data: activeSession.user_data,
+        config_id: activeSession.config_id,
+        is_connected: true
+      } : null;
 
       if (!activeConfig) {
         console.warn('🔧 [AISettingsForm] No active broker config found');
@@ -153,14 +156,14 @@ export default function AISettingsForm() {
         return;
       }
 
-      const userId = activeConfig.user_data.user_id;
+      const userId = activeConfig.user_data?.user_id || activeSession.broker_user_id;
       console.log('🔧 [AISettingsForm] Loading settings for user:', userId);
 
       const response = await railwayAPI.request('/api/ai/preferences', {
         method: 'GET',
         headers: {
           'X-User-ID': userId,
-          'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
+          'X-Config-ID': activeConfig.config_id
         }
       });
 
@@ -318,18 +321,16 @@ export default function AISettingsForm() {
     try {
       console.log('💾 [AISettingsForm] Saving AI preferences...');
       
-      // Get stored broker config for API calls
-      const storedConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-      const activeConfig = storedConfigs.find(config => 
-        config.is_connected && 
-        config.user_data?.user_id
-      );
-
-      if (!activeConfig) {
+      // Get active session from single source of truth
+      const { brokerSessionStore } = await import('@/api/sessionStore');
+      const activeSession = brokerSessionStore.load();
+      
+      if (!activeSession || activeSession.session_status !== 'connected') {
         throw new Error('No active broker connection found');
       }
 
-      const userId = activeConfig.user_data.user_id;
+      const userId = activeSession.user_data?.user_id || activeSession.broker_user_id;
+      const configId = activeSession.config_id;
 
       // Validate keys if option is enabled and there are new keys
       if (validateBeforeSaving) {
@@ -380,7 +381,7 @@ export default function AISettingsForm() {
         method: 'POST',
         headers: {
           'X-User-ID': userId,
-          'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`,
+          'X-Config-ID': configId,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestBody)

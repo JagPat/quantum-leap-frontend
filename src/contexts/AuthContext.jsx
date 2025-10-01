@@ -46,15 +46,12 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔐 [AuthContext] Loading AI status for user:', userData.user_id);
       
-      // Get stored broker config for API calls
-      const storedConfigs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-      const activeConfig = storedConfigs.find(config => 
-        config.is_connected && 
-        config.user_data?.user_id === userData.user_id
-      );
+      // Use brokerSessionStore as single source of truth
+      const { brokerSessionStore } = await import('@/api/sessionStore');
+      const activeSession = brokerSessionStore.load();
 
-      if (!activeConfig) {
-        console.warn('🔐 [AuthContext] No active broker config found for AI status');
+      if (!activeSession || activeSession.session_status !== 'connected') {
+        console.warn('🔐 [AuthContext] No active broker session found for AI status');
         setAiStatus({ status: 'unauthenticated', message: 'No broker connection' });
         return;
       }
@@ -64,13 +61,13 @@ export const AuthProvider = ({ children }) => {
         fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/status`, {
           headers: {
             'X-User-ID': userData.user_id,
-            'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
+            'X-Config-ID': activeSession.config_id
           }
         }),
         fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/health`, {
           headers: {
             'X-User-ID': userData.user_id,
-            'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
+            'X-Config-ID': activeSession.config_id
           }
         })
       ]);

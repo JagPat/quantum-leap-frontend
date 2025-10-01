@@ -55,11 +55,12 @@ export const AIStatusProvider = ({ children }) => {
 
       abortControllerRef.current = new AbortController();
 
-      const configs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-      const activeConfig = configs.find(config => config.is_connected && config.access_token);
+      // Use brokerSessionStore as single source of truth
+      const { brokerSessionStore } = await import('@/api/sessionStore');
+      const activeSession = brokerSessionStore.load();
 
-      if (!activeConfig) {
-        console.warn('🧠 [AIStatusContext] No active broker config found');
+      if (!activeSession || activeSession.session_status !== 'connected') {
+        console.warn('🧠 [AIStatusContext] No active broker session found');
         setAiStatus({ 
           status: 'unauthenticated', 
           message: 'No broker connection found',
@@ -69,7 +70,7 @@ export const AIStatusProvider = ({ children }) => {
         return;
       }
 
-      const userId = activeConfig.user_data.user_id;
+      const userId = activeSession.user_data?.user_id || activeSession.broker_user_id;
       console.log('🧠 [AIStatusContext] Loading AI data for user:', userId);
 
       // Load AI preferences first
@@ -77,7 +78,7 @@ export const AIStatusProvider = ({ children }) => {
         method: 'GET',
         headers: {
           'X-User-ID': userId,
-          'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
+          'X-Config-ID': activeSession.config_id
         },
         signal: abortControllerRef.current.signal
       });
