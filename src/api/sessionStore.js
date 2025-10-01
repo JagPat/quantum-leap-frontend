@@ -4,11 +4,18 @@ const LEGACY_CONFIGS_KEY = 'brokerConfigs';
 const normalizeSessionPayload = (payload = {}) => {
   if (!payload) return null;
 
-  const configId = payload.config_id || payload.configId || null;
-  const userId = payload.user_id || payload.userId || null;
+  const configId = payload.config_id || payload.configId || payload.id || null;
+  // Try multiple sources for userId - API might return it in user_data
+  const userId = payload.user_id || payload.userId || payload.user_data?.user_id || payload.broker_user_id || null;
 
-  if (!configId || !userId) {
+  if (!configId) {
+    console.warn('[sessionStore] Cannot normalize session - missing configId', payload);
     return null;
+  }
+  
+  // Allow missing userId for now - some API responses don't include it initially
+  if (!userId) {
+    console.warn('[sessionStore] Normalizing session without userId - this may cause issues', { configId, payload });
   }
 
   const needsReauth = Boolean(payload.needs_reauth ?? payload.needsReauth ?? false);
@@ -53,12 +60,32 @@ const persistLegacyConfigs = (session) => {
 
 export const brokerSessionStore = {
   persist(payload) {
+    console.log('🔧 [brokerSessionStore] persist() called with payload:', payload);
     const normalized = normalizeSessionPayload(payload);
+    console.log('🔧 [brokerSessionStore] normalized result:', normalized);
+    
     if (!normalized) {
+      console.error('❌ [brokerSessionStore] persist() failed - normalization returned null');
       return null;
     }
 
-    localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(normalized));
+    try {
+      const jsonString = JSON.stringify(normalized);
+      localStorage.setItem(ACTIVE_SESSION_KEY, jsonString);
+      console.log('✅ [brokerSessionStore] Successfully persisted to localStorage');
+      
+      // Verify it was saved
+      const verify = localStorage.getItem(ACTIVE_SESSION_KEY);
+      if (!verify) {
+        console.error('❌ [brokerSessionStore] CRITICAL: localStorage.setItem succeeded but getItem returns null!');
+      } else {
+        console.log('✅ [brokerSessionStore] Verified: session saved and retrievable');
+      }
+    } catch (error) {
+      console.error('❌ [brokerSessionStore] localStorage.setItem failed:', error);
+      return null;
+    }
+
     persistLegacyConfigs(normalized);
     return normalized;
   },
