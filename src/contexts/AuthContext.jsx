@@ -61,13 +61,13 @@ export const AuthProvider = ({ children }) => {
         fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/status`, {
           headers: {
             'X-User-ID': userData.user_id,
-            'X-Config-ID': activeSession.config_id
+            'X-Config-ID': activeSession.configId
           }
         }),
         fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/health`, {
           headers: {
             'X-User-ID': userData.user_id,
-            'X-Config-ID': activeSession.config_id
+            'X-Config-ID': activeSession.configId
           }
         })
       ]);
