@@ -131,7 +131,8 @@ const BrokerIntegration = () => {
     }
 
     try {
-      const response = await railwayAPI.fetchLivePortfolio(session.userId, {
+      // Use configId as primary identifier, userId as secondary
+      const response = await railwayAPI.fetchLivePortfolio(session.userId || null, {
         configId: session.configId
       });
       if (response?.status === 'success' && response.snapshot) {

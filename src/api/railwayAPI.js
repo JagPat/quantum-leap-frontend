@@ -295,8 +295,16 @@ class RailwayAPI {
     }
 
     const params = new URLSearchParams();
-    if (userId) params.append('user_id', userId);
-    if (configId) params.append('config_id', configId);
+    // CRITICAL: Only add user_id if it's a valid non-null value
+    // Backend prefers config_id anyway, so use that as primary identifier
+    if (userId && userId !== 'null' && userId !== 'undefined') {
+      params.append('user_id', userId);
+    }
+    if (configId) {
+      params.append('config_id', configId);
+    }
+
+    console.log('[railwayAPI] Fetching portfolio with params:', params.toString());
 
     // Prefer consolidated broker portfolio endpoint handled by auth module
     return this.request(`/api/broker/portfolio?${params.toString()}`);
