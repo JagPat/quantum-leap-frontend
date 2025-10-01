@@ -203,11 +203,11 @@ export default function AIPage() {
     try {
       console.log('🔍 [AIPage] Checking AI status...');
       
-      // Check if user is authenticated first
-      const configs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-      const activeConfig = configs.find(config => config.is_connected && config.access_token);
+      // Check if user is authenticated first - use new brokerSessionStore
+      const { brokerSessionStore } = await import('@/api/sessionStore');
+      const activeSession = brokerSessionStore.load();
       
-      if (!activeConfig) {
+      if (!activeSession || activeSession.session_status !== 'connected') {
         console.warn('🔍 [AIPage] No authenticated broker found for AI status check');
         setAiStatus({ 
           status: 'unauthenticated', 
@@ -220,18 +220,19 @@ export default function AIPage() {
       }
 
       setIsAuthenticated(true);
-      console.log('🔍 [AIPage] Found active config for user:', activeConfig.user_data?.user_id);
+      console.log('🔍 [AIPage] Found active session for user:', activeSession.user_data?.user_id);
       
       // Use railwayAPI for consistent authentication handling
       const { railwayAPI } = await import('@/api/railwayAPI');
       
       // Get AI status and health with proper authentication
+      const userId = activeSession.user_data?.user_id || activeSession.broker_user_id;
       const [statusResponse, healthResponse] = await Promise.all([
         railwayAPI.request('/api/ai/status', {
           method: 'GET',
           headers: {
-            'X-User-ID': activeConfig.user_data.user_id,
-            'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
+            'X-User-ID': userId,
+            'X-Config-ID': activeSession.config_id
           }
         }).catch(err => {
           console.warn('🔍 [AIPage] Status check failed:', err);
@@ -241,8 +242,8 @@ export default function AIPage() {
         railwayAPI.request('/api/ai/health', {
           method: 'GET',
           headers: {
-            'X-User-ID': activeConfig.user_data.user_id,
-            'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
+            'X-User-ID': userId,
+            'X-Config-ID': activeSession.config_id
           }
         }).catch(err => {
           console.warn('🔍 [AIPage] Health check failed:', err);
@@ -265,12 +266,12 @@ export default function AIPage() {
       
       // Check user's AI provider status for BYOAI
       try {
-        if (activeConfig?.user_data?.user_id) {
+        if (userId) {
           const userPrefs = await railwayAPI.request('/api/ai/preferences', {
             method: 'GET',
             headers: {
-              'X-User-ID': activeConfig.user_data.user_id,
-              'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
+              'X-User-ID': userId,
+              'X-Config-ID': activeSession.config_id
             }
           });
           
@@ -304,14 +305,14 @@ export default function AIPage() {
     }
   };
 
-  const loadPortfolioData = () => {
+  const loadPortfolioData = async () => {
     try {
-      // Try to get portfolio data from localStorage or context
-      const configs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-      const activeConfig = configs.find(config => config.is_connected);
+      // Try to get portfolio data from new brokerSessionStore
+      const { brokerSessionStore } = await import('@/api/sessionStore');
+      const activeSession = brokerSessionStore.load();
       
-      if (activeConfig && activeConfig.portfolio_data) {
-        setPortfolioData(activeConfig.portfolio_data);
+      if (activeSession?.portfolio_data) {
+        setPortfolioData(activeSession.portfolio_data);
       }
     } catch (err) {
       console.error('Failed to load portfolio data:', err);
