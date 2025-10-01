@@ -22,22 +22,30 @@ class RailwayAPI {
     this.pendingRequests = new Map(); // For request deduplication
   }
 
-  // Get authentication headers for Kite Connect API calls
+  // Get authentication headers - uses single source of truth (brokerSessionStore)
   getAuthHeaders() {
     try {
-      const configs = JSON.parse(localStorage.getItem('brokerConfigs') || '[]');
-      const activeConfig = configs.find(config => config.is_connected && config.access_token);
+      // Use synchronous localStorage access to avoid async issues in constructor/headers
+      const sessionData = localStorage.getItem('activeBrokerSession');
+      if (!sessionData) {
+        console.warn('⚠️ [RailwayAPI] No active broker session found');
+        return {};
+      }
+
+      const session = JSON.parse(sessionData);
       
-      if (activeConfig && activeConfig.api_key && activeConfig.access_token) {
-        const user_id = activeConfig.user_data?.user_id || activeConfig.user_id || 'unknown';
-        console.log('🔐 [RailwayAPI] Using auth headers for user:', user_id);
+      if (session && session.session_status === 'connected') {
+        const user_id = session.user_data?.user_id || session.broker_user_id || 'unknown';
+        const config_id = session.config_id;
+        
+        console.log('🔐 [RailwayAPI] Using auth headers for user:', user_id, 'config:', config_id);
         return {
-          'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`,
-          'X-User-ID': user_id
+          'X-User-ID': user_id,
+          'X-Config-ID': config_id
         };
       }
       
-      console.warn('⚠️ [RailwayAPI] No active broker configuration found for authentication');
+      console.warn('⚠️ [RailwayAPI] Session exists but not connected:', session?.session_status);
       return {};
     } catch (error) {
       console.error('❌ [RailwayAPI] Error getting auth headers:', error);
@@ -66,8 +74,8 @@ class RailwayAPI {
     
     const authHeaders = requiresAuth ? this.getAuthHeaders() : {};
     
-    if (requiresAuth && (!authHeaders.Authorization || !authHeaders['X-User-ID'])) {
-      console.warn(`⚠️ [RailwayAPI] Missing authorization for authenticated endpoint: ${endpoint}`);
+    if (requiresAuth && (!authHeaders['X-Config-ID'] || !authHeaders['X-User-ID'])) {
+      console.warn(`⚠️ [RailwayAPI] Missing authorization for authenticated endpoint: ${endpoint}`, authHeaders);
       return { 
           status: 'unauthorized', 
           message: 'Please connect to your broker to access this feature.', 
