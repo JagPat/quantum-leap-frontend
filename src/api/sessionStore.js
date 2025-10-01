@@ -22,16 +22,17 @@ const normalizeSessionPayload = (payload = {}) => {
   const sessionStatus = payload.session_status || payload.sessionStatus || (needsReauth ? 'needs_reauth' : 'connected');
 
   return {
-    configId,
-    userId,
-    brokerName: payload.broker_name || payload.brokerName || 'zerodha',
-    sessionStatus,
-    needsReauth,
-    connectionStatus: payload.connection_status || payload.connectionStatus || null,
-    lastTokenRefresh: payload.last_token_refresh || payload.lastTokenRefresh || null,
-    lastStatusCheck: payload.last_status_check || payload.lastStatusCheck || null,
-    tokenStatus: payload.token_status || payload.tokenStatus || null,
-    updatedAt: new Date().toISOString()
+    config_id: configId,
+    user_id: userId,
+    broker_name: payload.broker_name || payload.brokerName || 'zerodha',
+    session_status: sessionStatus,
+    needs_reauth: needsReauth,
+    connection_status: payload.connection_status || payload.connectionStatus || null,
+    last_token_refresh: payload.last_token_refresh || payload.lastTokenRefresh || null,
+    last_status_check: payload.last_status_check || payload.lastStatusCheck || null,
+    token_status: payload.token_status || payload.tokenStatus || null,
+    user_data: payload.user_data || null,
+    updated_at: new Date().toISOString()
   };
 };
 
@@ -42,17 +43,17 @@ const persistLegacyConfigs = (session) => {
   }
 
   const legacyConfig = {
-    config_id: session.configId,
-    broker_name: session.brokerName,
-    user_id: session.userId,
-    is_connected: !session.needsReauth,
-    connection_status: session.connectionStatus || {
-      state: session.sessionStatus,
-      lastChecked: session.updatedAt
+    config_id: session.config_id,
+    broker_name: session.broker_name,
+    user_id: session.user_id,
+    is_connected: !session.needs_reauth,
+    connection_status: session.connection_status || {
+      state: session.session_status,
+      lastChecked: session.updated_at
     },
-    needs_reauth: session.needsReauth,
-    session_status: session.sessionStatus,
-    last_token_refresh: session.lastTokenRefresh
+    needs_reauth: session.needs_reauth,
+    session_status: session.session_status,
+    last_token_refresh: session.last_token_refresh
   };
 
   localStorage.setItem(LEGACY_CONFIGS_KEY, JSON.stringify([legacyConfig]));
