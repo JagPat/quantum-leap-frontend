@@ -59,7 +59,7 @@ export const AIStatusProvider = ({ children }) => {
       const { brokerSessionStore } = await import('@/api/sessionStore');
       const activeSession = brokerSessionStore.load();
 
-      if (!activeSession || activeSession.session_status !== 'connected') {
+      if (!activeSession || activeSession.sessionStatus !== 'connected') {
         console.warn('🧠 [AIStatusContext] No active broker session found');
         setAiStatus({ 
           status: 'unauthenticated', 

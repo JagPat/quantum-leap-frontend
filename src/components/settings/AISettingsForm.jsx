@@ -130,7 +130,7 @@ export default function AISettingsForm() {
       const { brokerSessionStore } = await import('@/api/sessionStore');
       const activeSession = brokerSessionStore.load();
       
-      const activeConfig = activeSession && activeSession.session_status === 'connected' ? {
+      const activeConfig = activeSession && activeSession.sessionStatus === 'connected' ? {
         user_data: activeSession.user_data,
         config_id: activeSession.config_id,
         is_connected: true
@@ -325,12 +325,19 @@ export default function AISettingsForm() {
       const { brokerSessionStore } = await import('@/api/sessionStore');
       const activeSession = brokerSessionStore.load();
       
-      if (!activeSession || activeSession.session_status !== 'connected') {
+      // Check session using camelCase properties (load() returns camelCase interface)
+      if (!activeSession || activeSession.sessionStatus !== 'connected') {
+        console.error('[AISettingsForm] Session check failed:', {
+          hasSession: !!activeSession,
+          sessionStatus: activeSession?.sessionStatus,
+          session: activeSession
+        });
         throw new Error('No active broker connection found');
       }
 
-      const userId = activeSession.user_data?.user_id || activeSession.broker_user_id;
-      const configId = activeSession.config_id;
+      // Use camelCase properties from load() interface
+      const userId = activeSession.userId || activeSession.userData?.user_id;
+      const configId = activeSession.configId;
 
       // Validate keys if option is enabled and there are new keys
       if (validateBeforeSaving) {

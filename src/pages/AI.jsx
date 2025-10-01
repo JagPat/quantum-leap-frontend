@@ -207,7 +207,7 @@ export default function AIPage() {
       const { brokerSessionStore } = await import('@/api/sessionStore');
       const activeSession = brokerSessionStore.load();
       
-      if (!activeSession || activeSession.session_status !== 'connected') {
+      if (!activeSession || activeSession.sessionStatus !== 'connected') {
         console.warn('🔍 [AIPage] No authenticated broker found for AI status check');
         setAiStatus({ 
           status: 'unauthenticated', 

@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
   } = useBrokerSession();
 
   // Map useBrokerSession to legacy usePersistentAuth interface
-  const isAuthenticated = session?.session_status === 'connected';
+  const isAuthenticated = session?.sessionStatus === 'connected';
   const userData = session?.user_data || null;
   const connectionStatus = session?.connection_status?.state || 'disconnected';
   const lastChecked = session?.connection_status?.lastChecked || null;
@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }) => {
       const { brokerSessionStore } = await import('@/api/sessionStore');
       const activeSession = brokerSessionStore.load();
 
-      if (!activeSession || activeSession.session_status !== 'connected') {
+      if (!activeSession || activeSession.sessionStatus !== 'connected') {
         console.warn('🔐 [AuthContext] No active broker session found for AI status');
         setAiStatus({ status: 'unauthenticated', message: 'No broker connection' });
         return;
