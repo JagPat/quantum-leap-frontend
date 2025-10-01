@@ -135,15 +135,15 @@ const BrokerIntegration = () => {
       const response = await railwayAPI.fetchLivePortfolio(session.userId || null, {
         configId: session.configId
       });
-      if (response?.status === 'success' && response.snapshot) {
-        setPortfolioSnapshot(response.snapshot);
+      if (response?.success && response.data) {
+        setPortfolioSnapshot(response.data);
         toast({
           title: 'Live portfolio loaded',
           description: 'Latest holdings retrieved successfully.'
         });
-        return response.snapshot;
+        return response.data;
       }
-      throw new Error(response?.message || 'Failed to fetch live portfolio');
+      throw new Error(response?.error || response?.message || 'Failed to fetch live portfolio');
     } catch (error) {
       console.error('❌ [BrokerIntegration] Failed to fetch portfolio', error);
       toast({
