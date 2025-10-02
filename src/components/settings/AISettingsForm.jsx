@@ -130,8 +130,9 @@ export default function AISettingsForm() {
       const { brokerSessionStore } = await import('@/api/sessionStore');
       const activeSession = brokerSessionStore.load();
       
-      const activeConfig = activeSession && activeSession.sessionStatus === 'connected' ? {
-        config_id: activeSession.configId,
+      const activeConfig = activeSession && activeSession.session_status === 'connected' ? {
+        user_data: activeSession.user_data,
+        config_id: activeSession.config_id,
         is_connected: true
       } : null;
 
@@ -155,7 +156,7 @@ export default function AISettingsForm() {
         return;
       }
 
-      const userId = activeSession.userId;
+      const userId = activeConfig.user_data?.user_id || activeSession.broker_user_id;
       console.log('🔧 [AISettingsForm] Loading settings for user:', userId);
 
       const response = await railwayAPI.request('/api/ai/preferences', {
@@ -324,19 +325,12 @@ export default function AISettingsForm() {
       const { brokerSessionStore } = await import('@/api/sessionStore');
       const activeSession = brokerSessionStore.load();
       
-      // Check session using camelCase properties (load() returns camelCase interface)
-      if (!activeSession || activeSession.sessionStatus !== 'connected') {
-        console.error('[AISettingsForm] Session check failed:', {
-          hasSession: !!activeSession,
-          sessionStatus: activeSession?.sessionStatus,
-          session: activeSession
-        });
+      if (!activeSession || activeSession.session_status !== 'connected') {
         throw new Error('No active broker connection found');
       }
 
-      // Use camelCase properties from load() interface
-      const userId = activeSession.userId || activeSession.userData?.user_id;
-      const configId = activeSession.configId;
+      const userId = activeSession.user_data?.user_id || activeSession.broker_user_id;
+      const configId = activeSession.config_id;
 
       // Validate keys if option is enabled and there are new keys
       if (validateBeforeSaving) {

@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
   } = useBrokerSession();
 
   // Map useBrokerSession to legacy usePersistentAuth interface
-  const isAuthenticated = session?.sessionStatus === 'connected';
+  const isAuthenticated = session?.session_status === 'connected';
   const userData = session?.user_data || null;
   const connectionStatus = session?.connection_status?.state || 'disconnected';
   const lastChecked = session?.connection_status?.lastChecked || null;
@@ -40,32 +40,34 @@ export const AuthProvider = ({ children }) => {
   }, [isAuthenticated, userData]);
 
   const loadAIStatus = async () => {
-    // Use brokerSessionStore as single source of truth
-    const { brokerSessionStore } = await import('@/api/sessionStore');
-    const activeSession = brokerSessionStore.load();
-
-    if (!activeSession || activeSession.sessionStatus !== 'connected' || !activeSession.userId) {
-      console.warn('🔐 [AuthContext] No active broker session found for AI status');
-      setAiStatus({ status: 'unauthenticated', message: 'No broker connection' });
-      return;
-    }
+    if (!userData?.user_id) return;
 
     setAiLoading(true);
     try {
-      console.log('🔐 [AuthContext] Loading AI status for user:', activeSession.userId);
+      console.log('🔐 [AuthContext] Loading AI status for user:', userData.user_id);
+      
+      // Use brokerSessionStore as single source of truth
+      const { brokerSessionStore } = await import('@/api/sessionStore');
+      const activeSession = brokerSessionStore.load();
+
+      if (!activeSession || activeSession.session_status !== 'connected') {
+        console.warn('🔐 [AuthContext] No active broker session found for AI status');
+        setAiStatus({ status: 'unauthenticated', message: 'No broker connection' });
+        return;
+      }
 
       // Check AI status
       const [statusResponse, healthResponse] = await Promise.all([
         fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/status`, {
           headers: {
-            'X-User-ID': activeSession.userId,
-            'X-Config-ID': activeSession.configId
+            'X-User-ID': userData.user_id,
+            'X-Config-ID': activeSession.config_id
           }
         }),
         fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/health`, {
           headers: {
-            'X-User-ID': activeSession.userId,
-            'X-Config-ID': activeSession.configId
+            'X-User-ID': userData.user_id,
+            'X-Config-ID': activeSession.config_id
           }
         })
       ]);

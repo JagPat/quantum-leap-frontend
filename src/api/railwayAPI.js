@@ -34,22 +34,9 @@ class RailwayAPI {
 
       const session = JSON.parse(sessionData);
       
-      if (session && session.sessionStatus === 'connected') {
-        const user_id = session.userId;
-        const config_id = session.configId;
-        
-        if (!user_id) {
-          console.warn('⚠️ [RailwayAPI] Session connected but no userId found - this will cause auth issues');
-          console.warn('⚠️ [RailwayAPI] Session data:', session);
-          // Still return config_id for endpoints that might work without user_id
-          if (config_id) {
-            console.log('🔐 [RailwayAPI] Using config-only headers:', config_id);
-            return {
-              'X-Config-ID': config_id
-            };
-          }
-          return {};
-        }
+      if (session && session.session_status === 'connected') {
+        const user_id = session.user_data?.user_id || session.broker_user_id || 'unknown';
+        const config_id = session.config_id;
         
         console.log('🔐 [RailwayAPI] Using auth headers for user:', user_id, 'config:', config_id);
         return {
@@ -58,7 +45,7 @@ class RailwayAPI {
         };
       }
       
-        console.warn('⚠️ [RailwayAPI] Session exists but not connected:', session?.sessionStatus);
+      console.warn('⚠️ [RailwayAPI] Session exists but not connected:', session?.session_status);
       return {};
     } catch (error) {
       console.error('❌ [RailwayAPI] Error getting auth headers:', error);

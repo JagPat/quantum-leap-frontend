@@ -1,0 +1,88 @@
+name: Rock Solid Deployment Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  INTENDED_SHA: ${{ github.sha }}
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run linting
+        run: npm run lint
+      
+      - name: Check for duplicate code
+        run: |
+          npm install -g jscpd
+          jscpd --min-lines 5 --min-tokens 50 --reporters console src/
+      
+      - name: Check unused dependencies
+        run: |
+          npm install -g depcheck
+          depcheck .
+
+  build-and-test:
+    runs-on: ubuntu-latest
+    needs: code-quality
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Create build info
+        run: |
+          echo '{
+            "commitSha": "${{ github.sha }}",
+            "buildTime": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
+            "nodeVersion": "'$(node --version)'",
+            "npmVersion": "'$(npm --version)'",
+            "packageLockHash": "'$(md5sum package-lock.json | cut -d" " -f1)'",
+            "buildId": "'$(echo ${{ github.sha }} | cut -c1-8)'-'$(date +%Y%m%d%H%M%S)'"
+          }' > build-info.json
+      
+      - name: Build application
+        run: npm run build
+      
+      - name: Run tests
+        run: npm test
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy to Railway
+        run: |
+          echo "Railway auto-deploys from main branch"
+      
+      - name: Verify deployment
+        run: |
+          sleep 60
+          node scripts/verify-deployment.cjs
+        env:
+          INTENDED_SHA: ${{ github.sha }}

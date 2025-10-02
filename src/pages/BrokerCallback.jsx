@@ -190,9 +190,7 @@ export default function BrokerCallback() {
             // Persist the broker session using the proper API
             if (configIdParam && userId) {
                 console.log('📝 BrokerCallback: Persisting broker session', { configId: configIdParam, userId });
-                
-                // CRITICAL FIX: Ensure proper session structure for persistence
-                const sessionPayload = {
+                brokerSessionStore.persist({
                     config_id: configIdParam,
                     user_id: userId,
                     broker_name: 'zerodha',
@@ -203,11 +201,7 @@ export default function BrokerCallback() {
                         message: 'Successfully authenticated',
                         lastChecked: new Date().toISOString()
                     }
-                };
-                
-                console.log('🔧 BrokerCallback: Session payload to persist:', sessionPayload);
-                const persistedSession = brokerSessionStore.persist(sessionPayload);
-                console.log('✅ BrokerCallback: Session persisted successfully:', persistedSession);
+                });
                 
                 // Also set legacy localStorage keys for backwards compatibility
                 localStorage.setItem('broker_status', 'Connected');

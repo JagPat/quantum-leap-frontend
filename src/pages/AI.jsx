@@ -207,7 +207,7 @@ export default function AIPage() {
       const { brokerSessionStore } = await import('@/api/sessionStore');
       const activeSession = brokerSessionStore.load();
       
-      if (!activeSession || activeSession.sessionStatus !== 'connected') {
+      if (!activeSession || activeSession.session_status !== 'connected') {
         console.warn('🔍 [AIPage] No authenticated broker found for AI status check');
         setAiStatus({ 
           status: 'unauthenticated', 
@@ -266,12 +266,12 @@ export default function AIPage() {
       
       // Check user's AI provider status for BYOAI
       try {
-        if (activeSession.userId) {
+        if (userId) {
           const userPrefs = await railwayAPI.request('/api/ai/preferences', {
             method: 'GET',
             headers: {
-              'X-User-ID': activeSession.userId,
-              'X-Config-ID': activeSession.configId
+              'X-User-ID': userId,
+              'X-Config-ID': activeSession.config_id
             }
           });
           

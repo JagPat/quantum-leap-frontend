@@ -59,7 +59,7 @@ export const AIStatusProvider = ({ children }) => {
       const { brokerSessionStore } = await import('@/api/sessionStore');
       const activeSession = brokerSessionStore.load();
 
-      if (!activeSession || activeSession.sessionStatus !== 'connected') {
+      if (!activeSession || activeSession.session_status !== 'connected') {
         console.warn('🧠 [AIStatusContext] No active broker session found');
         setAiStatus({ 
           status: 'unauthenticated', 
@@ -70,7 +70,7 @@ export const AIStatusProvider = ({ children }) => {
         return;
       }
 
-      const userId = activeSession.userId;
+      const userId = activeSession.user_data?.user_id || activeSession.broker_user_id;
       console.log('🧠 [AIStatusContext] Loading AI data for user:', userId);
 
       // Load AI preferences first
@@ -78,7 +78,7 @@ export const AIStatusProvider = ({ children }) => {
         method: 'GET',
         headers: {
           'X-User-ID': userId,
-          'X-Config-ID': activeSession.configId
+          'X-Config-ID': activeSession.config_id
         },
         signal: abortControllerRef.current.signal
       });
