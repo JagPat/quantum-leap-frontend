@@ -39,7 +39,15 @@ class RailwayAPI {
         const config_id = session.configId;
         
         if (!user_id) {
-          console.warn('⚠️ [RailwayAPI] Session connected but no userId found');
+          console.warn('⚠️ [RailwayAPI] Session connected but no userId found - this will cause auth issues');
+          console.warn('⚠️ [RailwayAPI] Session data:', session);
+          // Still return config_id for endpoints that might work without user_id
+          if (config_id) {
+            console.log('🔐 [RailwayAPI] Using config-only headers:', config_id);
+            return {
+              'X-Config-ID': config_id
+            };
+          }
           return {};
         }
         

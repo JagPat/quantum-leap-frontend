@@ -5,17 +5,25 @@ const normalizeSessionPayload = (payload = {}) => {
   if (!payload) return null;
 
   const configId = payload.config_id || payload.configId || payload.id || null;
-  // Try multiple sources for userId - API might return it in user_data
-  const userId = payload.user_id || payload.userId || payload.user_data?.user_id || payload.broker_user_id || null;
+  // CRITICAL FIX: Properly extract userId from OAuth callback response
+  // The backend returns: { data: { user_id: "EBW183", config_id: "uuid" } }
+  // But we also need to handle direct payload: { user_id: "EBW183", config_id: "uuid" }
+  const userId = payload.user_id || 
+                 payload.userId || 
+                 payload.data?.user_id || 
+                 payload.user_data?.user_id || 
+                 payload.broker_user_id || 
+                 null;
 
   if (!configId) {
     console.warn('[sessionStore] Cannot normalize session - missing configId', payload);
     return null;
   }
   
-  // Allow missing userId for now - some API responses don't include it initially
+  // CRITICAL: userId is REQUIRED for proper authentication
   if (!userId) {
     console.warn('[sessionStore] Normalizing session without userId - this may cause issues', { configId, payload });
+    // Don't return null, but log the issue for debugging
   }
 
   const needsReauth = Boolean(payload.needs_reauth ?? payload.needsReauth ?? false);
@@ -70,6 +78,13 @@ export const brokerSessionStore = {
       return null;
     }
 
+    // CRITICAL DEBUG: Log the exact data being stored
+    console.log('💾 [brokerSessionStore] Storing to localStorage:', {
+      configId: normalized.config_id,
+      userId: normalized.user_id,
+      sessionStatus: normalized.session_status
+    });
+
     try {
       const jsonString = JSON.stringify(normalized);
       localStorage.setItem(ACTIVE_SESSION_KEY, jsonString);
@@ -81,6 +96,13 @@ export const brokerSessionStore = {
         console.error('❌ [brokerSessionStore] CRITICAL: localStorage.setItem succeeded but getItem returns null!');
       } else {
         console.log('✅ [brokerSessionStore] Verified: session saved and retrievable');
+        // Log what was actually stored
+        const storedData = JSON.parse(verify);
+        console.log('📋 [brokerSessionStore] Stored data verification:', {
+          configId: storedData.config_id,
+          userId: storedData.user_id,
+          sessionStatus: storedData.session_status
+        });
       }
     } catch (error) {
       console.error('❌ [brokerSessionStore] localStorage.setItem failed:', error);
@@ -94,15 +116,25 @@ export const brokerSessionStore = {
   load() {
     try {
       const raw = localStorage.getItem(ACTIVE_SESSION_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      const normalized = normalizeSessionPayload(parsed);
+      if (!raw) {
+        console.log('📭 [brokerSessionStore] No session found in localStorage');
+        return null;
+      }
       
-      if (!normalized) return null;
+      const parsed = JSON.parse(raw);
+      console.log('📖 [brokerSessionStore] Loaded raw session from localStorage:', parsed);
+      
+      const normalized = normalizeSessionPayload(parsed);
+      console.log('🔄 [brokerSessionStore] Normalized session:', normalized);
+      
+      if (!normalized) {
+        console.warn('⚠️ [brokerSessionStore] Normalization returned null for loaded session');
+        return null;
+      }
       
       // Transform snake_case (storage format) to camelCase (component interface)
       // This maintains backward compatibility with components expecting camelCase
-      return {
+      const transformed = {
         configId: normalized.config_id,
         userId: normalized.user_id,
         brokerName: normalized.broker_name,
@@ -115,6 +147,14 @@ export const brokerSessionStore = {
         userData: normalized.user_data,
         updatedAt: normalized.updated_at
       };
+      
+      console.log('✅ [brokerSessionStore] Transformed session for components:', {
+        configId: transformed.configId,
+        userId: transformed.userId,
+        sessionStatus: transformed.sessionStatus
+      });
+      
+      return transformed;
     } catch (error) {
       console.error('❌ [brokerSessionStore] Failed to load active session:', error);
       return null;
