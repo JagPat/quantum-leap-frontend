@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install ALL dependencies (including dev dependencies for build)
-RUN npm ci --frozen-lockfile
+# Install ALL dependencies (using npm install for Railway compatibility)
+RUN npm install
 
 # Copy source code
 COPY . .
