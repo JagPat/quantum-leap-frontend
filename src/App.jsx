@@ -19,3 +19,7 @@ function App() {
 }
 
 export default App 
+// Rock solid audit enforcement - Version panel
+import RockSolidVersionPanel from './components/RockSolidVersionPanel';
+
+// Add <RockSolidVersionPanel /> before closing </div> in the main return statement
