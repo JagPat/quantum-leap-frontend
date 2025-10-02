@@ -1,4 +1,4 @@
-# Railway-compatible Dockerfile with proper dependency handling
+# Robust Railway-compatible Dockerfile
 FROM node:18-alpine AS builder
 
 WORKDIR /app
@@ -6,14 +6,17 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install ALL dependencies (including dev dependencies for build)
-RUN npm ci --frozen-lockfile
+# Install dependencies with verbose output
+RUN npm ci --frozen-lockfile --verbose
+
+# Verify vite is installed
+RUN npm list vite || echo "vite not found"
 
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application with verbose output
+RUN npm run build --verbose
 
 # Production stage
 FROM nginx:alpine AS production
