@@ -15,17 +15,19 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build argument for commit SHA (injected by Railway or CI/CD)
+# Build arguments for commit tracking (injected by Railway or CI/CD)
 ARG COMMIT_SHA=unknown
 ARG BUILD_TIME
+ARG GITHUB_SHA
 ENV VITE_COMMIT_SHA=${COMMIT_SHA}
 ENV VITE_BUILD_TIME=${BUILD_TIME}
+ENV VITE_GITHUB_SHA=${GITHUB_SHA}
 
 # Build the application
 RUN npm run build
 
-# Create version.json with build info
-RUN echo "{\"service\":\"quantum-leap-frontend\",\"commit\":\"${COMMIT_SHA}\",\"buildTime\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"status\":\"ROCK_SOLID_CERTIFIED\"}" > dist/version.json
+# Create version.json with comprehensive build info
+RUN echo "{\"service\":\"quantum-leap-frontend\",\"commit\":\"${COMMIT_SHA}\",\"githubSha\":\"${GITHUB_SHA}\",\"buildTime\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"nodeVersion\":\"$(node --version)\",\"npmVersion\":\"$(npm --version)\",\"status\":\"ROCK_SOLID_CERTIFIED\"}" > dist/version.json
 
 # Production stage
 FROM nginx:alpine AS production

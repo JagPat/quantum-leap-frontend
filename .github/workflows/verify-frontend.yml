@@ -1,0 +1,105 @@
+name: Verify Frontend Deployment
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.js'
+      - 'tailwind.config.js'
+      - 'Dockerfile'
+      - 'nginx.conf.template'
+      - 'docker-entrypoint.sh'
+  workflow_dispatch:
+    inputs:
+      frontend_url:
+        description: 'Frontend URL to verify'
+        required: false
+        default: 'https://quantum-leap-frontend-production.up.railway.app'
+      expected_sha:
+        description: 'Expected commit SHA (leave empty to skip SHA verification)'
+        required: false
+        default: ''
+
+jobs:
+  verify-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for SHA verification
+      
+      - name: Get commit SHA
+        id: commit-sha
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "Commit SHA: $(git rev-parse HEAD)"
+          echo "Short SHA: $(git rev-parse --short HEAD)"
+      
+      - name: Wait for Railway deployment
+        run: |
+          echo "⏳ Waiting 2 minutes for Railway to detect and deploy the changes..."
+          sleep 120
+          echo "✅ Wait period completed"
+      
+      - name: Verify frontend deployment
+        env:
+          FRONTEND_URL: ${{ inputs.frontend_url || 'https://quantum-leap-frontend-production.up.railway.app' }}
+          EXPECTED_SHA: ${{ inputs.expected_sha || steps.commit-sha.outputs.sha }}
+          TIMEOUT: 30
+          MAX_RETRIES: 15
+        run: |
+          echo "🔍 Starting frontend deployment verification..."
+          echo "Frontend URL: $FRONTEND_URL"
+          echo "Expected SHA: $EXPECTED_SHA"
+          echo ""
+          
+          # Run the verification script
+          ./scripts/verify_frontend.sh
+      
+      - name: Report deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Frontend deployment verification PASSED"
+            echo "✅ Commit ${{ steps.commit-sha.outputs.short_sha }} is successfully deployed"
+          else
+            echo "❌ Frontend deployment verification FAILED"
+            echo "❌ Commit ${{ steps.commit-sha.outputs.short_sha }} deployment issues detected"
+            exit 1
+          fi
+      
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const shortSha = '${{ steps.commit-sha.outputs.short_sha }}';
+            const frontendUrl = '${{ inputs.frontend_url || 'https://quantum-leap-frontend-production.up.railway.app' }}';
+            
+            const comment = status === 'success' 
+              ? `✅ **Frontend Deployment Verified**\n\n` +
+                `- Commit: \`${shortSha}\`\n` +
+                `- Status: Successfully deployed and verified\n` +
+                `- URL: ${frontendUrl}\n` +
+                `- SHA verification: PASSED`
+              : `❌ **Frontend Deployment Verification Failed**\n\n` +
+                `- Commit: \`${shortSha}\`\n` +
+                `- Status: Deployment verification failed\n` +
+                `- URL: ${frontendUrl}\n` +
+                `- Please check Railway deployment logs`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
