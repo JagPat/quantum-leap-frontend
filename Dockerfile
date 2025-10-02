@@ -1,4 +1,4 @@
-# Railway-compatible Dockerfile for Quantum Leap Frontend
+# Rock Solid Railway-compatible Dockerfile
 FROM node:18-alpine AS builder
 
 WORKDIR /app
@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production --frozen-lockfile
+# Install ALL dependencies (including dev dependencies for build)
+RUN npm ci --frozen-lockfile
 
 # Copy source code
 COPY . .
@@ -30,6 +30,9 @@ FROM nginx:alpine AS production
 # Copy built files
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY --from=builder /app/build-info.json /usr/share/nginx/html/build-info.json
+
+# Copy nginx config
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Add version endpoint
 RUN echo '{"service":"quantum-leap-frontend","commit":"'${COMMIT_SHA:-unknown}'","buildTime":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","status":"ROCK_SOLID_CERTIFIED"}' > /usr/share/nginx/html/version.json
