@@ -12,14 +12,8 @@ RUN npm ci --frozen-lockfile
 # Copy source code
 COPY . .
 
-# Create build info
-RUN echo '{
-  "commitSha": "'${COMMIT_SHA:-unknown}'",
-  "buildTime": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
-  "nodeVersion": "'$(node --version)'",
-  "packageLockHash": "'$(md5sum package-lock.json | cut -d" " -f1)'",
-  "buildId": "'$(date +%Y%m%d%H%M%S)'"
-}' > build-info.json
+# Create build info (simplified for Railway compatibility)
+RUN echo '{"commitSha":"unknown","buildTime":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","nodeVersion":"'$(node --version)'","packageLockHash":"unknown","buildId":"'$(date +%Y%m%d%H%M%S)'"}' > build-info.json
 
 # Build the application
 RUN npm run build
@@ -34,8 +28,8 @@ COPY --from=builder /app/build-info.json /usr/share/nginx/html/build-info.json
 # Copy nginx config
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Add version endpoint
-RUN echo '{"service":"quantum-leap-frontend","commit":"'${COMMIT_SHA:-unknown}'","buildTime":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","status":"ROCK_SOLID_CERTIFIED"}' > /usr/share/nginx/html/version.json
+# Add version endpoint (simplified for Railway)
+RUN echo '{"service":"quantum-leap-frontend","commit":"unknown","buildTime":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","status":"ROCK_SOLID_CERTIFIED"}' > /usr/share/nginx/html/version.json
 
 EXPOSE 80
 
