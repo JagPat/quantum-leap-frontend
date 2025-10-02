@@ -131,7 +131,6 @@ export default function AISettingsForm() {
       const activeSession = brokerSessionStore.load();
       
       const activeConfig = activeSession && activeSession.sessionStatus === 'connected' ? {
-        user_data: activeSession.userData,
         config_id: activeSession.configId,
         is_connected: true
       } : null;
@@ -156,7 +155,7 @@ export default function AISettingsForm() {
         return;
       }
 
-      const userId = activeConfig.user_data?.user_id || activeSession.userId;
+      const userId = activeSession.userId;
       console.log('🔧 [AISettingsForm] Loading settings for user:', userId);
 
       const response = await railwayAPI.request('/api/ai/preferences', {

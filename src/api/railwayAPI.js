@@ -35,8 +35,13 @@ class RailwayAPI {
       const session = JSON.parse(sessionData);
       
       if (session && session.sessionStatus === 'connected') {
-        const user_id = session.userId || session.user_data?.user_id || 'unknown';
+        const user_id = session.userId;
         const config_id = session.configId;
+        
+        if (!user_id) {
+          console.warn('⚠️ [RailwayAPI] Session connected but no userId found');
+          return {};
+        }
         
         console.log('🔐 [RailwayAPI] Using auth headers for user:', user_id, 'config:', config_id);
         return {

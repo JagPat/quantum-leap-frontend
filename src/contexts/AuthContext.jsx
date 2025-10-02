@@ -40,33 +40,31 @@ export const AuthProvider = ({ children }) => {
   }, [isAuthenticated, userData]);
 
   const loadAIStatus = async () => {
-    if (!userData?.user_id) return;
+    // Use brokerSessionStore as single source of truth
+    const { brokerSessionStore } = await import('@/api/sessionStore');
+    const activeSession = brokerSessionStore.load();
+
+    if (!activeSession || activeSession.sessionStatus !== 'connected' || !activeSession.userId) {
+      console.warn('🔐 [AuthContext] No active broker session found for AI status');
+      setAiStatus({ status: 'unauthenticated', message: 'No broker connection' });
+      return;
+    }
 
     setAiLoading(true);
     try {
-      console.log('🔐 [AuthContext] Loading AI status for user:', userData.user_id);
-      
-      // Use brokerSessionStore as single source of truth
-      const { brokerSessionStore } = await import('@/api/sessionStore');
-      const activeSession = brokerSessionStore.load();
-
-      if (!activeSession || activeSession.sessionStatus !== 'connected') {
-        console.warn('🔐 [AuthContext] No active broker session found for AI status');
-        setAiStatus({ status: 'unauthenticated', message: 'No broker connection' });
-        return;
-      }
+      console.log('🔐 [AuthContext] Loading AI status for user:', activeSession.userId);
 
       // Check AI status
       const [statusResponse, healthResponse] = await Promise.all([
         fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/status`, {
           headers: {
-            'X-User-ID': userData.user_id,
+            'X-User-ID': activeSession.userId,
             'X-Config-ID': activeSession.configId
           }
         }),
         fetch(`${import.meta.env.VITE_BACKEND_URL || 'https://web-production-de0bc.up.railway.app'}/api/ai/health`, {
           headers: {
-            'X-User-ID': userData.user_id,
+            'X-User-ID': activeSession.userId,
             'X-Config-ID': activeSession.configId
           }
         })

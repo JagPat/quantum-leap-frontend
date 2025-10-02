@@ -266,12 +266,12 @@ export default function AIPage() {
       
       // Check user's AI provider status for BYOAI
       try {
-        if (userId) {
+        if (activeSession.userId) {
           const userPrefs = await railwayAPI.request('/api/ai/preferences', {
             method: 'GET',
             headers: {
-              'X-User-ID': userId,
-              'X-Config-ID': activeSession.config_id
+              'X-User-ID': activeSession.userId,
+              'X-Config-ID': activeSession.configId
             }
           });
           

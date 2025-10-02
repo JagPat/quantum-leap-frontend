@@ -70,7 +70,7 @@ export const AIStatusProvider = ({ children }) => {
         return;
       }
 
-      const userId = activeSession.user_data?.user_id || activeSession.broker_user_id;
+      const userId = activeSession.userId;
       console.log('🧠 [AIStatusContext] Loading AI data for user:', userId);
 
       // Load AI preferences first
