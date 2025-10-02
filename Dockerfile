@@ -1,4 +1,4 @@
-# Simple Railway-compatible Dockerfile
+# Railway-compatible Dockerfile with proper dependency handling
 FROM node:18-alpine AS builder
 
 WORKDIR /app
@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production --frozen-lockfile
+# Install ALL dependencies (including dev dependencies for build)
+RUN npm ci --frozen-lockfile
 
 # Copy source code
 COPY . .
