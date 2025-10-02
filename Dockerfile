@@ -1,4 +1,7 @@
-# Rock Solid Railway-compatible Dockerfile
+# Railway-compatible Dockerfile for Vite/React static build
+# Supports dynamic PORT binding and version tracking
+
+# Build stage
 FROM node:18-alpine AS builder
 
 WORKDIR /app
@@ -6,36 +9,46 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install ALL dependencies (using npm install for Railway compatibility)
+# Install dependencies
 RUN npm install
 
 # Copy source code
 COPY . .
 
-# Create build info (simplified for Railway compatibility)
-RUN echo '{"commitSha":"unknown","buildTime":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","nodeVersion":"'$(node --version)'","packageLockHash":"unknown","buildId":"'$(date +%Y%m%d%H%M%S)'"}' > build-info.json
+# Build argument for commit SHA (injected by Railway or CI/CD)
+ARG COMMIT_SHA=unknown
+ARG BUILD_TIME
+ENV VITE_COMMIT_SHA=${COMMIT_SHA}
+ENV VITE_BUILD_TIME=${BUILD_TIME}
 
 # Build the application
 RUN npm run build
 
+# Create version.json with build info
+RUN echo "{\"service\":\"quantum-leap-frontend\",\"commit\":\"${COMMIT_SHA}\",\"buildTime\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"status\":\"ROCK_SOLID_CERTIFIED\"}" > dist/version.json
+
 # Production stage
 FROM nginx:alpine AS production
 
+# Install gettext for envsubst
+RUN apk add --no-cache gettext
+
 # Copy built files
 COPY --from=builder /app/dist /usr/share/nginx/html
-COPY --from=builder /app/build-info.json /usr/share/nginx/html/build-info.json
 
-# Copy nginx config
-COPY nginx.conf /etc/nginx/nginx.conf
+# Copy nginx template and startup script
+COPY nginx.conf.template /etc/nginx/nginx.conf.template
+COPY docker-entrypoint.sh /docker-entrypoint.sh
 
-# Add version endpoint (simplified for Railway)
-RUN echo '{"service":"quantum-leap-frontend","commit":"unknown","buildTime":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","status":"ROCK_SOLID_CERTIFIED"}' > /usr/share/nginx/html/version.json
+# Make startup script executable
+RUN chmod +x /docker-entrypoint.sh
 
 # Create nginx log symlinks to stdout/stderr for Railway
 RUN ln -sf /dev/stdout /var/log/nginx/access.log \
     && ln -sf /dev/stderr /var/log/nginx/error.log
 
-EXPOSE 80
+# Railway will set PORT env var
+ENV PORT=80
 
-# Use exec form to ensure nginx runs as PID 1
-CMD ["nginx", "-g", "daemon off;"]
+# Use our custom entrypoint
+ENTRYPOINT ["/docker-entrypoint.sh"]
