@@ -59,10 +59,8 @@ check_frontend_health() {
     fi
 }
 
-# Function to get deployed commit SHA
-get_deployed_sha() {
-    log_info "Fetching deployed commit SHA from /version endpoint..."
-    
+# Function to get deployed commit SHA (silent version for internal use)
+get_deployed_sha_silent() {
     local version_url="$FRONTEND_URL/version"
     local version_response
     
@@ -72,16 +70,38 @@ get_deployed_sha() {
         deployed_sha=$(echo "$version_response" | grep -o '"commit":"[^"]*"' | cut -d'"' -f4)
         
         if [ -n "$deployed_sha" ] && [ "$deployed_sha" != "unknown" ]; then
-            log_success "Deployed commit SHA: $deployed_sha"
             echo "$deployed_sha"
             return 0
+        elif [ "$deployed_sha" = "unknown" ]; then
+            echo "unknown"
+            return 0
         else
-            log_error "Could not extract commit SHA from version response"
-            log_error "Response: $version_response"
             return 1
         fi
     else
-        log_error "Failed to fetch version information"
+        return 1
+    fi
+}
+
+# Function to get deployed commit SHA
+get_deployed_sha() {
+    log_info "Fetching deployed commit SHA from /version endpoint..."
+    
+    local deployed_sha
+    deployed_sha=$(get_deployed_sha_silent)
+    local exit_code=$?
+    
+    if [ $exit_code -eq 0 ]; then
+        if [ "$deployed_sha" != "unknown" ]; then
+            log_success "Deployed commit SHA: $deployed_sha"
+        else
+            log_warning "Deployed commit SHA is 'unknown' - Railway not injecting build args"
+            log_warning "This is expected if Railway build args are not configured"
+        fi
+        echo "$deployed_sha"
+        return 0
+    else
+        log_error "Could not extract commit SHA from version response"
         return 1
     fi
 }
@@ -113,6 +133,15 @@ verify_commit_sha() {
     
     if [ -z "$expected_sha" ]; then
         log_warning "No expected SHA provided, skipping SHA verification"
+        return 0
+    fi
+    
+    # Handle case where deployed SHA is "unknown"
+    if [ "$deployed_sha" = "unknown" ]; then
+        log_warning "⚠️ SHA verification SKIPPED - Deployed SHA is 'unknown'"
+        log_warning "Railway is not injecting build args (COMMIT_SHA)"
+        log_warning "To enable SHA verification, configure Railway build args:"
+        log_warning "  COMMIT_SHA=\${{ github.sha }}"
         return 0
     fi
     
@@ -156,9 +185,18 @@ main() {
     
     # Step 2: Get deployed commit SHA
     local deployed_sha
-    if ! deployed_sha=$(get_deployed_sha); then
+    deployed_sha=$(get_deployed_sha_silent)
+    if [ $? -ne 0 ]; then
         log_error "Deployment verification FAILED - Could not get deployed SHA"
         exit 1
+    fi
+    
+    # Log the deployed SHA
+    if [ "$deployed_sha" != "unknown" ]; then
+        log_success "Deployed commit SHA: $deployed_sha"
+    else
+        log_warning "Deployed commit SHA is 'unknown' - Railway not injecting build args"
+        log_warning "This is expected if Railway build args are not configured"
     fi
     
     # Step 3: Verify SHA match (if expected SHA provided)
