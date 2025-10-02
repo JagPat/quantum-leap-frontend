@@ -9,16 +9,16 @@ class BrokerAPIService {
         this.baseURL = config.urls.backend;
         this.endpoints = {
             ...config.api.auth,
-            // OAuth endpoints
-            setupOAuth: `${this.baseURL}/api/modules/auth/broker/setup-oauth`,
-            callback: `${this.baseURL}/api/modules/auth/broker/callback`,
-            generateSession: `${this.baseURL}/api/modules/auth/broker/generate-session`,
-            refreshToken: `${this.baseURL}/api/modules/auth/broker/refresh-token`,
-            disconnect: `${this.baseURL}/api/modules/auth/broker/disconnect`,
-            status: `${this.baseURL}/api/modules/auth/broker/status`,
-            configs: `${this.baseURL}/api/modules/auth/broker/configs`,
-            reconnect: `${this.baseURL}/api/modules/auth/broker/reconnect`,
-            health: `${this.baseURL}/api/modules/auth/broker/health`
+            // OAuth endpoints - Backend routes are at /api/broker/* not /api/modules/auth/broker/*
+            setupOAuth: `${this.baseURL}/api/broker/setup-oauth`,
+            callback: `${this.baseURL}/api/broker/callback`,
+            generateSession: `${this.baseURL}/api/broker/generate-session`,
+            refreshToken: `${this.baseURL}/api/broker/refresh-token`,
+            disconnect: `${this.baseURL}/api/broker/disconnect`,
+            status: `${this.baseURL}/api/broker/status`,
+            configs: `${this.baseURL}/api/broker/configs`,
+            reconnect: `${this.baseURL}/api/broker/reconnect`,
+            health: `${this.baseURL}/api/broker/health`
         };
         
     // OAuth flow management
