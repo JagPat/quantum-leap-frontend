@@ -19,7 +19,9 @@ COPY . .
 ARG COMMIT_SHA=unknown
 ARG BUILD_TIME
 ARG GITHUB_SHA
-ENV VITE_COMMIT_SHA=${COMMIT_SHA}
+ARG RAILWAY_GIT_COMMIT_SHA
+# Use Railway's built-in variable if available, otherwise fall back to build args
+ENV VITE_COMMIT_SHA=${RAILWAY_GIT_COMMIT_SHA:-${COMMIT_SHA}}
 ENV VITE_BUILD_TIME=${BUILD_TIME}
 ENV VITE_GITHUB_SHA=${GITHUB_SHA}
 
@@ -27,7 +29,9 @@ ENV VITE_GITHUB_SHA=${GITHUB_SHA}
 RUN npm run build
 
 # Create version.json with comprehensive build info
-RUN echo "{\"service\":\"quantum-leap-frontend\",\"commit\":\"${COMMIT_SHA}\",\"githubSha\":\"${GITHUB_SHA}\",\"buildTime\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"nodeVersion\":\"$(node --version)\",\"npmVersion\":\"$(npm --version)\",\"status\":\"ROCK_SOLID_CERTIFIED\"}" > dist/version.json
+# Use VITE_COMMIT_SHA which already has Railway fallback logic
+RUN FINAL_COMMIT="${VITE_COMMIT_SHA:-unknown}" && \
+    echo "{\"service\":\"quantum-leap-frontend\",\"commit\":\"${FINAL_COMMIT}\",\"githubSha\":\"${GITHUB_SHA:-}\",\"buildTime\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"nodeVersion\":\"$(node --version)\",\"npmVersion\":\"$(npm --version)\",\"status\":\"ROCK_SOLID_CERTIFIED\"}" > dist/version.json
 
 # Production stage
 FROM nginx:alpine AS production
