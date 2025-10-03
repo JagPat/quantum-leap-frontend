@@ -4,12 +4,17 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'frontend/**'
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'vite.config.js'
+      - 'Dockerfile'
+      - 'nginx.conf*'
+      - 'docker-entrypoint.sh'
       - '.github/workflows/deploy-frontend.yml'
   pull_request:
     branches: [ main ]
-    paths:
-      - 'frontend/**'
 
 concurrency:
   group: "deploy-${{ github.ref }}"
@@ -28,21 +33,17 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
-        cache-dependency-path: frontend/package.json
         
     - name: Install dependencies
-      working-directory: ./frontend
       run: npm install
       
     - name: Build frontend
-      working-directory: ./frontend
       env:
-        VITE_API_BASE_URL: https://quantumtrade-backend-production-925c.up.railway.app
+        VITE_API_BASE_URL: https://web-production-de0bc.up.railway.app
         NODE_ENV: production
       run: npm run build
       
     - name: Run tests
-      working-directory: ./frontend
       run: npm test -- --coverage --watchAll=false
       continue-on-error: true
       
@@ -56,14 +57,13 @@ jobs:
       if: github.ref == 'refs/heads/main'
       env:
         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      working-directory: ./frontend
       run: |
         export RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}"
-        railway up --service frontend
+        railway up --detach
         
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
         name: frontend-build
-        path: frontend/dist/
+        path: dist/
         retention-days: 7
