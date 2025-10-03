@@ -35,12 +35,25 @@ class RailwayAPI {
       const session = JSON.parse(sessionData);
       
       if (session && session.session_status === 'connected') {
-        const user_id = session.user_data?.user_id || session.broker_user_id || 'unknown';
+        // Extract user_id - try multiple sources
+        // Priority: direct user_id > nested user_data > broker_user_id
+        const user_id = session.user_id || 
+                        session.user_data?.user_id || 
+                        session.broker_user_id || 
+                        null;
         const config_id = session.config_id;
         
-        console.log('🔐 [RailwayAPI] Using auth headers for user:', user_id, 'config:', config_id);
+        if (!user_id) {
+          console.warn('⚠️ [RailwayAPI] Session connected but user_id is missing!', {
+            hasUserId: !!session.user_id,
+            hasUserData: !!session.user_data,
+            hasBrokerUserId: !!session.broker_user_id
+          });
+        }
+        
+        console.log('🔐 [RailwayAPI] Using auth headers for user:', user_id || 'unknown', 'config:', config_id);
         return {
-          'X-User-ID': user_id,
+          'X-User-ID': user_id || config_id,  // Fallback to config_id if user_id is missing
           'X-Config-ID': config_id
         };
       }
