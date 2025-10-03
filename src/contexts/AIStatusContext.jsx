@@ -59,7 +59,9 @@ export const AIStatusProvider = ({ children }) => {
       const { brokerSessionStore } = await import('@/api/sessionStore');
       const activeSession = brokerSessionStore.load();
 
-      if (!activeSession || activeSession.session_status !== 'connected') {
+      // ✅ Check sessionStatus (camelCase from normalized session)
+      // Don't require userId - access_token is what matters
+      if (!activeSession || activeSession.sessionStatus !== 'connected') {
         console.warn('🧠 [AIStatusContext] No active broker session found');
         setAiStatus({ 
           status: 'unauthenticated', 
@@ -70,8 +72,12 @@ export const AIStatusProvider = ({ children }) => {
         return;
       }
 
-      const userId = activeSession.user_data?.user_id || activeSession.broker_user_id;
-      console.log('🧠 [AIStatusContext] Loading AI data for user:', userId);
+      // Extract userId - may be null, that's okay
+      const userId = activeSession.userId || activeSession.user_data?.user_id || activeSession.broker_user_id || null;
+      console.log('🧠 [AIStatusContext] Loading AI data for session:', {
+        hasUserId: !!userId,
+        configId: activeSession.configId
+      });
 
       // Load AI preferences first
       const preferencesResponse = await railwayAPI.request('/api/ai/preferences', {

@@ -50,7 +50,8 @@ export const AuthProvider = ({ children }) => {
       const { brokerSessionStore } = await import('@/api/sessionStore');
       const activeSession = brokerSessionStore.load();
 
-      if (!activeSession || activeSession.session_status !== 'connected') {
+      // ✅ Check sessionStatus (camelCase from normalized session)
+      if (!activeSession || activeSession.sessionStatus !== 'connected') {
         console.warn('🔐 [AuthContext] No active broker session found for AI status');
         setAiStatus({ status: 'unauthenticated', message: 'No broker connection' });
         return;

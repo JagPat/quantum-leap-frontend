@@ -49,6 +49,7 @@ const normalizeSessionPayload = (payload = {}) => {
     last_status_check: payload.last_status_check || payload.lastStatusCheck || null,
     token_status: payload.token_status || payload.tokenStatus || null,
     user_data: payload.user_data || null,
+    access_token: payload.access_token || payload.accessToken || null,  // ✅ Preserve access_token
     updated_at: new Date().toISOString()
   };
 };
@@ -72,6 +73,7 @@ const transformToCamelCase = (session) => {
     lastTokenRefresh: session.last_token_refresh,
     lastStatusCheck: session.last_status_check,
     tokenStatus: session.token_status,
+    accessToken: session.access_token,  // ✅ Include access_token in camelCase transform
     userData: session.user_data,
     updatedAt: session.updated_at
   };

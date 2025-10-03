@@ -325,12 +325,21 @@ export default function AISettingsForm() {
       const { brokerSessionStore } = await import('@/api/sessionStore');
       const activeSession = brokerSessionStore.load();
       
-      if (!activeSession || activeSession.session_status !== 'connected') {
-        throw new Error('No active broker connection found');
+      // ✅ Only check session_status, not user_id
+      // access_token is stored and that's what matters for broker API calls
+      if (!activeSession || activeSession.sessionStatus !== 'connected') {
+        throw new Error('No active broker connection found. Please connect to Zerodha first.');
       }
 
-      const userId = activeSession.user_data?.user_id || activeSession.broker_user_id;
-      const configId = activeSession.config_id;
+      // Extract userId and configId - userId may be null, that's okay
+      const userId = activeSession.userId || activeSession.user_data?.user_id || activeSession.broker_user_id || null;
+      const configId = activeSession.configId || activeSession.config_id;
+      
+      console.log('🔍 [AISettingsForm] Session data:', {
+        hasConfigId: !!configId,
+        hasUserId: !!userId,
+        sessionStatus: activeSession.sessionStatus
+      });
 
       // Validate keys if option is enabled and there are new keys
       if (validateBeforeSaving) {
