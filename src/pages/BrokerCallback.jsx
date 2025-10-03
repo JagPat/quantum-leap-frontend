@@ -114,7 +114,7 @@ export default function BrokerCallback() {
                         console.warn('⚠️ BrokerCallback: Missing OAuth state for backend exchange. Falling back to parent handling.');
                     } else {
                         console.log('🔐 BrokerCallback: Posting token to backend:', payload);
-                        const response = await fetch(`${getBackendBaseUrl()}/api/modules/auth/broker/callback`, {
+                        const response = await fetch(`${getBackendBaseUrl()}/api/broker/callback`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
