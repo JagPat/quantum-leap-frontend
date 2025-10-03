@@ -183,16 +183,25 @@ export default function BrokerCallback() {
             console.log('✅ BrokerCallback: Backend completed token exchange successfully');
             const configIdParam = urlParams.get('config_id');
             
+            console.log('🔍 BrokerCallback: Received params:', {
+                configIdParam,
+                userId,
+                urlParamsUserId: urlParams.get('user_id')
+            });
+            
             // Clean up OAuth temp storage
             localStorage.removeItem('oauth_config_id');
             localStorage.removeItem('oauth_state');
             
             // Persist the broker session using the proper API
-            if (configIdParam && userId) {
+            if (configIdParam) {
                 console.log('📝 BrokerCallback: Persisting broker session', { configId: configIdParam, userId });
+                
+                // ALWAYS persist the session, even if user_id is missing
+                // The backend will fetch it later via /api/broker/status
                 brokerSessionStore.persist({
                     config_id: configIdParam,
-                    user_id: userId,
+                    user_id: userId || null,  // Store null if not provided
                     broker_name: 'zerodha',
                     session_status: 'connected',
                     needs_reauth: false,
@@ -205,9 +214,13 @@ export default function BrokerCallback() {
                 
                 // Also set legacy localStorage keys for backwards compatibility
                 localStorage.setItem('broker_status', 'Connected');
-                localStorage.setItem('broker_user_id', userId);
+                if (userId) {
+                    localStorage.setItem('broker_user_id', userId);
+                }
                 localStorage.setItem('broker_config_id', configIdParam);
                 localStorage.setItem('broker_access_token', 'authenticated');
+            } else {
+                console.error('❌ BrokerCallback: Missing config_id, cannot persist session');
             }
             
             // Check if this is a popup callback (has window.opener) or direct redirect
