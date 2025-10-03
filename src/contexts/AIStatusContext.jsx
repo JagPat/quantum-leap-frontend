@@ -115,8 +115,8 @@ export const AIStatusProvider = ({ children }) => {
           railwayAPI.request('/api/ai/status', {
             method: 'GET',
             headers: {
-              'X-User-ID': userId,
-              'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
+              'X-User-ID': userId || activeSession?.configId,
+              'X-Config-ID': activeSession?.configId
             },
             signal: abortControllerRef.current.signal
           }).catch(() => ({ status: 'configured', message: 'AI configured' })),
@@ -124,8 +124,8 @@ export const AIStatusProvider = ({ children }) => {
           railwayAPI.request('/api/ai/health', {
             method: 'GET',
             headers: {
-              'X-User-ID': userId,
-              'Authorization': `token ${activeConfig.api_key}:${activeConfig.access_token}`
+              'X-User-ID': userId || activeSession?.configId,
+              'X-Config-ID': activeSession?.configId
             },
             signal: abortControllerRef.current.signal
           }).catch(() => ({ 
