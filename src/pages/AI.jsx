@@ -232,19 +232,20 @@ export default function AIPage() {
       }
 
       setIsAuthenticated(true);
-      console.log('🔍 [AIPage] Found active session for user:', activeSession.user_data?.user_id);
+      console.log('🔍 [AIPage] Found active session for user:', activeSession.userId);
       
       // Use railwayAPI for consistent authentication handling
       const { railwayAPI } = await import('@/api/railwayAPI');
       
       // Get AI status and health with proper authentication
-      const userId = activeSession.user_data?.user_id || activeSession.broker_user_id;
+      // Use camelCase userId directly from activeSession
+      const userId = activeSession.userId;
       const [statusResponse, healthResponse] = await Promise.all([
         railwayAPI.request('/api/ai/status', {
           method: 'GET',
           headers: {
             'X-User-ID': userId,
-            'X-Config-ID': activeSession.config_id
+            'X-Config-ID': activeSession.configId
           }
         }).catch(err => {
           console.warn('🔍 [AIPage] Status check failed:', err);
@@ -255,7 +256,7 @@ export default function AIPage() {
           method: 'GET',
           headers: {
             'X-User-ID': userId,
-            'X-Config-ID': activeSession.config_id
+            'X-Config-ID': activeSession.configId
           }
         }).catch(err => {
           console.warn('🔍 [AIPage] Health check failed:', err);
@@ -283,7 +284,7 @@ export default function AIPage() {
             method: 'GET',
             headers: {
               'X-User-ID': userId,
-              'X-Config-ID': activeSession.config_id
+              'X-Config-ID': activeSession.configId
             }
           });
           
