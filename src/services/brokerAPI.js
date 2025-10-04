@@ -326,15 +326,21 @@ class BrokerAPIService {
             if (effectiveUserId && !params.has('user_id')) params.append('user_id', effectiveUserId);
 
             const queryString = params.toString();
-            if (typeof import.meta !== 'undefined' && import.meta.env?.MODE !== 'production') {
-                console.debug('[BrokerAPI] Checking broker status', {
-                    configId: effectiveConfigId,
-                    userId: effectiveUserId,
-                    query: queryString
-                });
-            }
+            console.log('[BrokerAPI] Checking broker status', {
+                configId: effectiveConfigId,
+                userId: effectiveUserId,
+                url: `${this.endpoints.status}?${queryString}`,
+                query: queryString
+            });
 
-            const response = await fetch(`${this.endpoints.status}?${queryString}`);
+            const response = await fetch(`${this.endpoints.status}?${queryString}`, {
+                method: 'GET',
+                credentials: 'include',
+                mode: 'cors',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
             const result = await response.json().catch(() => ({}));
 
             if (!response.ok || result.success === false) {
