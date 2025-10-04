@@ -207,8 +207,20 @@ export default function AIPage() {
       const { brokerSessionStore } = await import('@/api/sessionStore');
       const activeSession = brokerSessionStore.load();
       
-      if (!activeSession || activeSession.session_status !== 'connected') {
-        console.warn('🔍 [AIPage] No authenticated broker found for AI status check');
+      // Handle incomplete session (waiting for user_id)
+      if (activeSession?.sessionStatus === 'incomplete') {
+        console.log('🔍 [AIPage] Session incomplete, waiting for user_id...');
+        setLoading(false);
+        return;
+      }
+      
+      // Check for proper session (must have sessionStatus 'connected' and userId)
+      if (!activeSession || activeSession.sessionStatus !== 'connected' || !activeSession.userId) {
+        console.warn('🔍 [AIPage] No authenticated broker found for AI status check', {
+          hasSession: !!activeSession,
+          sessionStatus: activeSession?.sessionStatus,
+          hasUserId: !!activeSession?.userId
+        });
         setAiStatus({ 
           status: 'unauthenticated', 
           overall_status: 'offline',

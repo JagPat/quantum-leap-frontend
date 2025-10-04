@@ -138,7 +138,10 @@ export default function AISettingsForm() {
       });
       
       // Check session using camelCase properties (as returned by sessionStore.load())
-      const isConnected = activeSession && activeSession.sessionStatus === 'connected';
+      // Session must be 'connected' AND have userId to be valid
+      const isConnected = activeSession && 
+                         activeSession.sessionStatus === 'connected' && 
+                         activeSession.userId;
       
       const activeConfig = isConnected ? {
         user_data: { user_id: activeSession.userId },
@@ -147,10 +150,22 @@ export default function AISettingsForm() {
       } : null;
 
       if (!activeConfig) {
+        const isIncomplete = activeSession?.sessionStatus === 'incomplete';
+        
         console.warn('🔧 [AISettingsForm] No active broker config found', {
           hasSession: !!activeSession,
-          sessionStatus: activeSession?.sessionStatus
+          sessionStatus: activeSession?.sessionStatus,
+          hasUserId: !!activeSession?.userId,
+          isIncomplete
         });
+        
+        if (isIncomplete) {
+          // Session is loading - don't show error yet
+          console.log('🔧 [AISettingsForm] Session incomplete, waiting for user_id...');
+          setLoading(false);
+          return;
+        }
+        
         toast({
           title: "Authentication Required",
           description: "Please connect to your broker first to configure AI settings.",

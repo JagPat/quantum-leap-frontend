@@ -26,16 +26,27 @@ const normalizeSessionPayload = (payload = {}) => {
     return null;
   }
   
-  // Allow missing userId for now - some API responses don't include it initially
+  // Validate userId - session without userId should be treated as incomplete
   if (!userId) {
-    console.warn('[sessionStore] Normalizing session without userId - this may cause issues', { 
+    console.warn('[sessionStore] ⚠️ Session missing userId - marking as incomplete', { 
       configId, 
-      payload: { ...payload, access_token: payload.access_token ? '[REDACTED]' : undefined } 
+      hasPayload: !!payload,
+      payloadKeys: Object.keys(payload || {}).filter(k => k !== 'access_token')
     });
   }
 
   const needsReauth = Boolean(payload.needs_reauth ?? payload.needsReauth ?? false);
-  const sessionStatus = payload.session_status || payload.sessionStatus || (needsReauth ? 'needs_reauth' : 'connected');
+  
+  // CRITICAL FIX: Mark session as 'incomplete' if userId is missing
+  // This prevents API calls from being made before user_id is fetched from backend
+  let sessionStatus;
+  if (!userId) {
+    sessionStatus = 'incomplete';  // New status to prevent premature API calls
+  } else if (needsReauth) {
+    sessionStatus = 'needs_reauth';
+  } else {
+    sessionStatus = payload.session_status || payload.sessionStatus || 'connected';
+  }
 
   // IMPORTANT: Store in snake_case for Zerodha API compliance and backend consistency
   return {

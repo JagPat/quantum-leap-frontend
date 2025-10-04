@@ -60,9 +60,22 @@ export const AIStatusProvider = ({ children }) => {
       const activeSession = brokerSessionStore.load();
 
       // ✅ Check sessionStatus (camelCase from normalized session)
-      // Don't require userId - access_token is what matters
-      if (!activeSession || activeSession.sessionStatus !== 'connected') {
-        console.warn('🧠 [AIStatusContext] No active broker session found');
+      // Session must be 'connected' AND have userId to proceed
+      if (!activeSession || activeSession.sessionStatus === 'incomplete') {
+        console.log('🧠 [AIStatusContext] Session incomplete, waiting for user_id...', {
+          hasSession: !!activeSession,
+          sessionStatus: activeSession?.sessionStatus,
+          hasUserId: !!activeSession?.userId
+        });
+        // Don't set error state - just wait for session to complete
+        return;
+      }
+      
+      if (activeSession.sessionStatus !== 'connected' || !activeSession.userId) {
+        console.warn('🧠 [AIStatusContext] No active broker session found', {
+          sessionStatus: activeSession?.sessionStatus,
+          hasUserId: !!activeSession?.userId
+        });
         setAiStatus({ 
           status: 'unauthenticated', 
           message: 'No broker connection found',
