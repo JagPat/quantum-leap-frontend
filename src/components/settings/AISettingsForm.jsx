@@ -130,14 +130,27 @@ export default function AISettingsForm() {
       const { brokerSessionStore } = await import('@/api/sessionStore');
       const activeSession = brokerSessionStore.load();
       
-      const activeConfig = activeSession && activeSession.session_status === 'connected' ? {
-        user_data: activeSession.user_data,
-        config_id: activeSession.config_id,
+      console.log('🔧 [AISettingsForm] Active session:', {
+        exists: !!activeSession,
+        sessionStatus: activeSession?.sessionStatus,
+        configId: activeSession?.configId,
+        userId: activeSession?.userId
+      });
+      
+      // Check session using camelCase properties (as returned by sessionStore.load())
+      const isConnected = activeSession && activeSession.sessionStatus === 'connected';
+      
+      const activeConfig = isConnected ? {
+        user_data: { user_id: activeSession.userId },
+        config_id: activeSession.configId,
         is_connected: true
       } : null;
 
       if (!activeConfig) {
-        console.warn('🔧 [AISettingsForm] No active broker config found');
+        console.warn('🔧 [AISettingsForm] No active broker config found', {
+          hasSession: !!activeSession,
+          sessionStatus: activeSession?.sessionStatus
+        });
         toast({
           title: "Authentication Required",
           description: "Please connect to your broker first to configure AI settings.",
@@ -156,7 +169,7 @@ export default function AISettingsForm() {
         return;
       }
 
-      const userId = activeConfig.user_data?.user_id || activeSession.broker_user_id;
+      const userId = activeSession.userId;
       console.log('🔧 [AISettingsForm] Loading settings for user:', userId);
 
       const response = await railwayAPI.request('/api/ai/preferences', {
