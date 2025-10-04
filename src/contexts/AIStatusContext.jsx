@@ -97,7 +97,7 @@ export const AIStatusProvider = ({ children }) => {
         method: 'GET',
         headers: {
           'X-User-ID': userId,
-          'X-Config-ID': activeSession.config_id
+          'X-Config-ID': activeSession.configId
         },
         signal: abortControllerRef.current.signal
       });

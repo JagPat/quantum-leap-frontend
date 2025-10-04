@@ -144,9 +144,9 @@ export default function AISettingsForm() {
                          activeSession.userId;
       
       const activeConfig = isConnected ? {
-        user_data: { user_id: activeSession.userId },
-        config_id: activeSession.configId,
-        is_connected: true
+        userId: activeSession.userId,
+        configId: activeSession.configId,
+        isConnected: true
       } : null;
 
       if (!activeConfig) {
@@ -191,7 +191,7 @@ export default function AISettingsForm() {
         method: 'GET',
         headers: {
           'X-User-ID': userId,
-          'X-Config-ID': activeConfig.config_id
+          'X-Config-ID': activeConfig.configId
         }
       });
 
@@ -359,9 +359,9 @@ export default function AISettingsForm() {
         throw new Error('No active broker connection found. Please connect to Zerodha first.');
       }
 
-      // Extract userId and configId - userId may be null, that's okay
-      const userId = activeSession.userId || activeSession.user_data?.user_id || activeSession.broker_user_id || null;
-      const configId = activeSession.configId || activeSession.config_id;
+      // Extract userId and configId - use camelCase directly from normalized session
+      const userId = activeSession.userId;
+      const configId = activeSession.configId;
       
       console.log('🔍 [AISettingsForm] Session data:', {
         hasConfigId: !!configId,
